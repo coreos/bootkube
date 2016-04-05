@@ -1,0 +1,42 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: kube-controllermanager
+  namespace: kube-system
+  labels:
+    k8s-app: kube-controllermanager
+    version: 1.2.0_coreos.1
+spec:
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-controllermanager
+        version: 1.2.0_coreos.1
+    spec:
+      nodeSelector:
+        master: "true"
+      hostNetwork: true
+      containers:
+      - name: controllermanager
+        image: quay.io/coreos/hyperkube:v1.2.0_coreos.1
+        command:
+        - ./hyperkube
+        - controller-manager
+        - --master=127.0.0.1:8080
+        - --root-ca-file=/etc/kubernetes/secrets/ca.crt
+        - --service-account-private-key-file=/etc/kubernetes/secrets/service-account.key
+        - --leader-elect=true
+        volumeMounts:
+        - name: secrets
+          mountPath: /etc/kubernetes/secrets
+          readOnly: true
+        - name: ssl-host
+          mountPath: /etc/ssl/certs
+          readOnly: true
+      volumes:
+      - name: secrets
+        secret:
+          secretName: kube-controllermanager
+      - name: ssl-host
+        hostPath:
+          path: /usr/share/ca-certificates

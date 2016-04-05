@@ -4,21 +4,21 @@ metadata:
   name: kube-apiserver
   namespace: kube-system
   labels:
-    component: kube-apiserver
-    version: v1.2.0_coreos.0
+    k8s-app: kube-apiserver
+    version: v1.2.0_coreos.1
 spec:
   template:
     metadata:
       labels:
-        component: kube-apiserver
-        version: v1.2.0_coreos.0
+        k8s-app: kube-apiserver
+        version: v1.2.0_coreos.1
     spec:
       nodeSelector:
         master: "true"
       hostNetwork: true
       containers:
       - name: kube-apiserver
-        image: quay.io/peanutbutter/hyperkube:v1.2.0_coreos.0
+        image: quay.io/coreos/hyperkube:v1.2.0_coreos.1
         command:
         - /hyperkube
         - apiserver

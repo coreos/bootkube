@@ -12,10 +12,9 @@ import (
 )
 
 var (
-	secretNamespace            = "kube-system"
-	secretAPIServerName        = "kube-apiserver"
-	secretServiceAccountPubKey = "service-account.pub"
-	secretTokenFile            = "token-auth.csv"
+	secretNamespace     = "kube-system"
+	secretAPIServerName = "kube-apiserver"
+	secretCMName        = "kube-controllermanager"
 )
 
 func NewKubeConfig(assets Assets) (Asset, error) {
@@ -37,7 +36,7 @@ func NewKubeConfig(assets Assets) (Asset, error) {
 		CACert string
 	}{
 		//TODO(aaron): temporary hack. Get token info from generated asset & server from cli opt
-		"https://172.17.4.100",
+		"https://172.17.4.100:6443",
 		"token",
 		base64.StdEncoding.EncodeToString(caCert.Data),
 	}
@@ -54,46 +53,33 @@ func NewKubeConfig(assets Assets) (Asset, error) {
 }
 
 func NewAPIServerSecret(assets Assets) (Asset, error) {
-	var secret Asset
-	data := make(map[string][]byte)
-
-	// API Private Key
-	apiKey, err := assets.Get(AssetPathAPIServerKey)
-	if err != nil {
-		return secret, err
-	}
-	data[filepath.Base(apiKey.Name)] = apiKey.Data
-
-	// API Cert
-	apiCert, err := assets.Get(AssetPathAPIServerCert)
-	if err != nil {
-		return secret, err
-	}
-	data[filepath.Base(apiCert.Name)] = apiCert.Data
-
-	// Service account pub-key
-	saPubKey, err := assets.Get(AssetPathServiceAccountPubKey)
-	if err != nil {
-		return secret, err
-	}
-	data[secretServiceAccountPubKey] = saPubKey.Data
-
-	// Token auth
-	tokenAuth, err := assets.Get(AssetPathTokenAuth)
-	if err != nil {
-		return secret, err
-	}
-	data[secretTokenFile] = tokenAuth.Data
-
-	y, err := newSecretYaml(secretAPIServerName, secretNamespace, data)
-	if err != nil {
-		return secret, err
+	secretAssets := []string{
+		AssetPathAPIServerKey,
+		AssetPathAPIServerCert,
+		AssetPathServiceAccountPubKey,
+		AssetPathTokenAuth,
 	}
 
-	secret.Name = AssetPathAPIServerSecret
-	secret.Data = y
+	secretYAML, err := newSecretFromAssets(secretAPIServerName, secretNamespace, secretAssets, assets)
+	if err != nil {
+		return Asset{}, err
+	}
 
-	return secret, nil
+	return Asset{Name: AssetPathAPIServerSecret, Data: secretYAML}, nil
+}
+
+func NewControllerManagerSecret(assets Assets) (Asset, error) {
+	secretAssets := []string{
+		AssetPathServiceAccountPrivKey,
+		AssetPathCACert, //TODO(aaron): do we want this also distributed as secret? or expect available on host?
+	}
+
+	secretYAML, err := newSecretFromAssets(secretCMName, secretNamespace, secretAssets, assets)
+	if err != nil {
+		return Asset{}, err
+	}
+
+	return Asset{Name: AssetPathControllerManagerSecret, Data: secretYAML}, nil
 }
 
 func NewTokenAuth() Asset {
@@ -113,12 +99,16 @@ type secret struct {
 	Data       map[string]string `json:"data"`
 }
 
-func newSecretYaml(name, namespace string, data map[string][]byte) ([]byte, error) {
-	b64data := make(map[string]string)
-	for k, v := range data {
-		b64data[k] = base64.StdEncoding.EncodeToString(v)
+func newSecretFromAssets(name, namespace string, assetNames []string, assets Assets) ([]byte, error) {
+	data := make(map[string]string)
+	for _, an := range assetNames {
+		a, err := assets.Get(an)
+		if err != nil {
+			return []byte{}, err
+		}
+		data[filepath.Base(a.Name)] = base64.StdEncoding.EncodeToString(a.Data)
 	}
-	s := secret{
+	return yaml.Marshal(secret{
 		ApiVersion: "v1",
 		Kind:       "Secret",
 		Type:       "Opaque",
@@ -126,7 +116,6 @@ func newSecretYaml(name, namespace string, data map[string][]byte) ([]byte, erro
 			"name":      name,
 			"namespace": namespace,
 		},
-		Data: b64data,
-	}
-	return yaml.Marshal(s)
+		Data: data,
+	})
 }

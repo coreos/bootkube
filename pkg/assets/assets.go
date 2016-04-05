@@ -10,17 +10,20 @@ import (
 )
 
 const (
-	AssetPathCAKey                 = "tls/ca.key"
-	AssetPathCACert                = "tls/ca.crt"
-	AssetPathAPIServerKey          = "tls/apiserver.key"
-	AssetPathAPIServerCert         = "tls/apiserver.crt"
-	AssetPathServiceAccountPrivKey = "tls/service-account.key"
-	AssetPathServiceAccountPubKey  = "tls/service-account.pub"
-	AssetPathKubeConfig            = "auth/kubeconfig.yaml"
-	AssetPathTokenAuth             = "auth/token-auth.csv"
-	AssetPathAPIServerSecret       = "manifests/apiserver-secret.yaml"
-	AssetPathAPIServer             = "manifests/apiserver.yaml"
-	AssetPathKubelet               = "manifests/kubelet.yaml"
+	AssetPathCAKey                   = "tls/ca.key"
+	AssetPathCACert                  = "tls/ca.crt"
+	AssetPathAPIServerKey            = "tls/apiserver.key"
+	AssetPathAPIServerCert           = "tls/apiserver.crt"
+	AssetPathServiceAccountPrivKey   = "tls/service-account.key"
+	AssetPathServiceAccountPubKey    = "tls/service-account.pub"
+	AssetPathKubeConfig              = "auth/kubeconfig.yaml"
+	AssetPathTokenAuth               = "auth/token-auth.csv"
+	AssetPathKubelet                 = "manifests/kubelet.yaml"
+	AssetPathAPIServerSecret         = "manifests/kube-apiserver-secret.yaml"
+	AssetPathAPIServer               = "manifests/kube-apiserver.yaml"
+	AssetPathControllerManager       = "manifests/kube-controllermanager.yaml"
+	AssetPathControllerManagerSecret = "manifests/kube-controllermanager-secret.yaml"
+	AssetPathScheduler               = "manifests/kube-scheduler.yaml"
 )
 
 //go:generate go run templates_gen.go
@@ -61,7 +64,9 @@ func (a Assets) WriteFiles(path string) error {
 
 func StaticAssets() []Asset {
 	return []Asset{
-		{Name: AssetPathAPIServer, Data: internal.APIServerTemplate},
 		{Name: AssetPathKubelet, Data: internal.KubeletTemplate},
+		{Name: AssetPathAPIServer, Data: internal.APIServerTemplate},
+		{Name: AssetPathControllerManager, Data: internal.ControllerManagerTemplate},
+		{Name: AssetPathScheduler, Data: internal.SchedulerTemplate},
 	}
 }

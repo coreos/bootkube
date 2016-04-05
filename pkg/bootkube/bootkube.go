@@ -77,6 +77,7 @@ func NewBootkube(config Config) (*bootkube, error) {
 		"--master=" + localAPIServerInsecureAddr,
 		"--service-account-private-key-file=" + config.ServiceAccountKey,
 		"--root-ca-file=" + config.CACert,
+		"--leader-elect=true",
 	})
 
 	schedServer := scheduler.NewSchedulerServer()
@@ -84,6 +85,7 @@ func NewBootkube(config Config) (*bootkube, error) {
 	schedServer.AddFlags(fs)
 	fs.Parse([]string{
 		"--master=" + localAPIServerInsecureAddr,
+		"--leader-elect=true",
 	})
 
 	sshConfig, err := newSSHConfig(config.SSHUser, config.SSHKeyFile)

@@ -52,6 +52,13 @@ func runCmdRender(cmd *cobra.Command, args []string) error {
 	}
 	as = append(as, apiSecret)
 
+	// K8S ControllerManager secret
+	cmSecret, err := assets.NewControllerManagerSecret(as)
+	if err != nil {
+		return err
+	}
+	as = append(as, cmSecret)
+
 	// Static Assets
 	as = append(as, assets.StaticAssets()...)
 
