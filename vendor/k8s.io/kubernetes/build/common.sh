@@ -60,7 +60,8 @@ readonly KUBE_BUILD_IMAGE_CROSS_TAG="v1.4.2-1"
 # *_OUTPUT_BINPATH - location where final binaries are placed.  If the remote
 #                    is really remote, this is the stuff that has to be copied
 #                    back.
-readonly LOCAL_OUTPUT_ROOT="${KUBE_ROOT}/_output"
+# OUT_DIR can come in from the Makefile, so honor it.
+readonly LOCAL_OUTPUT_ROOT="${KUBE_ROOT}/${OUT_DIR:-_output}"
 readonly LOCAL_OUTPUT_SUBPATH="${LOCAL_OUTPUT_ROOT}/dockerized"
 readonly LOCAL_OUTPUT_BINPATH="${LOCAL_OUTPUT_SUBPATH}/bin"
 readonly LOCAL_OUTPUT_IMAGE_STAGING="${LOCAL_OUTPUT_ROOT}/images"
@@ -925,12 +926,9 @@ function kube::release::package_salt_tarball() {
 }
 
 # This will pack kube-system manifests files for distros without using salt
-# such as Ubuntu Trusty.
-#
-# There are two sources of manifests files: (1) some manifests in the directory
-# cluster/saltbase/salt and cluster/addons can be used directly or after minor
-# revision, so we copy them from there; (2) otherwise, we will maintain separate
-# copies in cluster/gce/<distro>/kube-manifests.
+# such as Ubuntu Trusty. For Trusty, we directly copy manifests from cluster/addons
+# and cluster/saltbase/salt. The script of cluster initialization will remove
+# the salt configuration and evaluate the variables in the manifests.
 function kube::release::package_kube_manifests_tarball() {
   kube::log::status "Building tarball: manifests"
 
@@ -938,7 +936,6 @@ function kube::release::package_kube_manifests_tarball() {
   rm -rf "${release_stage}"
   mkdir -p "${release_stage}/trusty"
 
-  # Source 1: manifests from cluster/saltbase/salt and cluster/addons
   local salt_dir="${KUBE_ROOT}/cluster/saltbase/salt"
   cp "${salt_dir}/fluentd-es/fluentd-es.yaml" "${release_stage}/"
   cp "${salt_dir}/fluentd-gcp/fluentd-gcp.yaml" "${release_stage}/"
@@ -946,18 +943,18 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${salt_dir}/kube-proxy/kube-proxy.manifest" "${release_stage}/"
   cp "${salt_dir}/etcd/etcd.manifest" "${release_stage}/trusty"
   cp "${salt_dir}/kube-scheduler/kube-scheduler.manifest" "${release_stage}/trusty"
+  cp "${salt_dir}/kube-apiserver/kube-apiserver.manifest" "${release_stage}/trusty"
+  cp "${salt_dir}/kube-controller-manager/kube-controller-manager.manifest" "${release_stage}/trusty"
   cp "${salt_dir}/kube-addons/namespace.yaml" "${release_stage}/trusty"
   cp "${salt_dir}/kube-addons/kube-addons.sh" "${release_stage}/trusty"
   cp "${salt_dir}/kube-addons/kube-addon-update.sh" "${release_stage}/trusty"
+  cp "${KUBE_ROOT}/cluster/gce/trusty/configure-helper.sh" "${release_stage}/trusty"
   cp -r "${salt_dir}/kube-admission-controls/limit-range" "${release_stage}/trusty"
   local objects
   objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)
   tar c -C "${KUBE_ROOT}/cluster/addons" ${objects} | tar x -C "${release_stage}/trusty"
 
-  # Source 2: manifests from cluster/gce/<distro>/kube-manifests.
-  # TODO(andyzheng0831): Avoid using separate copies for trusty. We should use whatever
-  # from cluster/saltbase/salt to minimize maintenance cost.
-  cp "${KUBE_ROOT}/cluster/gce/trusty/kube-manifests/"* "${release_stage}/trusty"
+  # This is for coreos only. ContainerVM or Trusty does not use it.
   cp -r "${KUBE_ROOT}/cluster/gce/coreos/kube-manifests"/* "${release_stage}/"
 
   kube::release::clean_cruft

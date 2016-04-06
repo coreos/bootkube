@@ -39,7 +39,7 @@ type HandlerRunner interface {
 // RuntimeHelper wraps kubelet to make container runtime
 // able to get necessary informations like the RunContainerOptions, DNS settings.
 type RuntimeHelper interface {
-	GenerateRunContainerOptions(pod *api.Pod, container *api.Container) (*RunContainerOptions, error)
+	GenerateRunContainerOptions(pod *api.Pod, container *api.Container, podIP string) (*RunContainerOptions, error)
 	GetClusterDNS(pod *api.Pod) (dnsServers []string, dnsSearches []string, err error)
 }
 
@@ -56,6 +56,10 @@ func ShouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatu
 	// Check whether container is running
 	if status.State == ContainerStateRunning {
 		return false
+	}
+	// Always restart container in unknown state now
+	if status.State == ContainerStateUnknown {
+		return true
 	}
 	// Check RestartPolicy for dead container
 	if pod.Spec.RestartPolicy == api.RestartPolicyNever {

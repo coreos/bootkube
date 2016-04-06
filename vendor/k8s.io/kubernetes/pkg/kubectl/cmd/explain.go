@@ -36,11 +36,7 @@ kubectl explain pods.spec.containers`
 
 	explainLong = `Documentation of resources.
 
-Possible resource types include: pods (po), services (svc),
-replicationcontrollers (rc), nodes (no), events (ev), componentstatuses (cs),
-limitranges (limits), persistentvolumes (pv), persistentvolumeclaims (pvc),
-resourcequotas (quota), namespaces (ns), horizontalpodautoscalers (hpa)
-or endpoints (ep).`
+` + kubectl.PossibleResourceTypes
 )
 
 // NewCmdExplain returns a cobra command for swagger docs
@@ -79,9 +75,16 @@ func RunExplain(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 	}
 
 	// TODO: We should deduce the group for a resource by discovering the supported resources at server.
-	gvk, err := mapper.KindFor(unversioned.ParseGroupResource(inModel).WithVersion(""))
-	if err != nil {
-		return err
+	fullySpecifiedGVR, groupResource := unversioned.ParseResourceArg(inModel)
+	gvk := unversioned.GroupVersionKind{}
+	if fullySpecifiedGVR != nil {
+		gvk, _ = mapper.KindFor(*fullySpecifiedGVR)
+	}
+	if gvk.IsEmpty() {
+		gvk, err = mapper.KindFor(groupResource.WithVersion(""))
+		if err != nil {
+			return err
+		}
 	}
 
 	if len(apiVersionString) == 0 {

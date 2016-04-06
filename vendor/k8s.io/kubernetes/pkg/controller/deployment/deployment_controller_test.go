@@ -42,7 +42,7 @@ func rs(name string, replicas int, selector map[string]string) *exp.ReplicaSet {
 		Spec: exp.ReplicaSetSpec{
 			Replicas: replicas,
 			Selector: &unversioned.LabelSelector{MatchLabels: selector},
-			Template: &api.PodTemplateSpec{},
+			Template: api.PodTemplateSpec{},
 		},
 	}
 }
@@ -120,7 +120,7 @@ func newReplicaSet(d *exp.Deployment, name string, replicas int) *exp.ReplicaSet
 		},
 		Spec: exp.ReplicaSetSpec{
 			Replicas: replicas,
-			Template: &d.Spec.Template,
+			Template: d.Spec.Template,
 		},
 	}
 
@@ -230,13 +230,14 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 		expectedOldReplicas int
 	}{
 		{
-			deploymentReplicas: 10,
-			maxUnavailable:     intstr.FromInt(0),
-			oldReplicas:        10,
-			newReplicas:        0,
-			readyPodsFromOldRS: 10,
-			readyPodsFromNewRS: 0,
-			scaleExpected:      false,
+			deploymentReplicas:  10,
+			maxUnavailable:      intstr.FromInt(0),
+			oldReplicas:         10,
+			newReplicas:         0,
+			readyPodsFromOldRS:  10,
+			readyPodsFromNewRS:  0,
+			scaleExpected:       true,
+			expectedOldReplicas: 9,
 		},
 		{
 			deploymentReplicas:  10,
@@ -492,11 +493,12 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 		expectedOldReplicas int
 	}{
 		{
-			deploymentReplicas: 10,
-			maxUnavailable:     intstr.FromInt(0),
-			readyPods:          10,
-			oldReplicas:        10,
-			scaleExpected:      false,
+			deploymentReplicas:  10,
+			maxUnavailable:      intstr.FromInt(0),
+			readyPods:           10,
+			oldReplicas:         10,
+			scaleExpected:       true,
+			expectedOldReplicas: 9,
 		},
 		{
 			deploymentReplicas:  10,
@@ -779,4 +781,29 @@ func TestSyncDeploymentCreatesReplicaSet(t *testing.T) {
 	f.expectUpdateDeploymentAction(d)
 
 	f.run(getKey(d, t))
+}
+
+// issue: https://github.com/kubernetes/kubernetes/issues/23218
+func TestDeploymentController_dontSyncDeploymentsWithEmptyPodSelector(t *testing.T) {
+	fake := &fake.Clientset{}
+	controller := NewDeploymentController(fake, controller.NoResyncPeriodFunc)
+
+	controller.eventRecorder = &record.FakeRecorder{}
+	controller.rsStoreSynced = alwaysReady
+	controller.podStoreSynced = alwaysReady
+
+	d := newDeployment(1, nil)
+	empty := unversioned.LabelSelector{}
+	d.Spec.Selector = &empty
+	controller.dStore.Store.Add(d)
+	// We expect the deployment controller to not take action here since it's configuration
+	// is invalid, even though no replicasets exist that match it's selector.
+	controller.syncDeployment(fmt.Sprintf("%s/%s", d.ObjectMeta.Namespace, d.ObjectMeta.Name))
+	if len(fake.Actions()) == 0 {
+		return
+	}
+	for _, action := range fake.Actions() {
+		t.Logf("unexpected action: %#v", action)
+	}
+	t.Errorf("expected deployment controller to not take action")
 }

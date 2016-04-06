@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -36,7 +35,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/runtime"
@@ -74,6 +72,7 @@ func RegisterFlags() {
 	flag.StringVar(&testContext.OutputDir, "e2e-output-dir", "/tmp", "Output directory for interesting/useful test data, like performance data, benchmarks, and other metrics.")
 	flag.StringVar(&testContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 	flag.StringVar(&testContext.prefix, "prefix", "e2e", "A prefix to be added to cloud resources created during testing.")
+	flag.StringVar(&testContext.OSDistro, "os-distro", "debian", "The OS distribution of cluster VM instances (debian, trusty, or coreos).")
 
 	// TODO: Flags per provider?  Rename gce-project/gce-zone?
 	flag.StringVar(&cloudConfig.MasterName, "kube-master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
@@ -125,21 +124,8 @@ func setupProviderConfig() error {
 		}
 
 	case "aws":
-		awsConfig := "[Global]\n"
 		if cloudConfig.Zone == "" {
 			return fmt.Errorf("gce-zone must be specified for AWS")
-		}
-		awsConfig += fmt.Sprintf("Zone=%s\n", cloudConfig.Zone)
-
-		if cloudConfig.ClusterTag == "" {
-			return fmt.Errorf("--cluster-tag must be specified for AWS")
-		}
-		awsConfig += fmt.Sprintf("KubernetesClusterTag=%s\n", cloudConfig.ClusterTag)
-
-		var err error
-		cloudConfig.Provider, err = cloudprovider.GetCloudProvider(testContext.Provider, strings.NewReader(awsConfig))
-		if err != nil {
-			return fmt.Errorf("Error building AWS provider: %v", err)
 		}
 
 	}
@@ -187,6 +173,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 			dumpAllNamespaceInfo(c, api.NamespaceSystem)
 		}
 		logFailedContainers(api.NamespaceSystem)
+		runKubernetesServiceTestContainer(testContext.RepoRoot, api.NamespaceDefault)
 		Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
 

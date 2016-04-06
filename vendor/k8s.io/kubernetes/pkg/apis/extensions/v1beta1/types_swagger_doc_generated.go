@@ -323,7 +323,7 @@ func (IngressRuleValue) SwaggerDoc() map[string]string {
 var map_IngressSpec = map[string]string{
 	"":        "IngressSpec describes the Ingress the user wishes to exist.",
 	"backend": "A default backend capable of servicing requests that don't match any rule. At least one of 'backend' or 'rules' must be specified. This field is optional to allow the loadbalancer controller or defaulting logic to specify a global default.",
-	"tls":     "TLS configuration. Currently the Ingress only supports a single TLS port, 443, and assumes TLS termination. If multiple members of this list specify different hosts, they will be multiplexed on the same port according to the hostname specified through the SNI TLS extension.",
+	"tls":     "TLS configuration. Currently the Ingress only supports a single TLS port, 443. If multiple members of this list specify different hosts, they will be multiplexed on the same port according to the hostname specified through the SNI TLS extension, if the ingress controller fulfilling the ingress supports SNI.",
 	"rules":   "A list of host rules used to configure the Ingress. If unspecified, or no rule matches, all traffic is sent to the default backend.",
 }
 
@@ -468,16 +468,16 @@ func (PodSecurityPolicyList) SwaggerDoc() map[string]string {
 }
 
 var map_PodSecurityPolicySpec = map[string]string{
-	"":               "Pod Security Policy Spec defines the policy enforced.",
-	"privileged":     "privileged determines if a pod can request to be run as privileged.",
-	"capabilities":   "capabilities is a list of capabilities that can be added.",
-	"volumes":        "volumes is a white list of allowed volume plugins.  Empty indicates that all plugins may be used.",
-	"hostNetwork":    "hostNetwork determines if the policy allows the use of HostNetwork in the pod spec.",
-	"hostPorts":      "hostPorts determines which host port ranges are allowed to be exposed.",
-	"hostPID":        "hostPID determines if the policy allows the use of HostPID in the pod spec.",
-	"hostIPC":        "hostIPC determines if the policy allows the use of HostIPC in the pod spec.",
-	"seLinuxContext": "seLinuxContext is the strategy that will dictate the allowable labels that may be set.",
-	"runAsUser":      "runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.",
+	"":             "Pod Security Policy Spec defines the policy enforced.",
+	"privileged":   "privileged determines if a pod can request to be run as privileged.",
+	"capabilities": "capabilities is a list of capabilities that can be added.",
+	"volumes":      "volumes is a white list of allowed volume plugins.  Empty indicates that all plugins may be used.",
+	"hostNetwork":  "hostNetwork determines if the policy allows the use of HostNetwork in the pod spec.",
+	"hostPorts":    "hostPorts determines which host port ranges are allowed to be exposed.",
+	"hostPID":      "hostPID determines if the policy allows the use of HostPID in the pod spec.",
+	"hostIPC":      "hostIPC determines if the policy allows the use of HostIPC in the pod spec.",
+	"seLinux":      "seLinux is the strategy that will dictate the allowable labels that may be set.",
+	"runAsUser":    "runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.",
 }
 
 func (PodSecurityPolicySpec) SwaggerDoc() map[string]string {
@@ -517,9 +517,10 @@ func (ReplicaSetSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ReplicaSetStatus = map[string]string{
-	"":                   "ReplicaSetStatus represents the current status of a ReplicaSet.",
-	"replicas":           "Replicas is the most recently oberved number of replicas. More info: http://releases.k8s.io/release-1.2/docs/user-guide/replication-controller.md#what-is-a-replication-controller",
-	"observedGeneration": "ObservedGeneration reflects the generation of the most recently observed ReplicaSet.",
+	"":                     "ReplicaSetStatus represents the current status of a ReplicaSet.",
+	"replicas":             "Replicas is the most recently oberved number of replicas. More info: http://releases.k8s.io/release-1.2/docs/user-guide/replication-controller.md#what-is-a-replication-controller",
+	"fullyLabeledReplicas": "The number of pods that have labels matching the labels of the pod template of the replicaset.",
+	"observedGeneration":   "ObservedGeneration reflects the generation of the most recently observed ReplicaSet.",
 }
 
 func (ReplicaSetStatus) SwaggerDoc() map[string]string {
@@ -554,7 +555,7 @@ func (RollingUpdateDeployment) SwaggerDoc() map[string]string {
 
 var map_RunAsUserStrategyOptions = map[string]string{
 	"":       "Run A sUser Strategy Options defines the strategy type and any options used to create the strategy.",
-	"type":   "type is the strategy that will dictate the allowable RunAsUser values that may be set.",
+	"rule":   "Rule is the strategy that will dictate the allowable RunAsUser values that may be set.",
 	"ranges": "Ranges are the allowed ranges of uids that may be used.",
 }
 
@@ -562,14 +563,14 @@ func (RunAsUserStrategyOptions) SwaggerDoc() map[string]string {
 	return map_RunAsUserStrategyOptions
 }
 
-var map_SELinuxContextStrategyOptions = map[string]string{
-	"":               "SELinux Context Strategy Options defines the strategy type and any options used to create the strategy.",
-	"type":           "type is the strategy that will dictate the allowable labels that may be set.",
+var map_SELinuxStrategyOptions = map[string]string{
+	"":               "SELinux  Strategy Options defines the strategy type and any options used to create the strategy.",
+	"rule":           "type is the strategy that will dictate the allowable labels that may be set.",
 	"seLinuxOptions": "seLinuxOptions required to run as; required for MustRunAs More info: http://releases.k8s.io/release-1.2/docs/design/security_context.md#security-context",
 }
 
-func (SELinuxContextStrategyOptions) SwaggerDoc() map[string]string {
-	return map_SELinuxContextStrategyOptions
+func (SELinuxStrategyOptions) SwaggerDoc() map[string]string {
+	return map_SELinuxStrategyOptions
 }
 
 var map_Scale = map[string]string{
@@ -593,9 +594,10 @@ func (ScaleSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ScaleStatus = map[string]string{
-	"":         "represents the current status of a scale subresource.",
-	"replicas": "actual number of observed instances of the scaled object.",
-	"selector": "label query over pods that should match the replicas count. More info: http://releases.k8s.io/release-1.2/docs/user-guide/labels.md#label-selectors",
+	"":               "represents the current status of a scale subresource.",
+	"replicas":       "actual number of observed instances of the scaled object.",
+	"selector":       "label query over pods that should match the replicas count. More info: http://releases.k8s.io/release-1.2/docs/user-guide/labels.md#label-selectors",
+	"targetSelector": "label selector for pods that should match the replicas count. This is a serializated version of both map-based and more expressive set-based selectors. This is done to avoid introspection in the clients. The string will be in the same format as the query-param syntax. If the target type only supports map-based selectors, both this field and map-based selector field are populated. More info: http://releases.k8s.io/release-1.2/docs/user-guide/labels.md#label-selectors",
 }
 
 func (ScaleStatus) SwaggerDoc() map[string]string {

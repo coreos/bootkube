@@ -187,11 +187,12 @@ func (s *CMServer) Run(_ []string) error {
 		api.Kind("Secret"),
 	}
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
-		KubeClient:            resourceQuotaControllerClient,
-		ResyncPeriod:          controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod.Duration),
-		Registry:              resourceQuotaRegistry,
-		GroupKindsToReplenish: groupKindsToReplenish,
-		ControllerFactory:     resourcequotacontroller.NewReplenishmentControllerFactory(resourceQuotaControllerClient),
+		KubeClient:                resourceQuotaControllerClient,
+		ResyncPeriod:              controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod.Duration),
+		Registry:                  resourceQuotaRegistry,
+		GroupKindsToReplenish:     groupKindsToReplenish,
+		ReplenishmentResyncPeriod: s.resyncPeriod,
+		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(resourceQuotaControllerClient),
 	}
 	go resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions).Run(s.ConcurrentResourceQuotaSyncs, wait.NeverStop)
 
@@ -246,7 +247,7 @@ func (s *CMServer) Run(_ []string) error {
 
 		if containsResource(resources, "daemonsets") {
 			glog.Infof("Starting daemon set controller")
-			go daemon.NewDaemonSetsController(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "daemon-set-controller")), s.resyncPeriod).
+			go daemon.NewDaemonSetsController(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "daemon-set-controller")), s.resyncPeriod, s.LookupCacheSizeForDaemonSet).
 				Run(s.ConcurrentDaemonSetSyncs, wait.NeverStop)
 		}
 

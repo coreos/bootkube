@@ -50,6 +50,7 @@ import (
 
 	"k8s.io/kubernetes/contrib/mesos/pkg/election"
 	execcfg "k8s.io/kubernetes/contrib/mesos/pkg/executor/config"
+	"k8s.io/kubernetes/contrib/mesos/pkg/flagutil"
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 	minioncfg "k8s.io/kubernetes/contrib/mesos/pkg/minion/config"
 	"k8s.io/kubernetes/contrib/mesos/pkg/podutil"
@@ -134,10 +135,11 @@ type SchedulerServer struct {
 	launchGracePeriod              time.Duration
 	kubeletEnableDebuggingHandlers bool
 
-	runProxy     bool
-	proxyBindall bool
-	proxyLogV    int
-	proxyMode    string
+	runProxy        bool
+	proxyBindall    bool
+	proxyKubeconfig string
+	proxyLogV       int
+	proxyMode       string
 
 	minionPathOverride    string
 	minionLogMaxSize      resource.Quantity
@@ -309,6 +311,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 
 	fs.BoolVar(&s.proxyBindall, "proxy-bindall", s.proxyBindall, "When true pass -proxy-bindall to the executor.")
 	fs.BoolVar(&s.runProxy, "run-proxy", s.runProxy, "Run the kube-proxy as a side process of the executor.")
+	fs.StringVar(&s.proxyKubeconfig, "proxy-kubeconfig", s.proxyKubeconfig, "Path to kubeconfig file with authorization and master location information used by the proxy.")
 	fs.IntVar(&s.proxyLogV, "proxy-logv", s.proxyLogV, "Logging verbosity of spawned minion proxy processes.")
 	fs.StringVar(&s.proxyMode, "proxy-mode", s.proxyMode, "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
 
@@ -405,6 +408,12 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--run-proxy=%v", s.runProxy))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--proxy-bindall=%v", s.proxyBindall))
+		if s.proxyKubeconfig != "" {
+			//TODO(jdef) should probably support non-local files, e.g. hdfs:///some/config/file
+			uri, basename := s.serveFrameworkArtifact(s.proxyKubeconfig)
+			ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri)})
+			ci.Arguments = append(ci.Arguments, fmt.Sprintf("--proxy-kubeconfig=%v", basename))
+		}
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--proxy-logv=%d", s.proxyLogV))
 		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--proxy-mode=%v", s.proxyMode))
 
@@ -459,9 +468,18 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 
 	if s.kubeletKubeconfig != "" {
 		//TODO(jdef) should probably support non-local files, e.g. hdfs:///some/config/file
-		uri, basename := s.serveFrameworkArtifact(s.kubeletKubeconfig)
-		ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri)})
-		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--kubeconfig=%s", basename))
+		if s.kubeletKubeconfig != s.proxyKubeconfig {
+			if filepath.Base(s.kubeletKubeconfig) == filepath.Base(s.proxyKubeconfig) {
+				// scheduler serves kubelet-kubeconfig and proxy-kubeconfig by their basename
+				// we currently don't support the case where the 2 kubeconfig files have the same
+				// basename but different absolute name, e.g., /kubelet/kubeconfig and /proxy/kubeconfig
+				return nil, fmt.Errorf("if kubelet-kubeconfig and proxy-kubeconfig are different, they must have different basenames")
+			}
+			// allows kubelet-kubeconfig and proxy-kubeconfig to point to the same file
+			uri, _ := s.serveFrameworkArtifact(s.kubeletKubeconfig)
+			ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri)})
+		}
+		ci.Arguments = append(ci.Arguments, fmt.Sprintf("--kubeconfig=%s", filepath.Base(s.kubeletKubeconfig)))
 	}
 	appendOptional := func(name string, value string) {
 		if value != "" {
@@ -477,6 +495,10 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 	appendOptional("pod-infra-container-image", s.kubeletPodInfraContainerImage)
 	appendOptional("host-network-sources", s.kubeletHostNetworkSources)
 	appendOptional("network-plugin", s.kubeletNetworkPluginName)
+
+	// TODO(jdef) this code depends on poorly scoped cadvisor flags, will need refactoring soon
+	appendOptional(flagutil.Cadvisor.HousekeepingInterval.NameValue())
+	appendOptional(flagutil.Cadvisor.GlobalHousekeepingInterval.NameValue())
 
 	log.V(1).Infof("prepared executor command %q with args '%+v'", ci.GetValue(), ci.Arguments)
 

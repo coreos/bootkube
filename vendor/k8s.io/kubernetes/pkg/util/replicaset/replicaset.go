@@ -21,15 +21,19 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/typed/generated/extensions/unversioned"
+	errorsutil "k8s.io/kubernetes/pkg/util/errors"
+	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	podutil "k8s.io/kubernetes/pkg/util/pod"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // TODO: use client library instead when it starts to support update retries
 //       see https://github.com/kubernetes/kubernetes/issues/21479
-type updateRSFunc func(rs *extensions.ReplicaSet)
+type updateRSFunc func(rs *extensions.ReplicaSet) error
 
 // UpdateRSWithRetries updates a RS with given applyUpdate function. Note that RS not found error is ignored.
 // The returned bool value can be used to tell if the RS is actually updated.
@@ -43,8 +47,9 @@ func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rs 
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
-		// TODO: add precondition for update
-		applyUpdate(rs)
+		if err = applyUpdate(rs); err != nil {
+			return false, err
+		}
 		if rs, err = rsClient.Update(rs); err == nil {
 			// Update successful.
 			return true, nil
@@ -57,6 +62,7 @@ func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rs 
 		rsUpdated = true
 	}
 
+	// Handle returned error from wait poll
 	if err == wait.ErrWaitTimeout {
 		err = fmt.Errorf("timed out trying to update RS: %+v", oldRs)
 	}
@@ -65,7 +71,23 @@ func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rs 
 		glog.V(4).Infof("%s %s/%s is not found, skip updating it.", oldRs.Kind, oldRs.Namespace, oldRs.Name)
 		err = nil
 	}
-	// If the error is non-nil the returned controller cannot be trusted, if it is nil, the returned
-	// controller contains the applied update.
+	// Ignore the precondition violated error, but the RS isn't updated.
+	if err == errorsutil.ErrPreconditionViolated {
+		glog.V(4).Infof("%s %s/%s precondition doesn't hold, skip updating it.", oldRs.Kind, oldRs.Namespace, oldRs.Name)
+		err = nil
+	}
+
+	// If the error is non-nil the returned RS cannot be trusted; if rsUpdated is false, the contoller isn't updated;
+	// if the error is nil and rsUpdated is true, the returned RS contains the applied update.
 	return rs, rsUpdated, err
+}
+
+// GetPodTemplateSpecHash returns the pod template hash of a ReplicaSet's pod template space
+func GetPodTemplateSpecHash(rs extensions.ReplicaSet) string {
+	meta := rs.Spec.Template.ObjectMeta
+	meta.Labels = labelsutil.CloneAndRemoveLabel(meta.Labels, extensions.DefaultDeploymentUniqueLabelKey)
+	return fmt.Sprintf("%d", podutil.GetPodTemplateSpecHash(api.PodTemplateSpec{
+		ObjectMeta: meta,
+		Spec:       rs.Spec.Template.Spec,
+	}))
 }

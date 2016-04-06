@@ -1038,18 +1038,12 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", rs.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", rs.Namespace)
-		if rs.Spec.Template != nil {
-			fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&rs.Spec.Template.Spec))
-		} else {
-			fmt.Fprintf(out, "Image(s):\t%s\n", "<unset>")
-		}
+		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&rs.Spec.Template.Spec))
 		fmt.Fprintf(out, "Selector:\t%s\n", unversioned.FormatLabelSelector(rs.Spec.Selector))
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(rs.Labels))
 		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", rs.Status.Replicas, rs.Spec.Replicas)
 		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
-		if rs.Spec.Template != nil {
-			describeVolumes(rs.Spec.Template.Spec.Volumes, out)
-		}
+		describeVolumes(rs.Spec.Template.Spec.Volumes, out)
 		if events != nil {
 			DescribeEvents(events, out)
 		}
@@ -1269,7 +1263,11 @@ func (i *IngressDescriber) describeIngress(ing *extensions.Ingress) (string, err
 func describeIngressTLS(out io.Writer, ingTLS []extensions.IngressTLS) {
 	fmt.Fprintf(out, "TLS:\n")
 	for _, t := range ingTLS {
-		fmt.Fprintf(out, "  %v terminates %v\n", t.SecretName, strings.Join(t.Hosts, ","))
+		if t.SecretName == "" {
+			fmt.Fprintf(out, "  SNI routes %v\n", strings.Join(t.Hosts, ","))
+		} else {
+			fmt.Fprintf(out, "  %v terminates %v\n", t.SecretName, strings.Join(t.Hosts, ","))
+		}
 	}
 	return
 }

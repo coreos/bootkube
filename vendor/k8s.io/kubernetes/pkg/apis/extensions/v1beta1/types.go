@@ -36,6 +36,14 @@ type ScaleStatus struct {
 
 	// label query over pods that should match the replicas count. More info: http://releases.k8s.io/release-1.2/docs/user-guide/labels.md#label-selectors
 	Selector map[string]string `json:"selector,omitempty"`
+
+	// label selector for pods that should match the replicas count. This is a serializated
+	// version of both map-based and more expressive set-based selectors. This is done to
+	// avoid introspection in the clients. The string will be in the same format as the
+	// query-param syntax. If the target type only supports map-based selectors, both this
+	// field and map-based selector field are populated.
+	// More info: http://releases.k8s.io/release-1.2/docs/user-guide/labels.md#label-selectors
+	TargetSelector string `json:"targetSelector,omitempty"`
 }
 
 // +genclient=true,noMethods=true
@@ -662,9 +670,10 @@ type IngressSpec struct {
 	Backend *IngressBackend `json:"backend,omitempty"`
 
 	// TLS configuration. Currently the Ingress only supports a single TLS
-	// port, 443, and assumes TLS termination. If multiple members of this
-	// list specify different hosts, they will be multiplexed on the same
-	// port according to the hostname specified through the SNI TLS extension.
+	// port, 443. If multiple members of this list specify different hosts, they
+	// will be multiplexed on the same port according to the hostname specified
+	// through the SNI TLS extension, if the ingress controller fulfilling the
+	// ingress supports SNI.
 	TLS []IngressTLS `json:"tls,omitempty"`
 
 	// A list of host rules used to configure the Ingress. If unspecified, or
@@ -890,7 +899,7 @@ type ReplicaSetSpec struct {
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected.
 	// More info: http://releases.k8s.io/release-1.2/docs/user-guide/replication-controller.md#pod-template
-	Template *v1.PodTemplateSpec `json:"template,omitempty"`
+	Template v1.PodTemplateSpec `json:"template,omitempty"`
 }
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.
@@ -898,6 +907,9 @@ type ReplicaSetStatus struct {
 	// Replicas is the most recently oberved number of replicas.
 	// More info: http://releases.k8s.io/release-1.2/docs/user-guide/replication-controller.md#what-is-a-replication-controller
 	Replicas int32 `json:"replicas"`
+
+	// The number of pods that have labels matching the labels of the pod template of the replicaset.
+	FullyLabeledReplicas int32 `json:"fullyLabeledReplicas,omitempty"`
 
 	// ObservedGeneration reflects the generation of the most recently observed ReplicaSet.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
@@ -932,8 +944,8 @@ type PodSecurityPolicySpec struct {
 	HostPID bool `json:"hostPID,omitempty"`
 	// hostIPC determines if the policy allows the use of HostIPC in the pod spec.
 	HostIPC bool `json:"hostIPC,omitempty"`
-	// seLinuxContext is the strategy that will dictate the allowable labels that may be set.
-	SELinuxContext SELinuxContextStrategyOptions `json:"seLinuxContext,omitempty"`
+	// seLinux is the strategy that will dictate the allowable labels that may be set.
+	SELinux SELinuxStrategyOptions `json:"seLinux,omitempty"`
 	// runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.
 	RunAsUser RunAsUserStrategyOptions `json:"runAsUser,omitempty"`
 }
@@ -968,30 +980,30 @@ type HostPortRange struct {
 	Max int32 `json:"max"`
 }
 
-// SELinux Context Strategy Options defines the strategy type and any options used to create the strategy.
-type SELinuxContextStrategyOptions struct {
+// SELinux  Strategy Options defines the strategy type and any options used to create the strategy.
+type SELinuxStrategyOptions struct {
 	// type is the strategy that will dictate the allowable labels that may be set.
-	Type SELinuxContextStrategy `json:"type"`
+	Rule SELinuxStrategy `json:"rule"`
 	// seLinuxOptions required to run as; required for MustRunAs
 	// More info: http://releases.k8s.io/release-1.2/docs/design/security_context.md#security-context
 	SELinuxOptions *v1.SELinuxOptions `json:"seLinuxOptions,omitempty"`
 }
 
-// SELinux Context Strategy Type denotes strategy types for generating SELinux options for a
+// SELinuxStrategy denotes strategy types for generating SELinux options for a
 // Security Context.
-type SELinuxContextStrategy string
+type SELinuxStrategy string
 
 const (
 	// container must have SELinux labels of X applied.
-	SELinuxStrategyMustRunAs SELinuxContextStrategy = "MustRunAs"
+	SELinuxStrategyMustRunAs SELinuxStrategy = "MustRunAs"
 	// container may make requests for any SELinux context labels.
-	SELinuxStrategyRunAsAny SELinuxContextStrategy = "RunAsAny"
+	SELinuxStrategyRunAsAny SELinuxStrategy = "RunAsAny"
 )
 
 // Run A sUser Strategy Options defines the strategy type and any options used to create the strategy.
 type RunAsUserStrategyOptions struct {
-	// type is the strategy that will dictate the allowable RunAsUser values that may be set.
-	Type RunAsUserStrategy `json:"type"`
+	// Rule is the strategy that will dictate the allowable RunAsUser values that may be set.
+	Rule RunAsUserStrategy `json:"rule"`
 	// Ranges are the allowed ranges of uids that may be used.
 	Ranges []IDRange `json:"ranges,omitempty"`
 }
@@ -1004,7 +1016,7 @@ type IDRange struct {
 	Max int64 `json:"max"`
 }
 
-// Run As User Strategy Type denotes strategy types for generating RunAsUser values for a
+// RunAsUserStrategy denotes strategy types for generating RunAsUser values for a
 // Security Context.
 type RunAsUserStrategy string
 
