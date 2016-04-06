@@ -1,2 +1,3 @@
 bin/
+vendor-v[0-9].[0-9].[0-9]/
 pkg/assets/internal/
