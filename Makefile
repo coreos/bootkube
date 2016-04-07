@@ -3,8 +3,9 @@ export CGO_ENABLED:=0
 
 GOFILES:=$(shell find . -name '*.go' | grep -v -E '(./vendor|internal/templates.go)')
 GOPACKAGES:=$(shell go list ./... | grep -v '/vendor/')
+GOPATH_BIN:=$(shell echo ${GOPATH} | awk 'BEGIN { FS = ":" }; { print $1 }')/bin
 
-all: bin/bootkube
+all: fmt vet bin/bootkube
 
 fmt:
 	@find . -name vendor -prune -o -name '*.go' -exec gofmt -s -d {} +
@@ -20,6 +21,9 @@ vendor: vendor-$(VENDOR_VERSION)
 bin/bootkube: $(GOFILES) pkg/asset/internal/templates.go
 	mkdir -p bin
 	go build -o bin/bootkube github.com/coreos/bootkube/cmd/bootkube
+
+install: all
+	cp bin/bootkube $(GOPATH_BIN)
 
 pkg/asset/internal/templates.go: $(GOFILES)
 	mkdir -p $(dir $@)
@@ -39,5 +43,5 @@ clean:
 	rm -f bin/bootkube
 	rm -rf pkg/asset/internal
 
-.PHONY: all clean fmt vet
+.PHONY: all clean fmt vet install
 
