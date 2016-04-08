@@ -20,14 +20,19 @@ const (
 func newStaticAssets() Assets {
 	var noData interface{}
 	return Assets{
-		mustCreateAssetFromTemplate(assetPathKubelet, internal.KubeletTemplate, noData),
-		mustCreateAssetFromTemplate(assetPathAPIServer, internal.APIServerTemplate, noData),
 		mustCreateAssetFromTemplate(assetPathControllerManager, internal.ControllerManagerTemplate, noData),
 		mustCreateAssetFromTemplate(assetPathScheduler, internal.SchedulerTemplate, noData),
-		mustCreateAssetFromTemplate(assetPathProxy, internal.ProxyTemplate, noData),
 		mustCreateAssetFromTemplate(assetPathKubeDNSRc, internal.DNSRcTemplate, noData),
 		mustCreateAssetFromTemplate(assetPathKubeDNSSvc, internal.DNSSvcTemplate, noData),
 		mustCreateAssetFromTemplate(assetPathSystemNamespace, internal.SystemNSTemplate, noData),
+	}
+}
+
+func newDynamicAssets(conf Config) Assets {
+	return Assets{
+		mustCreateAssetFromTemplate(assetPathKubelet, internal.KubeletTemplate, conf),
+		mustCreateAssetFromTemplate(assetPathAPIServer, internal.APIServerTemplate, conf),
+		mustCreateAssetFromTemplate(assetPathProxy, internal.ProxyTemplate, conf),
 	}
 }
 

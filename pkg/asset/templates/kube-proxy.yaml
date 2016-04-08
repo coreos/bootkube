@@ -22,7 +22,8 @@ spec:
         command:
         - /hyperkube
         - proxy
-        - --master=http://127.0.0.1:8080
+        - --master={{ .APIServers }}
+        - --kubeconfig=/etc/kubernetes/kubeconfig.yaml
         - --proxy-mode=iptables
         securityContext:
           privileged: true
@@ -30,7 +31,13 @@ spec:
         - mountPath: /etc/ssl/certs
           name: ssl-certs-host
           readOnly: true
+        - name: etc-kubernetes
+          mountPath: /etc/kubernetes
+          readOnly: true
       volumes:
       - hostPath:
           path: /usr/share/ca-certificates
         name: ssl-certs-host
+      - name: etc-kubernetes
+        hostPath:
+          path: /etc/kubernetes

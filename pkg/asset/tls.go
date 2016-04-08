@@ -7,7 +7,7 @@ import (
 	"github.com/coreos/bootkube/pkg/tlsutil"
 )
 
-func newTLSAssets() ([]Asset, error) {
+func newTLSAssets(apiCertIPs []string) ([]Asset, error) {
 	var assets []Asset
 
 	caKey, caCert, err := newCACert()
@@ -15,7 +15,7 @@ func newTLSAssets() ([]Asset, error) {
 		return assets, err
 	}
 
-	apiKey, apiCert, err := newAPIKeyAndCert(caCert, caKey)
+	apiKey, apiCert, err := newAPIKeyAndCert(caCert, caKey, apiCertIPs)
 	if err != nil {
 		return assets, err
 	}
@@ -60,7 +60,7 @@ func newCACert() (*rsa.PrivateKey, *x509.Certificate, error) {
 	return key, cert, err
 }
 
-func newAPIKeyAndCert(caCert *x509.Certificate, caKey *rsa.PrivateKey) (*rsa.PrivateKey, *x509.Certificate, error) {
+func newAPIKeyAndCert(caCert *x509.Certificate, caKey *rsa.PrivateKey, apiCertIPs []string) (*rsa.PrivateKey, *x509.Certificate, error) {
 	key, err := tlsutil.NewPrivateKey()
 	if err != nil {
 		return nil, nil, err
@@ -68,7 +68,7 @@ func newAPIKeyAndCert(caCert *x509.Certificate, caKey *rsa.PrivateKey) (*rsa.Pri
 	config := tlsutil.CertConfig{
 		CommonName:   "kube-apiserver",
 		Organization: []string{"kube-master"},
-		IPAddresses:  []string{"172.17.4.100", "127.0.0.1"}, //TODO(aaron): hack-placeholder
+		IPAddresses:  apiCertIPs,
 		DNSNames: []string{
 			"kubernetes",
 			"kubernetes.default",

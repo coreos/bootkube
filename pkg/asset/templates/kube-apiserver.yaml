@@ -23,7 +23,7 @@ spec:
         - /hyperkube
         - apiserver
         - --bind-address=0.0.0.0
-        - --etcd-servers=http://127.0.0.1:2379
+        - --etcd-servers={{ .ETCDServers }}
         - --allow-privileged=true
         - --service-cluster-ip-range=10.3.0.0/24
         - --secure-port=6443

@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const (
@@ -28,12 +29,25 @@ const (
 	assetPathSystemNamespace         = "manifests/kube-system-ns.yaml"
 )
 
-func NewDefaultAssets() (Assets, error) {
+// AssetConfig holds all configuration needed when generating
+// the default set of assets.
+type Config struct {
+	APIServerCertIPAddrs string
+	ETCDServers          string
+	APIServers           string
+}
+
+// NewDefaultAssets returns a list of default assets, optionally
+// configured via a user provided AssetConfig. Default assets include
+// TLS assets (certs, keys and secrets), token authentication assets,
+// and k8s component manifests.
+func NewDefaultAssets(conf Config) (Assets, error) {
 	// Static Assets
 	as := newStaticAssets()
+	as = append(as, newDynamicAssets(conf)...)
 
 	// TLS assets
-	tlsAssets, err := newTLSAssets()
+	tlsAssets, err := newTLSAssets(strings.Split(conf.APIServerCertIPAddrs, ","))
 	if err != nil {
 		return Assets{}, err
 	}

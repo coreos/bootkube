@@ -24,7 +24,7 @@ spec:
         - --
         - ./hyperkube
         - kubelet
-        - --api-servers=https://127.0.0.1:6443
+        - --api-servers={{ .APIServers }}
         - --allow-privileged
         - --cluster-dns=10.3.0.10
         - --cluster-domain=cluster.local
