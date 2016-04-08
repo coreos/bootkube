@@ -1,0 +1,67 @@
+#cloud-config
+
+hostname: $public_ipv4
+
+coreos:
+  flannel:
+    interface: $public_ipv4
+    etcd_endpoints: http://172.17.4.51:2379
+  units:
+    - name: etcd2.service
+      command: start
+    - name: flanneld.service
+      command: start
+      drop-ins:
+      - name: 50-network-config.conf
+        content: |
+          [Service]
+          ExecStartPre=/usr/bin/etcdctl --endpoint=http://172.17.4.51:2379 set /coreos.com/network/config '{ "Network": "10.2.0.0/16" }'
+    - name: docker.service
+      drop-ins:
+      - name: 50-flannel.conf
+        content: |
+          [Unit]
+          Requires=flanneld.service
+          After=flanneld.service
+    - name: kubelet.service
+      enable: true
+      command: start
+      content: |
+        [Service]
+        Environment=KUBELET_ACI=quay.io/aaron_levy/hyperkube
+        Environment=KUBELET_VERSION=v1.2.0_runonce.1
+        ExecStart=/usr/lib/coreos/kubelet-wrapper \
+          --runonce \
+          --runonce-timeout=60s \
+          --api-servers=https://127.0.0.1:6443 \
+          --kubeconfig=/etc/kubernetes/kubeconfig.yaml \
+          --lock-file=/var/run/lock/kubelet.lock \
+          --allow-privileged \
+          --node-labels=master=true \
+          --cluster_dns=10.3.0.10 \
+          --cluster_domain=cluster.local
+
+        Restart=always
+        RestartSec=5
+
+        [Install]
+        WantedBy=multi-user.target
+
+write_files:
+  - path: /etc/ssh/sshd_config
+    permissions: 0600
+    owner: root:root
+    content: |
+      # Use most defaults for sshd configuration.
+      UsePrivilegeSeparation sandbox
+      Subsystem sftp internal-sftp
+
+      PermitRootLogin no
+      AllowUsers core
+      PasswordAuthentication no
+      ChallengeResponseAuthentication no
+      GatewayPorts clientspecified
+  - path: "/etc/kubernetes/kubeconfig.yaml"
+    permissions: "0644"
+    owner: core
+    content: |
