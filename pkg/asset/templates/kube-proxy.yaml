@@ -13,8 +13,6 @@ spec:
         k8s_app: kube-proxy
         version: v1.2.0_coreos.1
     spec:
-      nodeSelector:
-        master: "true"
       hostNetwork: true
       containers:
       - name: kube-proxy
