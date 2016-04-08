@@ -67,6 +67,7 @@ func NewBootkube(config Config) (*bootkube, error) {
 		"--service-cluster-ip-range=10.3.0.0/24",
 		"--service-account-key-file=" + config.ServiceAccountKey,
 		"--token-auth-file=" + config.TokenAuth,
+		"--admission-control=ServiceAccount",
 		"--runtime-config=extensions/v1beta1/deployments=true,extensions/v1beta1/daemonsets=true",
 	})
 
