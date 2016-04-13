@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 source ./config-env
 
@@ -8,10 +8,10 @@ echo "starting..."
 	--ssh-keyfile=${HOME}/.vagrant.d/insecure_private_key \
 	--remote-address=172.17.4.101:22 \
 	--remote-etcd-address=172.17.4.51:2379 \
-	--manifest-dir=${OUTDIR}/manifests \
-	--apiserver-key=${OUTDIR}/tls/apiserver.key \
-	--apiserver-cert=${OUTDIR}/tls/apiserver.crt \
-	--ca-cert=${OUTDIR}/tls/ca.crt \
-	--service-account-key=${OUTDIR}/tls/service-account.key \
-	--token-auth-file=${OUTDIR}/auth/token-auth.csv
+	--manifest-dir=cluster/manifests \
+	--apiserver-key=cluster/tls/apiserver.key \
+	--apiserver-cert=cluster/tls/apiserver.crt \
+	--ca-cert=cluster/tls/ca.crt \
+	--service-account-key=cluster/tls/service-account.key \
+	--token-auth-file=cluster/auth/token-auth.csv
 

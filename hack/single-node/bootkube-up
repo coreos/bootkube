@@ -1,0 +1,17 @@
+#!/bin/bash -e
+
+source ./config-env
+
+echo "starting..."
+../../bin/bootkube start \
+    --ssh-user=core \
+    --ssh-keyfile=${HOME}/.vagrant.d/insecure_private_key \
+    --remote-address=172.17.4.100:22 \
+    --remote-etcd-address=127.0.0.1:2379 \
+    --manifest-dir=cluster/manifests \
+    --apiserver-key=cluster/tls/apiserver.key \
+    --apiserver-cert=cluster/tls/apiserver.crt \
+    --ca-cert=cluster/tls/ca.crt \
+    --service-account-key=cluster/tls/service-account.key \
+    --token-auth-file=cluster/auth/token-auth.csv
+

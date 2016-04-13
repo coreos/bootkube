@@ -33,7 +33,7 @@ coreos:
         ExecStart=/usr/lib/coreos/kubelet-wrapper \
           --runonce \
           --runonce-timeout=60s \
-          --api-servers=https://127.0.0.1:6443 \
+          --api-servers=https://172.17.4.101:6443 \
           --kubeconfig=/etc/kubernetes/kubeconfig.yaml \
           --lock-file=/var/run/lock/kubelet.lock \
           --allow-privileged \

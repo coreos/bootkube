@@ -1,0 +1,13 @@
+#!/bin/bash -e
+
+source ./config-env
+
+echo "rendering manifests to ./cluster"
+../../bin/bootkube render \
+    --outdir=cluster \
+    --apiserver-cert-ip-addrs=${APISERVER_CERT_IPS} \
+    --etcd-servers=${ETCD_SERVERS} \
+    --api-servers=${API_SERVERS}
+
+echo "inserting kubeconfig into user-data"
+cat user-data.sample > cluster/user-data && sed 's/^/      /' cluster/auth/kubeconfig.yaml >> cluster/user-data

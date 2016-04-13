@@ -9,7 +9,7 @@ require 'yaml'
 Vagrant.require_version ">= 1.6.0"
 
 NODE_IP = "172.17.4.100"
-USER_DATA_PATH = File.expand_path("user-data")
+USER_DATA_PATH = File.expand_path("cluster/user-data")
 
 Vagrant.configure("2") do |config|
   # always use Vagrant's insecure key

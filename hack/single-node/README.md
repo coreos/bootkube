@@ -1,59 +1,32 @@
-# (wip) Hack / Dev build
+# Hack / Dev single-node build
+
+**Note: All scripts are assumed to be ran from this directory.**
 
 ## Generate assets
 
 ```
-bootkube render --outdir=cluster
+./bootkube-render
 ```
 
-## Add kubeconfig to user-data
-
-```
-cat user-data.sample > user-data && sed 's/^/      /' cluster/auth/kubeconfig.yaml >> user-data
-```
+This will render all tls assets, manifests, secrets, and user-data files necessary to stand up a local vagrant based development cluster. If you would like to change configuration for any reason, you can tweak parameters found in the `config-env` file.
 
 ## Start VM
 
 ```
 vagrant up
 ```
-
-## Get SSH info
-
-```
-vagrant ssh-config
-```
-
-Make note of:
-
-`HostName`
-`User`
-`Port`
-`IdentityFile`
-
 ## Start Bootkube
 
-Replace $x with values from above.
-
 ```
-bootkube start \
-  --remote-address=$HostName:$Port \
-  --remote-etcd-address=127.0.0.1:2379 \
-  --ssh-keyfile=$IdentityFile \
-  --ssh-user=$User \
-  --manifest-dir=cluster/manifests \
-  --apiserver-key=cluster/tls/apiserver.key \
-  --apiserver-cert=cluster/tls/apiserver.crt \
-  --ca-cert=cluster/tls/ca.crt \
-  --token-auth-file=cluster/auth/token-auth.csv \
-  --service-account-key=cluster/tls/service-account.key
+./bootkube-up
 ```
 
-## Inspect node state
+Once kube-apiserver pod started, you can manually kill bootkube. After that, you will have a fully functional single-node self-hosted cluster with cluster DNS.
+
+## Cleaning up
+
+To stop the running cluster, run:
 
 ```
-vagrant ssh
-journalctl -lfu kubelet
+vagrant destroy -f
 ```
-
-Once kube-apiserver pod started, can manually kill bootkube

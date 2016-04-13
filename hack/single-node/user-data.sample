@@ -32,7 +32,7 @@ coreos:
         ExecStart=/usr/lib/coreos/kubelet-wrapper \
           --runonce \
           --runonce-timeout=60s \
-          --api-servers=https://127.0.0.1:6443 \
+          --api-servers=https://172.17.4.100:6443 \
           --kubeconfig=/etc/kubernetes/kubeconfig.yaml \
           --lock-file=/var/run/lock/kubelet.lock \
           --allow-privileged \
@@ -47,6 +47,19 @@ coreos:
         WantedBy=multi-user.target
 
 write_files:
+  - path: /etc/ssh/sshd_config
+    permissions: 0600
+    owner: root:root
+    content: |
+      # Use most defaults for sshd configuration.
+      UsePrivilegeSeparation sandbox
+      Subsystem sftp internal-sftp
+
+      PermitRootLogin no
+      AllowUsers core
+      PasswordAuthentication no
+      ChallengeResponseAuthentication no
+      GatewayPorts clientspecified
   - path: "/etc/kubernetes/kubeconfig.yaml"
     permissions: "0644"
     owner: core
