@@ -1,6 +1,6 @@
 bin/
 vendor-v[0-9].[0-9].[0-9]/
-pkg/asset/internal/
+pkg/asset/binassets/
 
 hack/*/.vagrant/
 hack/*/cluster/

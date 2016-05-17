@@ -9,7 +9,7 @@ import (
 
 	"github.com/ghodss/yaml"
 
-	"github.com/coreos/bootkube/pkg/asset/internal"
+	"github.com/coreos/bootkube/pkg/asset/binassets"
 )
 
 const (
@@ -18,22 +18,34 @@ const (
 	secretCMName        = "kube-controller-manager"
 )
 
+var (
+	KubeConfigTemplate        = binassets.MustAsset("kubeconfig.yaml")
+	KubeletTemplate           = binassets.MustAsset("kubelet.yaml")
+	APIServerTemplate         = binassets.MustAsset("kube-apiserver.yaml")
+	ControllerManagerTemplate = binassets.MustAsset("kube-controller-manager.yaml")
+	SchedulerTemplate         = binassets.MustAsset("kube-scheduler.yaml")
+	ProxyTemplate             = binassets.MustAsset("kube-proxy.yaml")
+	DNSRcTemplate             = binassets.MustAsset("kube-dns-rc.yaml")
+	DNSSvcTemplate            = binassets.MustAsset("kube-dns-svc.yaml")
+	SystemNSTemplate          = binassets.MustAsset("kube-system-ns.yaml")
+)
+
 func newStaticAssets() Assets {
 	var noData interface{}
 	return Assets{
-		mustCreateAssetFromTemplate(assetPathControllerManager, internal.ControllerManagerTemplate, noData),
-		mustCreateAssetFromTemplate(assetPathScheduler, internal.SchedulerTemplate, noData),
-		mustCreateAssetFromTemplate(assetPathKubeDNSRc, internal.DNSRcTemplate, noData),
-		mustCreateAssetFromTemplate(assetPathKubeDNSSvc, internal.DNSSvcTemplate, noData),
-		mustCreateAssetFromTemplate(assetPathSystemNamespace, internal.SystemNSTemplate, noData),
+		mustCreateAssetFromTemplate(assetPathControllerManager, ControllerManagerTemplate, noData),
+		mustCreateAssetFromTemplate(assetPathScheduler, SchedulerTemplate, noData),
+		mustCreateAssetFromTemplate(assetPathKubeDNSRc, DNSRcTemplate, noData),
+		mustCreateAssetFromTemplate(assetPathKubeDNSSvc, DNSSvcTemplate, noData),
+		mustCreateAssetFromTemplate(assetPathSystemNamespace, SystemNSTemplate, noData),
 	}
 }
 
 func newDynamicAssets(conf Config) Assets {
 	return Assets{
-		mustCreateAssetFromTemplate(assetPathKubelet, internal.KubeletTemplate, conf),
-		mustCreateAssetFromTemplate(assetPathAPIServer, internal.APIServerTemplate, conf),
-		mustCreateAssetFromTemplate(assetPathProxy, internal.ProxyTemplate, conf),
+		mustCreateAssetFromTemplate(assetPathKubelet, KubeletTemplate, conf),
+		mustCreateAssetFromTemplate(assetPathAPIServer, APIServerTemplate, conf),
+		mustCreateAssetFromTemplate(assetPathProxy, ProxyTemplate, conf),
 	}
 }
 
@@ -53,7 +65,7 @@ func newKubeConfigAsset(assets Assets, conf Config) (Asset, error) {
 		base64.StdEncoding.EncodeToString(caCert.Data),
 	}
 
-	return assetFromTemplate(assetPathKubeConfig, internal.KubeConfigTemplate, data)
+	return assetFromTemplate(assetPathKubeConfig, KubeConfigTemplate, data)
 }
 
 func newAPIServerSecretAsset(assets Assets) (Asset, error) {

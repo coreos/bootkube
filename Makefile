@@ -1,6 +1,8 @@
 export GO15VENDOREXPERIMENT:=1
 export CGO_ENABLED:=0
 
+MANIFESTS=$(find . /pkg/asset/templates -name '*.yaml')
+DEBUG="-debug"
 GOFILES:=$(shell find . -name '*.go' | grep -v -E '(./vendor|internal/templates.go)')
 GOPACKAGES:=$(shell go list ./... | grep -v '/vendor/')
 GOPATH_BIN:=$(shell echo ${GOPATH} | awk 'BEGIN { FS = ":" }; { print $1 }')/bin
@@ -18,16 +20,15 @@ vet:
 VENDOR_VERSION = v1.2.1
 vendor: vendor-$(VENDOR_VERSION)
 
-bin/bootkube: $(GOFILES) pkg/asset/internal/templates.go
+bin/bootkube: $(GOFILES) pkg/asset/binassets/templates.go
 	mkdir -p bin
 	go build -o bin/bootkube github.com/coreos/bootkube/cmd/bootkube
 
 install: all
 	cp bin/bootkube $(GOPATH_BIN)
 
-pkg/asset/internal/templates.go: $(GOFILES)
-	mkdir -p $(dir $@)
-	go generate pkg/asset/templates_gen.go
+pkg/asset/binassets/templates.go: $(MANIFESTS)
+	go-bindata $(DEBUG) -pkg binassets -o pkg/asset/binassets/templates.go -prefix pkg/asset/templates pkg/asset/templates/...
 
 vendor-$(VENDOR_VERSION):
 	@echo "Creating k8s vendor dir: $@"
