@@ -21,7 +21,7 @@ sed -i.bak -e '/--node-labels=master=true/d' cluster/user-data-worker
 # Start the VM
 vagrant up
 
-ssh_ident="$(vagrant ssh-config c1 | awk '/IdentityFile/ {print $2}')"
+ssh_ident="$(vagrant ssh-config c1 | awk '/IdentityFile/ {print $2}' | tr -d '"')"
 ssh_port="$(vagrant ssh-config c1 | awk '/Port [0-9]+/ {print $2}')"
 
 # Copy locally rendered assets to the server

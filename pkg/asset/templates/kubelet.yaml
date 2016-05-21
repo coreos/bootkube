@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: kubelet
-        image: quay.io/aaron_levy/hyperkube:v1.2.2_runonce.0
+        image: quay.io/peanutbutter/hyperkube:v1.2.4_inotify.3
         command:
         - /nsenter
         - --target=1

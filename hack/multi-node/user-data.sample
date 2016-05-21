@@ -25,11 +25,10 @@ coreos:
       content: |
         [Service]
         EnvironmentFile=/etc/environment
-        Environment=KUBELET_ACI=quay.io/aaron_levy/hyperkube
-        Environment=KUBELET_VERSION=v1.2.2_runonce.0
+        Environment=KUBELET_ACI=quay.io/peanutbutter/hyperkube
+        Environment=KUBELET_VERSION=v1.2.4_inotify.3
         ExecStart=/usr/lib/coreos/kubelet-wrapper \
-          --runonce \
-          --runonce-timeout=60s \
+          --bootstrap \
           --api-servers=https://172.17.4.101:443 \
           --kubeconfig=/etc/kubernetes/kubeconfig \
           --lock-file=/var/run/lock/kubelet.lock \
