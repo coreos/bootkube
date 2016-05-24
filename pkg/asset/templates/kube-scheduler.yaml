@@ -5,13 +5,13 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: kube-scheduler
-    version: 1.2.2_coreos.0
+    version: v1.2.4_inotify.3
 spec:
   template:
     metadata:
       labels:
         k8s-app: kube-scheduler
-        version: 1.2.2_coreos.0
+        version: v1.2.4_inotify.3
     spec:
       containers:
       - name: kube-scheduler

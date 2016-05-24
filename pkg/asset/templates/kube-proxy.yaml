@@ -5,13 +5,13 @@ metadata:
   namespace: kube-system
   labels:
     k8s_app: kube-proxy
-    version: v1.2.2_coreos.0
+    version: v1.2.4_inotify.3
 spec:
   template:
     metadata:
       labels:
         k8s_app: kube-proxy
-        version: v1.2.2_coreos.0
+        version: v1.2.4_inotify.3
     spec:
       hostNetwork: true
       containers:

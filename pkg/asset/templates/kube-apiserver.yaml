@@ -11,7 +11,7 @@ spec:
     metadata:
       labels:
         k8s-app: kube-apiserver
-        version: v1.2.2_coreos.0
+        version: v1.2.4_inotify.3
     spec:
       nodeSelector:
         master: "true"
