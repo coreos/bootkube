@@ -1,6 +1,8 @@
 package asset
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
 	"fmt"
 	"io/ioutil"
 	"net/url"
@@ -38,6 +40,8 @@ const (
 type Config struct {
 	EtcdServers []*url.URL
 	APIServers  []*url.URL
+	CACert      *x509.Certificate
+	CAPrivKey   *rsa.PrivateKey
 	AltNames    *tlsutil.AltNames
 }
 
@@ -49,7 +53,7 @@ func NewDefaultAssets(conf Config) (Assets, error) {
 	as = append(as, newDynamicAssets(conf)...)
 
 	// TLS assets
-	tlsAssets, err := newTLSAssets(*conf.AltNames)
+	tlsAssets, err := newTLSAssets(conf.CACert, conf.CAPrivKey, *conf.AltNames)
 	if err != nil {
 		return Assets{}, err
 	}

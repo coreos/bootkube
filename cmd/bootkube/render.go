@@ -1,8 +1,11 @@
 package main
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/url"
 	"strings"
@@ -24,16 +27,20 @@ var (
 	}
 
 	renderOpts struct {
-		assetDir    string
-		etcdServers string
-		apiServers  string
-		altNames    string
+		assetDir          string
+		caCertificatePath string
+		caPrivateKeyPath  string
+		etcdServers       string
+		apiServers        string
+		altNames          string
 	}
 )
 
 func init() {
 	cmdRoot.AddCommand(cmdRender)
 	cmdRender.Flags().StringVar(&renderOpts.assetDir, "asset-dir", "", "Output path for rendered assets")
+	cmdRender.Flags().StringVar(&renderOpts.caCertificatePath, "ca-certificate-path", "", "Path to an existing PEM encoded CA. If provided, TLS assets will be generated using this certificate authority.")
+	cmdRender.Flags().StringVar(&renderOpts.caPrivateKeyPath, "ca-private-key-path", "", "Path to an existing Certificate Authority RSA private key. Required if --ca-certificate is set.")
 	cmdRender.Flags().StringVar(&renderOpts.etcdServers, "etcd-servers", "http://127.0.0.1:2379", "List of etcd servers URLs including host:port, comma separated")
 	cmdRender.Flags().StringVar(&renderOpts.apiServers, "api-servers", "https://127.0.0.1:443", "List of API server URLs including host:port, commma seprated")
 	cmdRender.Flags().StringVar(&renderOpts.altNames, "api-server-alt-names", "", "List of SANs to use in api-server certificate. Example: 'IP=127.0.0.1,IP=127.0.0.2,DNS=localhost'. If empty, SANs will be extracted from the --api-servers flag.")
@@ -54,6 +61,12 @@ func runCmdRender(cmd *cobra.Command, args []string) error {
 }
 
 func validateRenderOpts(cmd *cobra.Command, args []string) error {
+	if renderOpts.caCertificatePath != "" && renderOpts.caPrivateKeyPath == "" {
+		return errors.New("You must provide the --ca-private-key-path flag when --ca-certificate-path is provided.")
+	}
+	if renderOpts.caPrivateKeyPath != "" && renderOpts.caCertificatePath == "" {
+		return errors.New("You must provide the --ca-certificate-path flag when --ca-private-key-path is provided.")
+	}
 	if renderOpts.assetDir == "" {
 		return errors.New("Missing required flag: --asset-dir")
 	}
@@ -83,11 +96,44 @@ func flagsToAssetConfig() (c *asset.Config, err error) {
 		// Fall back to parsing from api-server list
 		altNames = altNamesFromURLs(apiServers)
 	}
+
+	var caCert *x509.Certificate
+	var caPrivKey *rsa.PrivateKey
+	if renderOpts.caCertificatePath != "" {
+		caPrivKey, caCert, err = parseCertAndPrivateKeyFromDisk(renderOpts.caCertificatePath, renderOpts.caPrivateKeyPath)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &asset.Config{
 		EtcdServers: etcdServers,
+		CACert:      caCert,
+		CAPrivKey:   caPrivKey,
 		APIServers:  apiServers,
 		AltNames:    altNames,
 	}, nil
+}
+
+func parseCertAndPrivateKeyFromDisk(caCertPath, privKeyPath string) (*rsa.PrivateKey, *x509.Certificate, error) {
+	// Parse CA Private key.
+	keypem, err := ioutil.ReadFile(privKeyPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error reading ca private key file at %s: %v", privKeyPath, err)
+	}
+	key, err := tlsutil.ParsePEMEncodedPrivateKey(keypem)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to parse CA private key: %v", err)
+	}
+	// Parse CA Cert.
+	capem, err := ioutil.ReadFile(caCertPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error reading ca cert file at %s: %v", caCertPath, err)
+	}
+	cert, err := tlsutil.ParsePEMEncodedCACert(capem)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to parse CA Cert: %v", err)
+	}
+	return key, cert, nil
 }
 
 func parseURLs(s string) ([]*url.URL, error) {

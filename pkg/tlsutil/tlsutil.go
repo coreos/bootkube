@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"math"
 	"math/big"
 	"net"
@@ -83,6 +84,22 @@ func NewSelfSignedCACertificate(cfg CertConfig, key *rsa.PrivateKey) (*x509.Cert
 		return nil, err
 	}
 	return x509.ParseCertificate(certDERBytes)
+}
+
+func ParsePEMEncodedCACert(pemdata []byte) (*x509.Certificate, error) {
+	decoded, _ := pem.Decode(pemdata)
+	if decoded == nil {
+		return nil, errors.New("no PEM data found")
+	}
+	return x509.ParseCertificate(decoded.Bytes)
+}
+
+func ParsePEMEncodedPrivateKey(pemdata []byte) (*rsa.PrivateKey, error) {
+	decoded, _ := pem.Decode(pemdata)
+	if decoded == nil {
+		return nil, errors.New("no PEM data found")
+	}
+	return x509.ParsePKCS1PrivateKey(decoded.Bytes)
 }
 
 func NewSignedCertificate(cfg CertConfig, key *rsa.PrivateKey, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, error) {

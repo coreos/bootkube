@@ -8,15 +8,20 @@ import (
 	"github.com/coreos/bootkube/pkg/tlsutil"
 )
 
-func newTLSAssets(altNames tlsutil.AltNames) ([]Asset, error) {
-	var assets []Asset
+func newTLSAssets(caCert *x509.Certificate, caPrivKey *rsa.PrivateKey, altNames tlsutil.AltNames) ([]Asset, error) {
+	var (
+		assets []Asset
+		err    error
+	)
 
-	caKey, caCert, err := newCACert()
-	if err != nil {
-		return assets, err
+	if caCert == nil {
+		caPrivKey, caCert, err = newCACert()
+		if err != nil {
+			return assets, err
+		}
 	}
 
-	apiKey, apiCert, err := newAPIKeyAndCert(caCert, caKey, altNames)
+	apiKey, apiCert, err := newAPIKeyAndCert(caCert, caPrivKey, altNames)
 	if err != nil {
 		return assets, err
 	}
@@ -31,13 +36,13 @@ func newTLSAssets(altNames tlsutil.AltNames) ([]Asset, error) {
 		return assets, err
 	}
 
-	kubeletKey, kubeletCert, err := newKubeletKeyAndCert(caCert, caKey)
+	kubeletKey, kubeletCert, err := newKubeletKeyAndCert(caCert, caPrivKey)
 	if err != nil {
 		return assets, err
 	}
 
 	assets = append(assets, []Asset{
-		{Name: AssetPathCAKey, Data: tlsutil.EncodePrivateKeyPEM(caKey)},
+		{Name: AssetPathCAKey, Data: tlsutil.EncodePrivateKeyPEM(caPrivKey)},
 		{Name: AssetPathCACert, Data: tlsutil.EncodeCertificatePEM(caCert)},
 		{Name: AssetPathAPIServerKey, Data: tlsutil.EncodePrivateKeyPEM(apiKey)},
 		{Name: AssetPathAPIServerCert, Data: tlsutil.EncodeCertificatePEM(apiCert)},
@@ -68,7 +73,7 @@ func newCACert() (*rsa.PrivateKey, *x509.Certificate, error) {
 	return key, cert, err
 }
 
-func newAPIKeyAndCert(caCert *x509.Certificate, caKey *rsa.PrivateKey, altNames tlsutil.AltNames) (*rsa.PrivateKey, *x509.Certificate, error) {
+func newAPIKeyAndCert(caCert *x509.Certificate, caPrivKey *rsa.PrivateKey, altNames tlsutil.AltNames) (*rsa.PrivateKey, *x509.Certificate, error) {
 	key, err := tlsutil.NewPrivateKey()
 	if err != nil {
 		return nil, nil, err
@@ -86,14 +91,14 @@ func newAPIKeyAndCert(caCert *x509.Certificate, caKey *rsa.PrivateKey, altNames 
 		Organization: []string{"kube-master"},
 		AltNames:     altNames,
 	}
-	cert, err := tlsutil.NewSignedCertificate(config, key, caCert, caKey)
+	cert, err := tlsutil.NewSignedCertificate(config, key, caCert, caPrivKey)
 	if err != nil {
 		return nil, nil, err
 	}
 	return key, cert, err
 }
 
-func newKubeletKeyAndCert(caCert *x509.Certificate, caKey *rsa.PrivateKey) (*rsa.PrivateKey, *x509.Certificate, error) {
+func newKubeletKeyAndCert(caCert *x509.Certificate, caPrivKey *rsa.PrivateKey) (*rsa.PrivateKey, *x509.Certificate, error) {
 	key, err := tlsutil.NewPrivateKey()
 	if err != nil {
 		return nil, nil, err
@@ -102,7 +107,7 @@ func newKubeletKeyAndCert(caCert *x509.Certificate, caKey *rsa.PrivateKey) (*rsa
 		CommonName:   "kubelet",
 		Organization: []string{"kube-node"},
 	}
-	cert, err := tlsutil.NewSignedCertificate(config, key, caCert, caKey)
+	cert, err := tlsutil.NewSignedCertificate(config, key, caCert, caPrivKey)
 	if err != nil {
 		return nil, nil, err
 	}
