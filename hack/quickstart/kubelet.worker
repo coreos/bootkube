@@ -16,7 +16,8 @@ ExecStart=/usr/lib/coreos/kubelet-wrapper \
   --hostname-override=${COREOS_PRIVATE_IPV4} \
   --minimum-container-ttl-duration=3m0s \
   --cluster_dns=10.3.0.10 \
-  --cluster_domain=cluster.local
+  --cluster_domain=cluster.local \
+  --config=/etc/kubernetes/manifests
 
 Restart=always
 RestartSec=5

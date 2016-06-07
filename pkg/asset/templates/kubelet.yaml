@@ -25,6 +25,7 @@ spec:
         - ./hyperkube
         - kubelet
         - --api-servers={{ index .APIServers 0 }}
+        - --config=/etc/kubernetes/manifests
         - --allow-privileged
         - --hostname-override=$(MY_POD_IP)
         - --cluster-dns=10.3.0.10

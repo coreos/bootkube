@@ -39,13 +39,6 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: status.podIP
-        ports:
-        - containerPort: 443
-          hostPort: 443
-          name: https
-        - containerPort: 8080
-          hostPort: 8080
-          name: local
         volumeMounts:
         - mountPath: /etc/ssl/certs
           name: ssl-certs-host
@@ -57,6 +50,9 @@ spec:
       - name: ssl-certs-host
         hostPath:
           path: /usr/share/ca-certificates
+      - name: etc-k8s-manifests
+        hostPath:
+          path: /etc/kubernetes/manifests
       - name: secrets
         secret:
           secretName: kube-apiserver

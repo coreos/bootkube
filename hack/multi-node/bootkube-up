@@ -10,13 +10,12 @@ fi
 # Render assets
 if [ ! -d "cluster" ]; then
   ../../_output/bin/${local_os}/bootkube render --asset-dir=cluster --api-servers=https://172.17.4.101:443 --etcd-servers=http://172.17.4.51:2379
+  # Add rendered kubeconfig to the node user-data
+  cat user-data.sample > cluster/user-data && sed 's/^/      /' cluster/auth/kubeconfig >> cluster/user-data
+  cp cluster/user-data{,-worker}
+  cp cluster/user-data{,-controller}
+  sed -i.bak -e '/--node-labels=master=true/d' cluster/user-data-worker
 fi
-
-# Add rendered kubeconfig to the node user-data
-cat user-data.sample > cluster/user-data && sed 's/^/      /' cluster/auth/kubeconfig >> cluster/user-data
-cp cluster/user-data{,-worker}
-cp cluster/user-data{,-controller}
-sed -i.bak -e '/--node-labels=master=true/d' cluster/user-data-worker
 
 # Start the VM
 vagrant up
