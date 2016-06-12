@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/coreos/bootkube/pkg/version"
 )
@@ -26,6 +27,11 @@ var (
 		},
 	}
 )
+
+func init() {
+	remove := pflag.Lookup("log-flush-frequency")
+	remove.Hidden = true
+}
 
 func main() {
 	cmdRoot.AddCommand(cmdVersion)
