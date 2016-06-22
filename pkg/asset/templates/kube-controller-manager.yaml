@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: kube-controller-manager
-        image: quay.io/coreos/hyperkube:v1.3.0-alpha.5_coreos.0
+        image: quay.io/coreos/hyperkube:v1.3.0-beta.1_coreos.0
         command:
         - ./hyperkube
         - controller-manager
