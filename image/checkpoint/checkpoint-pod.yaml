@@ -15,14 +15,9 @@ spec:
       name: etc-kubernetes
     - mountPath: /srv/kubernetes
       name: srv-kubernetes
-    - mountPath: /var/run/secrets/coreos.com/checkpoints
-      name: secrets
   hostNetwork: true
   restartPolicy: Always
   volumes:
-  - name: secrets
-    hostPath:
-      path: /var/run/secrets/coreos.com/checkpoints
   - name: etc-kubernetes
     hostPath:
       path: /etc/kubernetes

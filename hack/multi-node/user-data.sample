@@ -29,7 +29,7 @@ coreos:
         Environment=KUBELET_VERSION=v1.3.0-alpha.5_coreos.0
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests
         ExecStartPre=/bin/mkdir -p /srv/kubernetes/manifests
-        ExecStartPre=/bin/mkdir -p /var/run/secrets/coreos.com/checkpoints
+        ExecStartPre=/bin/mkdir -p /etc/kubernetes/checkpoint-secrets
         ExecStart=/usr/lib/coreos/kubelet-wrapper \
           --api-servers=https://172.17.4.101:443 \
           --kubeconfig=/etc/kubernetes/kubeconfig \
