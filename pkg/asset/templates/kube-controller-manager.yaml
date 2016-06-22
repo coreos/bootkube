@@ -5,13 +5,13 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: kube-controller-manager
-    version: v1.3.0-alpha.5
+    version: v1.3.0-beta.1
 spec:
   template:
     metadata:
       labels:
         k8s-app: kube-controller-manager
-        version: v1.3.0-alpha.5
+        version: v1.3.0-beta.1
     spec:
       containers:
       - name: kube-controller-manager
