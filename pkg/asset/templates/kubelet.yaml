@@ -5,13 +5,11 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: kubelet
-    version: v1.3.0-beta.2
 spec:
   template:
     metadata:
       labels:
         k8s-app: kubelet
-        version: v1.3.0-beta.2
     spec:
       containers:
       - name: kubelet
