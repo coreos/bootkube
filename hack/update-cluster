@@ -1,0 +1,68 @@
+#!/bin/sh
+
+# Configuration
+#
+# Path to kubeconfig
+KUBECONFIG=${KUBECONFIG:-cluster/auth/kubeconfig}
+# Version of Kubernetes currently installed.
+OLD_VERSION=${OLD_VERSION:-"v1.3.0-alpha.5"}
+# Version of Kubernetes to upgrade to.
+NEW_VERSION=${NEW_VERSION:-"v1.3.0-beta.1"}
+# Directory where new manifests are expected.
+NEW_MANIFEST_DIR=${NEW_MANIFEST_DIR:-"cluster/manifests/${NEW_VERSION}"}
+# Directory where old manifests are expected.
+OLD_MANIFEST_DIR=${OLD_MANIFEST_DIR:-"cluster/manifests/${OLD_VERSION}"}
+
+if [ ! -d "${NEW_MANIFEST_DIR}" ]; then
+        echo "Manifest directory does not exist: ${NEW_MANIFEST_DIR}"
+        exit 1
+fi
+
+if [ ! -d "${OLD_MANIFEST_DIR}" ]; then
+        echo "Manifest directory does not exist: ${OLD_MANIFEST_DIR}"
+        exit 1
+fi
+
+# Shortcut for kubectl command
+KC="kubectl --kubeconfig=${KUBECONFIG}"
+
+# Update kube-apiserver
+# Object is a DaemonSet, so we must first delete, then create to update.
+echo
+echo "Updating apiserver"
+$KC delete -f $OLD_MANIFEST_DIR/kube-apiserver.yaml
+# Wait for temp-apiserver to take over.
+while true; do
+        echo "checking for apiserver..."
+        if $KC get pods 2>&1 >/dev/null; then
+                echo "got apiserver"
+                break
+        fi
+        echo "not found..."
+        sleep 1
+done
+$KC create -f $NEW_MANIFEST_DIR/kube-apiserver.yaml
+
+# Update controller-manager
+echo
+echo "Updating controller-manager"
+$KC apply -f $NEW_MANIFEST_DIR/kube-controller-manager.yaml
+
+# Update scheduler
+echo
+echo "Updating scheduler"
+$KC apply -f $NEW_MANIFEST_DIR/kube-scheduler.yaml
+
+# Update kubelet
+# Object is a DaemonSet, so we must first delete, then create to update.
+echo
+echo "Updating kubelet"
+$KC delete -f $OLD_MANIFEST_DIR/kubelet.yaml
+$KC create -f $NEW_MANIFEST_DIR/kubelet.yaml
+
+echo
+echo "Update to ${NEW_VERSION} from ${OLD_VERSION} complete."
+echo
+echo "Examine status of pods with:"
+echo "kubectl --kubeconfig=${KUBECONFIG} get pods"
+echo
