@@ -7,7 +7,7 @@ set -x
 # Path to kubeconfig
 KUBECONFIG=${KUBECONFIG:-cluster/auth/kubeconfig}
 # Version of Kubernetes to upgrade to.
-NEW_VERSION=${NEW_VERSION:-"v1.3.0-beta.1_coreos.0"}
+NEW_VERSION=${NEW_VERSION:-"v1.3.0-beta.2_coreos.0"}
 
 # Shortcut for kubectl command
 kc="kubectl --kubeconfig=${KUBECONFIG} --namespace=kube-system"
