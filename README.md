@@ -52,20 +52,9 @@ Example:
 bootkube start --asset-dir=my-cluster
 ```
 
-## Hack
-
-There are currently a few reference implementations to demonstrate bootstrapping a cluster.
-
-The ./hack directory in this repository contains Vagrant examples & quickstart guides, which launch VM(s) then use bootkube to render assets and launch a self-hosted cluster.
-
-The coreos-baremetal repository contains a reference implementation using bootkube with bootcfg and a baremetal cluster.
-
-* [hack/single-node](hack/single-node/README.md)
-* [hack/multi-node](hack/multi-node/README.md)
-* [hack/quickstart](hack/quickstart/README.md)
-* [coreos-baremetal](https://github.com/coreos/coreos-baremetal/blob/master/Documentation/bootkube.md)
-
 ## Upgrading
+
+** This tool is currently a proof-of-concept and not meant to update a production cluster. **
 
 To upgrade a cluster, use the `hack/update-cluster` script. The script allows you to pass configuration via
 environment variables. For more information on the configuration, refer to the script itself. All configuration

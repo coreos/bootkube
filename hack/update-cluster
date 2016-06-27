@@ -1,6 +1,9 @@
-#!/bin/sh
-set -e
+#!/bin/bash
+set -euo pipefail
 
+# NOTE: This is a proof-of-concept tool and is not intended for use in
+# upgrading a production cluster.
+#
 # Configuration
 #
 # Path to kubeconfig
