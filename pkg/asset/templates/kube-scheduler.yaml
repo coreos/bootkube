@@ -5,11 +5,16 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: kube-scheduler
+    version: v1.3.0-beta.2
 spec:
+  selector:
+    matchLabels:
+      k8s-app: kube-scheduler
   template:
     metadata:
       labels:
         k8s-app: kube-scheduler
+        version: v1.3.0-beta.2
     spec:
       containers:
       - name: kube-scheduler
