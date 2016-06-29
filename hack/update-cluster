@@ -17,64 +17,91 @@ kc="kubectl --kubeconfig=${KUBECONFIG} --namespace=kube-system"
 temp=$(mktemp -d -t k8s-upgrade-$NEW_VERSION.XXX)
 # New image to deploy.
 new_image=${new_image:-"quay.io\/coreos\/hyperkube:${NEW_VERSION}"}
+# Version we are upgrading up from, parsed from version label on API server.
+old_version=$($kc get pod \
+  --selector=k8s-app=kube-apiserver \
+  --output=jsonpath={@.items[0].metadata.labels.version}
+)
 
 update_image() {
   local filepath=$1
   local newfile=$(echo $filepath | sed "s/\.yaml/-${NEW_VERSION}.yaml/")
-  echo "newfile: " $newfile
-  sed "s/image:.*hyperkube.*$/image: ${new_image}/g" "${filepath}" > "${newfile}"
+  sed -e "s/image:.*hyperkube.*$/image: ${new_image}/g" \
+      -e "s/version:.*$/version: ${NEW_VERSION}/g" "${filepath}" > "${newfile}"
 }
+
+daemonset_rolling_update() {
+  echo "daemonset rolling upgrade on ${1}"
+  $kc get ds $1 -oyaml > "${temp}/${1}.yaml"
+  update_image "${temp}/${1}.yaml"
+
+  # Delete the DaemonSet manifest, but leave the pods alive.
+  $kc delete --cascade=false -f "${temp}/${1}.yaml"
+  # Create new DaemonSet manifest.
+  $kc create -f "${temp}/${1}-${NEW_VERSION}.yaml"
+  # Get list of pods belonging to this DaemonSet.
+  pods=""
+  while [ "$pods" == "" ]
+  do
+    sleep 1
+    pods=$($kc get pods --selector=version=$old_version,k8s-app=$1 --output=name)
+  done
+  # Now individually kill off old DaemonSet pods.
+  for pod in $pods
+  do
+    printf "deleting pod ${pod}..."
+    $kc delete $pod
+    echo "done."
+  done
+
+  if [ "$1" == "kube-apiserver" ]; then
+    # Give the API server time to spin back up.
+    sleep 5
+    echo "waiting for apiserver..."
+    while true; do
+      if $kc get pods 2>&1 >/dev/null; then
+        break
+      fi
+      sleep 5
+    done
+  fi
+}
+
+deployment_update() {
+  $kc get deployment $1 -oyaml > "${temp}/${1}.yaml"
+  update_image "${temp}/${1}.yaml"
+  $kc apply -f "${temp}/${1}-${NEW_VERSION}.yaml"
+}
+
+echo "Upgrading to version ${NEW_VERSION} from ${old_version}"
 
 # Update kube-apiserver
 # Object is a DaemonSet, so we must first delete, then create to update.
 echo
 echo "Updating apiserver"
-$kc get ds kube-apiserver -oyaml > "${temp}/kube-apiserver.yaml"
-update_image "${temp}/kube-apiserver.yaml"
-# Delete kube-apiserver and wait for temp-apiserver to take over.
-$kc delete --timeout=1s -f "${temp}/kube-apiserver.yaml"
-while true; do
-        echo "checking for apiserver..."
-        if $kc get pods 2>&1 >/dev/null; then
-                echo "got apiserver"
-                break
-        fi
-        echo "not found..."
-        sleep 3
-done
-$kc create -f "${temp}/kube-apiserver-${NEW_VERSION}.yaml"
-
-# Update controller-manager
-echo
-echo "Updating controller-manager"
-$kc get deployment kube-controller-manager -oyaml > "${temp}/kube-controller-manager.yaml"
-update_image "${temp}/kube-controller-manager.yaml"
-$kc apply -f "${temp}/kube-controller-manager-${NEW_VERSION}.yaml"
-
-# Update scheduler
-echo
-echo "Updating scheduler"
-$kc get deployment kube-scheduler -oyaml > "${temp}/kube-scheduler.yaml"
-update_image "${temp}/kube-scheduler.yaml"
-$kc apply -f "${temp}/kube-scheduler-${NEW_VERSION}.yaml"
-
-# Update kube-proxy
-# Object is a DaemonSet, so we must first delete, then create to update.
-echo
-echo "Updating kube-proxy"
-$kc get ds kube-proxy -oyaml > "${temp}/kube-proxy.yaml"
-update_image "${temp}/kube-proxy.yaml"
-$kc delete -f "${temp}/kube-proxy.yaml"
-$kc create -f "${temp}/kube-proxy-$NEW_VERSION.yaml"
+daemonset_rolling_update "kube-apiserver"
 
 # Update kubelet
 # Object is a DaemonSet, so we must first delete, then create to update.
 echo
 echo "Updating kubelet"
-$kc get ds kubelet -oyaml > "${temp}/kubelet.yaml"
-update_image "${temp}/kubelet.yaml"
-$kc delete -f "${temp}/kubelet.yaml"
-$kc create -f "${temp}/kubelet-$NEW_VERSION.yaml"
+daemonset_rolling_update "kubelet"
+
+# Update kube-proxy
+# Object is a DaemonSet, so we must first delete, then create to update.
+echo
+echo "Updating kube-proxy"
+daemonset_rolling_update "kube-proxy"
+
+# Update controller-manager
+echo
+echo "Updating controller-manager"
+deployment_update "kube-controller-manager"
+
+# Update scheduler
+echo
+echo "Updating scheduler"
+deployment_update "kube-scheduler"
 
 echo
 echo "Update to ${NEW_VERSION} complete."
