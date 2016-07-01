@@ -27,13 +27,14 @@ var (
 	}
 
 	renderOpts struct {
-		assetDir          string
-		caCertificatePath string
-		caPrivateKeyPath  string
-		etcdServers       string
-		apiServers        string
-		altNames          string
-		clusterDNS        string
+		assetDir                       string
+		caCertificatePath              string
+		caPrivateKeyPath               string
+		etcdServers                    string
+		apiServers                     string
+		altNames                       string
+		clusterDNS                     string
+		apiServerServiceClusterIPRange string
 	}
 )
 
@@ -46,6 +47,7 @@ func init() {
 	cmdRender.Flags().StringVar(&renderOpts.apiServers, "api-servers", "https://127.0.0.1:443", "List of API server URLs including host:port, commma seprated")
 	cmdRender.Flags().StringVar(&renderOpts.altNames, "api-server-alt-names", "", "List of SANs to use in api-server certificate. Example: 'IP=127.0.0.1,IP=127.0.0.2,DNS=localhost'. If empty, SANs will be extracted from the --api-servers flag.")
 	cmdRender.Flags().StringVar(&renderOpts.clusterDNS, "cluster-dns", "10.3.0.10", "The DNS_SERVICE_IP of the cluster")
+	cmdRender.Flags().StringVar(&renderOpts.apiServerServiceClusterIPRange, "api-server-service-cluster-ip-range", "10.3.0.0/24", "The kube-apiserver --service-cluster-ip-range value")
 }
 
 func runCmdRender(cmd *cobra.Command, args []string) error {
@@ -81,6 +83,9 @@ func validateRenderOpts(cmd *cobra.Command, args []string) error {
 	if renderOpts.clusterDNS == "" {
 		return errors.New("Missing requried flag: --cluster-dns")
 	}
+	if renderOpts.apiServerServiceClusterIPRange == "" {
+		return errors.New("Missing requried flag: --api-server-service-cluster-ip-range")
+	}
 	return nil
 }
 
@@ -111,12 +116,13 @@ func flagsToAssetConfig() (c *asset.Config, err error) {
 		}
 	}
 	return &asset.Config{
-		EtcdServers: etcdServers,
-		CACert:      caCert,
-		CAPrivKey:   caPrivKey,
-		APIServers:  apiServers,
-		AltNames:    altNames,
-		ClusterDNS:  renderOpts.clusterDNS,
+		EtcdServers:                    etcdServers,
+		CACert:                         caCert,
+		CAPrivKey:                      caPrivKey,
+		APIServers:                     apiServers,
+		AltNames:                       altNames,
+		ClusterDNS:                     renderOpts.clusterDNS,
+		APIServerServiceClusterIPRange: renderOpts.apiServerServiceClusterIPRange,
 	}, nil
 }
 
