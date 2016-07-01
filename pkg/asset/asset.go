@@ -24,6 +24,7 @@ const (
 	AssetPathKubeConfig              = "auth/kubeconfig"
 	AssetPathManifests               = "manifests"
 	AssetPathKubelet                 = "manifests/kubelet.yaml"
+	AssetPathKubeletConfig           = "manifests/kubelet-config.yaml"
 	AssetPathProxy                   = "manifests/kube-proxy.yaml"
 	AssetPathAPIServerSecret         = "manifests/kube-apiserver-secret.yaml"
 	AssetPathAPIServer               = "manifests/kube-apiserver.yaml"
