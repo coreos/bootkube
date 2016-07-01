@@ -1,0 +1,129 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: kubelet
+  namespace: kube-system
+  labels:
+    k8s-app: kubelet
+    version: v1.3.6_coreos.0
+spec:
+  template:
+    metadata:
+      labels:
+        k8s-app: kubelet
+        version: v1.3.6_coreos.0
+    spec:
+      containers:
+      - name: kubelet
+        image: quay.io/coreos/hyperkube:v1.3.6_coreos.0
+        command:
+        - /nsenter
+        - --target=1
+        - --mount
+        - --wd=.
+        - --
+        - ./hyperkube
+        - kubelet
+        - --api-servers=$(API_SERVERS)
+        - --config=$(CONFIG)
+        - --allow-privileged=$(ALLOW_PRIVILEGED)
+        - --hostname-override=$(MY_POD_IP)
+        - --cluster-dns=$(CLUSTER_DNS)
+        - --cluster-domain=$(CLUSTER_DOMAIN)
+        - --kubeconfig=$(KUBECONFIG)
+        - --lock-file=$(LOCK_FILE)
+        - --minimum-container-ttl-duration=$(MINIMUM_CONTAINER_TTL_DURATION)
+        env:
+          - name: MY_POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          - name: API_SERVERS
+            valueFrom:
+              configMapKeyRef:
+                name: kubelet-config
+                key: api-servers
+          - name: CONFIG
+            valueFrom:
+              configMapKeyRef:
+                name: kubelet-config
+                key: config
+          - name: ALLOW_PRIVILEGED
+            valueFrom:
+              configMapKeyRef:
+                name: kubelet-config
+                key: allow-privileged
+          - name: CLUSTER_DNS
+            valueFrom:
+              configMapKeyRef:
+                name: kubelet-config
+                key: cluster-dns
+          - name: CLUSTER_DOMAIN
+            valueFrom:
+              configMapKeyRef:
+                name: kubelet-config
+                key: cluster-domain
+          - name: KUBECONFIG
+            valueFrom:
+              configMapKeyRef:
+                name: kubelet-config
+                key: kubeconfig
+          - name: LOCK_FILE
+            valueFrom:
+              configMapKeyRef:
+                name: kubelet-config
+                key: lock-file
+          - name: MINIMUM_CONTAINER_TTL_DURATION
+            valueFrom:
+              configMapKeyRef:
+                name: kubelet-config
+                key: minimum-container-ttl-duration
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: dev
+          mountPath: /dev
+        - name: run
+          mountPath: /run
+        - name: sys
+          mountPath: /sys
+          readOnly: true
+        - name: etc-kubernetes
+          mountPath: /etc/kubernetes
+          readOnly: true
+        - name: etc-ssl-certs
+          mountPath: /etc/ssl/certs
+          readOnly: true
+        - name: var-lib-docker
+          mountPath: /var/lib/docker
+        - name: var-lib-kubelet
+          mountPath: /var/lib/kubelet
+        - name: var-lib-rkt
+          mountPath: /var/lib/rkt
+      hostNetwork: true
+      hostPID: true
+      volumes:
+      - name: dev
+        hostPath:
+          path: /dev
+      - name: run
+        hostPath:
+          path: /run
+      - name: sys
+        hostPath:
+          path: /sys
+      - name: etc-kubernetes
+        hostPath:
+          path: /etc/kubernetes
+      - name: etc-ssl-certs
+        hostPath:
+          path: /usr/share/ca-certificates
+      - name: var-lib-docker
+        hostPath:
+          path: /var/lib/docker
+      - name: var-lib-kubelet
+        hostPath:
+          path: /var/lib/kubelet
+      - name: var-lib-rkt
+        hostPath:
+          path: /var/lib/rkt

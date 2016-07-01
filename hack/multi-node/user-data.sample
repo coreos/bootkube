@@ -30,23 +30,29 @@ coreos:
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests
         ExecStartPre=/bin/mkdir -p /srv/kubernetes/manifests
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/checkpoint-secrets
-        ExecStart=/usr/lib/coreos/kubelet-wrapper \
-          --api-servers=https://172.17.4.101:443 \
-          --kubeconfig=/etc/kubernetes/kubeconfig \
-          --lock-file=/var/run/lock/kubelet.lock \
-          --exit-on-lock-contention \
-          --config=/etc/kubernetes/manifests \
-          --allow-privileged \
-          --hostname-override=${COREOS_PUBLIC_IPV4} \
-          --node-labels=master=true \
-          --minimum-container-ttl-duration=3m0s \
-          --cluster_dns=10.3.0.10 \
-          --cluster_domain=cluster.local
+        ExecStart=/usr/lib/coreos/kubelet-wrapper $PERSISTENT_KUBELET_FLAGS $KUBELET_FLAGS
         Restart=always
         RestartSec=5
 
         [Install]
         WantedBy=multi-user.target
+      drop-ins:
+      - name: 50-kubelet-config.conf
+        content: |
+          [Service]
+          Environment='KUBELET_FLAGS=--api-servers=https://172.17.4.101:443 \
+            --kubeconfig=/etc/kubernetes/kubeconfig \
+            --lock-file=/var/run/lock/kubelet.lock \
+            --allow-privileged \
+            --config=/etc/kubernetes/manifests \
+            --hostname-override=$public_ipv4 \
+            --minimum-container-ttl-duration=3m0s \
+            --cluster_dns=10.3.0.10 \
+            --cluster_domain=cluster.local'
+      - name: 60-kubelet-config-host.conf
+        content: |
+          [Service]
+          Environment='PERSISTENT_KUBELET_FLAGS=--exit-on-lock-contention=true --node-labels=master=true'
 
 write_files:
   - path: "/etc/kubernetes/kubeconfig"
