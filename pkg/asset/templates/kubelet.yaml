@@ -28,7 +28,7 @@ spec:
         - --config=/etc/kubernetes/manifests
         - --allow-privileged
         - --hostname-override=$(MY_POD_IP)
-        - --cluster-dns=10.3.0.10
+        - --cluster-dns={{ .ClusterDNS }}
         - --cluster-domain=cluster.local
         - --kubeconfig=/etc/kubernetes/kubeconfig
         - --lock-file=/var/run/lock/kubelet.lock

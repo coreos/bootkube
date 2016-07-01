@@ -43,6 +43,7 @@ type Config struct {
 	CACert      *x509.Certificate
 	CAPrivKey   *rsa.PrivateKey
 	AltNames    *tlsutil.AltNames
+	ClusterDNS  string
 }
 
 // NewDefaultAssets returns a list of default assets, optionally
