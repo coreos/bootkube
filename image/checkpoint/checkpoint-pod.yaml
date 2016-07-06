@@ -6,7 +6,7 @@ metadata:
 spec:
   containers:
   - name: checkpoint
-    image: quay.io/coreos/pod-checkpointer:f9949bfecdabc573517487d1a5af1e0cd22acf52
+    image: quay.io/coreos/pod-checkpointer:91d5a311eee40d579a8f0549c10eeed57979d6c4
     command:
     - /checkpoint
     imagePullPolicy: Always
