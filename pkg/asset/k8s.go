@@ -31,7 +31,6 @@ func newStaticAssets() Assets {
 
 func newDynamicAssets(conf Config) Assets {
 	return Assets{
-		mustCreateAssetFromTemplate(AssetPathKubeletConfig, internal.KubeletConfigTemplate, conf),
 		mustCreateAssetFromTemplate(AssetPathAPIServer, internal.APIServerTemplate, conf),
 		mustCreateAssetFromTemplate(AssetPathProxy, internal.ProxyTemplate, conf),
 	}
