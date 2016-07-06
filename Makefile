@@ -27,6 +27,10 @@ _output/bin/%: $(GOFILES)
 	mkdir -p $(dir $@)
 	GOOS=$(word 1, $(subst /, ,$*)) go build -ldflags "$(LDFLAGS)" -o $@ github.com/kubernetes-incubator/bootkube/cmd/$(notdir $@)
 
+_output/bin/%/node-agent: cmd/node-agent/main.go
+	mkdir -p $(dir $@)
+	GOOS=$* go build -o _output/bin/$*/node-agent github.com/coreos/bootkube/cmd/node-agent
+
 _output/release/bootkube.tar.gz: _output/bin/linux/bootkube _output/bin/darwin/bootkube _output/bin/linux/checkpoint
 	mkdir -p $(dir $@)
 	tar czf $@ -C _output bin/linux/bootkube bin/darwin/bootkube bin/linux/checkpoint
