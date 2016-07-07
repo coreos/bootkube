@@ -7,6 +7,9 @@ metadata:
     k8s-app: kube-controller-manager
     version: v1.3.0-beta.2
 spec:
+  selector:
+    matchLabels:
+      k8s-app: kube-controller-manager
   template:
     metadata:
       labels:

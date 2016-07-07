@@ -1,0 +1,111 @@
+#!/bin/bash
+set -euo pipefail
+
+# NOTE: This is a proof-of-concept tool and is not intended for use in
+# upgrading a production cluster.
+#
+# Configuration
+#
+# Path to kubeconfig
+KUBECONFIG=${KUBECONFIG:-cluster/auth/kubeconfig}
+# Version of Kubernetes to upgrade to.
+NEW_VERSION=${NEW_VERSION:-"v1.3.0-beta.2_coreos.0"}
+
+# Shortcut for kubectl command
+kc="kubectl --kubeconfig=${KUBECONFIG} --namespace=kube-system"
+# Temp dir for manifests
+temp=$(mktemp -d -t k8s-upgrade-$NEW_VERSION.XXX)
+# New image to deploy.
+new_image=${new_image:-"quay.io\/coreos\/hyperkube:${NEW_VERSION}"}
+# Version we are upgrading up from, parsed from version label on API server.
+old_version=$($kc get pod \
+  --selector=k8s-app=kube-apiserver \
+  --output=jsonpath={@.items[0].metadata.labels.version}
+)
+
+update_image() {
+  local filepath=$1
+  local newfile=$(echo $filepath | sed "s/\.yaml/-${NEW_VERSION}.yaml/")
+  sed -e "s/image:.*hyperkube.*$/image: ${new_image}/g" \
+      -e "s/version:.*$/version: ${NEW_VERSION}/g" "${filepath}" > "${newfile}"
+}
+
+daemonset_rolling_update() {
+  echo "daemonset rolling upgrade on ${1}"
+  $kc get ds $1 -oyaml > "${temp}/${1}.yaml"
+  update_image "${temp}/${1}.yaml"
+
+  # Delete the DaemonSet manifest, but leave the pods alive.
+  $kc delete --cascade=false -f "${temp}/${1}.yaml"
+  # Create new DaemonSet manifest.
+  $kc create -f "${temp}/${1}-${NEW_VERSION}.yaml"
+  # Get list of pods belonging to this DaemonSet.
+  pods=""
+  while [ "$pods" == "" ]
+  do
+    sleep 1
+    pods=$($kc get pods --selector=version=$old_version,k8s-app=$1 --output=name)
+  done
+  # Now individually kill off old DaemonSet pods.
+  for pod in $pods
+  do
+    printf "deleting pod ${pod}..."
+    $kc delete $pod
+    echo "done."
+  done
+
+  if [ "$1" == "kube-apiserver" ]; then
+    # Give the API server time to spin back up.
+    sleep 5
+    echo "waiting for apiserver..."
+    while true; do
+      if $kc get pods 2>&1 >/dev/null; then
+        break
+      fi
+      sleep 5
+    done
+  fi
+}
+
+deployment_update() {
+  $kc get deployment $1 -oyaml > "${temp}/${1}.yaml"
+  update_image "${temp}/${1}.yaml"
+  $kc apply -f "${temp}/${1}-${NEW_VERSION}.yaml"
+}
+
+echo "Upgrading to version ${NEW_VERSION} from ${old_version}"
+
+# Update kube-apiserver
+# Object is a DaemonSet, so we must first delete, then create to update.
+echo
+echo "Updating apiserver"
+daemonset_rolling_update "kube-apiserver"
+
+# Update kubelet
+# Object is a DaemonSet, so we must first delete, then create to update.
+echo
+echo "Updating kubelet"
+daemonset_rolling_update "kubelet"
+
+# Update kube-proxy
+# Object is a DaemonSet, so we must first delete, then create to update.
+echo
+echo "Updating kube-proxy"
+daemonset_rolling_update "kube-proxy"
+
+# Update controller-manager
+echo
+echo "Updating controller-manager"
+deployment_update "kube-controller-manager"
+
+# Update scheduler
+echo
+echo "Updating scheduler"
+deployment_update "kube-scheduler"
+
+echo
+echo "Update to ${NEW_VERSION} complete."
+echo
+echo "Examine status of pods with:"
+echo "kubectl --kubeconfig=${KUBECONFIG} get pods"
+echo

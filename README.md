@@ -52,6 +52,14 @@ Example:
 bootkube start --asset-dir=my-cluster
 ```
 
+## Upgrading
+
+** This tool is currently a proof-of-concept and not meant to update a production cluster. **
+
+To upgrade a cluster, use the `hack/update-cluster` script. The script allows you to pass configuration via
+environment variables. For more information on the configuration, refer to the script itself. All configuration
+is initialized at the top of the script.
+
 ## Building
 
 First, clone the repo into the proper location in your $GOPATH:

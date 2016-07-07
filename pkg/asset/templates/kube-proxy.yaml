@@ -4,13 +4,13 @@ metadata:
   name: kube-proxy
   namespace: kube-system
   labels:
-    k8s_app: kube-proxy
+    k8s-app: kube-proxy
     version: v1.3.0-beta.2
 spec:
   template:
     metadata:
       labels:
-        k8s_app: kube-proxy
+        k8s-app: kube-proxy
         version: v1.3.0-beta.2
     spec:
       hostNetwork: true
