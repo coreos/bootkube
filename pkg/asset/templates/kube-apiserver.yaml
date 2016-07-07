@@ -35,7 +35,7 @@ spec:
         - --advertise-address=$(MY_POD_IP)
         - --etcd-servers={{ range $i, $e := .EtcdServers }}{{ if $i }},{{end}}{{ $e }}{{end}}
         - --allow-privileged=true
-        - --service-cluster-ip-range=10.3.0.0/24
+        - --service-cluster-ip-range={{ .APIServerServiceClusterIPRange }}
         - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota
         - --tls-cert-file=/etc/kubernetes/secrets/apiserver.crt
         - --tls-private-key-file=/etc/kubernetes/secrets/apiserver.key
