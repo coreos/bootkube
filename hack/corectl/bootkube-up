@@ -1,0 +1,89 @@
+#!/bin/bash
+set -euo pipefail
+
+UUID=4AB5451F-A679-4CC8-9E2A-6E588AAD6BB4
+CONTROLLER_NODES=1
+WORKER_NODES=2
+ETCD_NODES=1
+
+ETCD_ENDPOINTS=""
+for (( j=1; j<=${ETCD_NODES}; j++ ));	do
+		ETCD_ENDPOINTS=http://etcd-$j:2379,${ETCD_ENDPOINTS}
+done
+API_SERVERS=""
+for (( j=1; j<=${CONTROLLER_NODES}; j++ ));	do
+		API_SERVERS=https://api-server-$j:443,${API_SERVERS}
+done
+ETCD_ENDPOINTS=$(echo ${ETCD_ENDPOINTS} | /usr/bin/sed -e "s#,\$##")
+API_SERVERS=$(echo ${API_SERVERS} | /usr/bin/sed -e "s#,\$##")
+
+# Render assets
+if [ ! -d "cluster" ]; then
+  ../../_output/bin/darwin/bootkube render --asset-dir=cluster \
+    --api-servers="${API_SERVERS}" --etcd-servers="${ETCD_ENDPOINTS}"
+  # Add rendered kubeconfig to the node user-data
+  cat user-data.sample > cluster/user-data && \
+    sed 's/^/      /' cluster/auth/kubeconfig >> cluster/user-data
+  # XXX kubelet-wrapper "seems" to misbehave if more than one set...
+  API_SERVERS=https://api-server-1:443
+  sed -i.bak -e 's#{{ETCD_ENDPOINTS}}#'"${ETCD_ENDPOINTS}"'#g' \
+    -e 's#{{API_SERVERS}}#'"${API_SERVERS}"'#g' cluster/user-data
+  cp cluster/user-data{,-worker}
+  cp cluster/user-data{,-controller}
+  sed -i.bak -e '/--node-labels=master=true/d' cluster/user-data-worker
+fi
+
+./etcd-cluster-setup.sh -s ${ETCD_NODES}
+
+bootstrapRootVolumes() {
+  vol=$1-root.qcow2
+  if ! [ -f "${vol}" ]; then
+    echo "creating ${vol}..."
+    qcow-tool create --size=16GiB ${vol}
+   else
+    echo "${vol} already created"
+  fi
+  echo "formating ${vol}..."
+  corectl run  --name helper --volume=${vol} -u ${UUID}
+  # the lazy_itable_init is a cheap trick to try to ensure that disk gets
+  # formated in our stock timeout window, even on slowish setups...
+  corectl ssh helper "yes | sudo mke2fs -b 1024 -i 1024 -t ext4 -E lazy_itable_init=1 /dev/vda"
+  corectl halt helper
+}
+
+boot() {
+  NAME=$1
+  MEM=$2
+  CPUS=$3
+  CFG=$4
+  bootstrapRootVolumes $1
+  ROOT=$1-root.qcow2
+  corectl run -n ${NAME} -m ${MEM} -N ${CPUS} -r ${ROOT} -L ${CFG}
+}
+
+for (( i=1; i<=${CONTROLLER_NODES}; i++ )); do
+  boot api-server-$i 2048 2 cluster/user-data-controller
+done
+
+for (( i=1; i<=${WORKER_NODES}; i++ )); do
+  boot worker-$i 2048 2 cluster/user-data-worker
+done
+echo
+echo "cluster is up..."
+corectl ps
+echo
+echo "starting bootstrap..."
+echo
+tar czf cluster.tgz cluster
+corectl scp ../../_output/bin/linux/bootkube api-server-1:/home/core/
+corectl scp cluster.tgz api-server-1:/home/core/
+rm -rf cluster.tgz
+corectl ssh api-server-1 "tar xzf cluster.tgz && rm cluster.tgz && chmod 755 bootkube"
+corectl ssh api-server-1 "sudo /home/core/bootkube start --asset-dir=/home/core/cluster --etcd-server=${ETCD_ENDPOINTS}"
+echo
+echo "Bootstrap complete. Access your kubernetes cluster using:"
+echo
+echo "$ kubectl --kubeconfig=cluster/auth/kubeconfig get no,svc,ep "
+echo
+echo "[make sure that \"nameserver 127.0.0.1\" is in your /etc/resolv.conf]"
+echo

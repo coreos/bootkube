@@ -15,6 +15,7 @@ If you are interested in the design and details [see the bootkube design documen
 * [CoreOS Baremetal](https://github.com/coreos/coreos-baremetal/blob/master/Documentation/bootkube.md)
 * [Vagrant Single-Node](hack/single-node/README.md)
 * [Vagrant Multi-Node](hack/multi-node/README.md)
+* [corectl Multi-Node](hack/corectl/README.md)
 
 ## Usage
 

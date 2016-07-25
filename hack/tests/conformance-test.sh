@@ -27,6 +27,8 @@ ssh -q -o stricthostkeychecking=no -i ${ssh_key} -p ${ssh_port} core@${ssh_host}
     "mkdir -p ${K8S_SRC} && [[ -d ${K8S_SRC}/.git ]] || git clone https://${CONFORMANCE_REPO} ${K8S_SRC}"
 
 RKT_OPTS=$(echo \
+    "--volume=resolv,kind=host,source=/etc/resolv.conf "\
+    "--mount volume=resolv,target=/etc/resolv.conf " \
     "--volume=kc,kind=host,source=/home/core/cluster/auth/kubeconfig "\
     "--volume=k8s,kind=host,source=${K8S_SRC} " \
     "--mount volume=kc,target=/kubeconfig " \
