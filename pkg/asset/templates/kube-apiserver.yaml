@@ -1,0 +1,68 @@
+apiVersion: "extensions/v1beta1"
+kind: DaemonSet
+metadata:
+  name: kube-apiserver
+  namespace: kube-system
+  labels:
+    k8s-app: kube-apiserver
+    version: v1.3.6_coreos.0
+spec:
+  selector:
+    matchLabels:
+      k8s-app: kube-apiserver
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-apiserver
+        version: v1.3.6_coreos.0
+    spec:
+      nodeSelector:
+        master: "true"
+      hostNetwork: true
+      containers:
+      - name: checkpoint-installer
+        image: quay.io/coreos/pod-checkpointer:91d5a311eee40d579a8f0549c10eeed57979d6c4
+        command:
+        - /checkpoint-installer.sh
+        volumeMounts:
+        - mountPath: /etc/kubernetes/manifests
+          name: etc-k8s-manifests
+      - name: kube-apiserver
+        image: quay.io/coreos/hyperkube:v1.3.6_coreos.0
+        command:
+        - /hyperkube
+        - apiserver
+        - --bind-address=0.0.0.0
+        - --secure-port=443
+        - --insecure-port=8080
+        - --advertise-address=$(MY_POD_IP)
+        - --etcd-servers={{ range $i, $e := .EtcdServers }}{{ if $i }},{{end}}{{ $e }}{{end}}
+        - --allow-privileged=true
+        - --service-cluster-ip-range=10.3.0.0/24
+        - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota
+        - --tls-cert-file=/etc/kubernetes/secrets/apiserver.crt
+        - --tls-private-key-file=/etc/kubernetes/secrets/apiserver.key
+        - --service-account-key-file=/etc/kubernetes/secrets/service-account.pub
+        - --client-ca-file=/etc/kubernetes/secrets/ca.crt
+        env:
+          - name: MY_POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+        volumeMounts:
+        - mountPath: /etc/ssl/certs
+          name: ssl-certs-host
+          readOnly: true
+        - mountPath: /etc/kubernetes/secrets
+          name: secrets
+          readOnly: true
+      volumes:
+      - name: ssl-certs-host
+        hostPath:
+          path: /usr/share/ca-certificates
+      - name: etc-k8s-manifests
+        hostPath:
+          path: /etc/kubernetes/manifests
+      - name: secrets
+        secret:
+          secretName: kube-apiserver

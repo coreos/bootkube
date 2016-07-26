@@ -38,14 +38,23 @@ type dbusConn interface {
 }
 
 const (
-	desiredConfigAnnotation = "node-agent.alpha.coreos.com/desired-config"
-	currentConfigAnnotation = "node-agent.alpha.coreos.com/current-config"
-	kubeletVersionKey       = "KUBELET_VERSION"
-	kubeletConfigKey        = "KUBELET_CONFIG"
-	kubeletFlagsKey         = "KUBELET_OPTS"
-	defaultKubeletEnvPath   = "/etc/kubernetes/kubelet.env"
-	kubeletService          = "kubelet.service"
-	configMapFlagsKey       = "kubelet-flags"
+	// DesiredConfigAnnotation is the annotation that describes the desired
+	// configuration state for the on-host kubelet.
+	DesiredConfigAnnotation = "node-agent.alpha.coreos.com/desired-config"
+	// CurrentConfigAnnotation is the annotation that describes the current
+	// configuration state for the on-host kubelet.
+	CurrentConfigAnnotation = "node-agent.alpha.coreos.com/current-config"
+	// KubeletVersionKey is the key in the JSON stored in the config annotations that
+	// describes the version of the kubelet to run on the host.
+	KubeletVersionKey = "KUBELET_VERSION"
+	// KubeletConfigKey is the key in the JSON stored in the config annotations that
+	// describes the configuration flags for the kubelet to run on the host.
+	KubeletConfigKey = "KUBELET_CONFIG"
+
+	kubeletFlagsKey       = "KUBELET_OPTS"
+	defaultKubeletEnvPath = "/etc/kubernetes/kubelet.env"
+	kubeletService        = "kubelet.service"
+	configMapFlagsKey     = "kubelet-flags"
 )
 
 // NodeUpdateCallback is called via an informer watching Node objects.
@@ -97,7 +106,7 @@ func (a *Agent) handleConfigUpdate(node v1.Node, onDiskConfig, desiredConfig map
 	newNode := node
 
 	// Get the ConfigMap specified in the annotation from the local cache.
-	cm, err := a.getConfigMap(desiredConfig[kubeletConfigKey])
+	cm, err := a.getConfigMap(desiredConfig[KubeletConfigKey])
 	if err != nil {
 		glog.Error(err)
 	}
@@ -122,33 +131,33 @@ func (a *Agent) handleConfigUpdate(node v1.Node, onDiskConfig, desiredConfig map
 		}
 	}
 
-	configName := desiredConfig[kubeletConfigKey]
+	configName := desiredConfig[KubeletConfigKey]
 	if configName == "" {
 		configName = "on-disk configuration"
 	}
 
 	updatedConfig := make(map[string]string)
-	updatedConfig[kubeletVersionKey] = onDiskConfig[kubeletVersionKey]
+	updatedConfig[KubeletVersionKey] = onDiskConfig[KubeletVersionKey]
 	updatedConfig[kubeletFlagsKey] = onDiskConfig[kubeletFlagsKey]
-	updatedConfig[kubeletConfigKey] = configName
+	updatedConfig[KubeletConfigKey] = configName
 	newConf, err := json.Marshal(updatedConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error attempting to marshal current config: %s", err)
 	}
-	newNode.Annotations[currentConfigAnnotation] = string(newConf)
+	newNode.Annotations[CurrentConfigAnnotation] = string(newConf)
 	return &newNode, nil
 }
 
 func (a *Agent) getDesiredConfig(node *v1.Node) (map[string]string, error) {
-	rawconf, ok := node.Annotations[desiredConfigAnnotation]
+	rawconf, ok := node.Annotations[DesiredConfigAnnotation]
 	if !ok {
-		err := fmt.Errorf("no %s annotation found for node %s, ignoring", desiredConfigAnnotation, node.Name)
+		err := fmt.Errorf("no %s annotation found for node %s, ignoring", DesiredConfigAnnotation, node.Name)
 		return nil, err
 	}
 
 	var desiredConfig map[string]string
 	if err := json.Unmarshal([]byte(rawconf), &desiredConfig); err != nil {
-		return nil, fmt.Errorf("error unmarshaling config from %s: %v", desiredConfigAnnotation, err)
+		return nil, fmt.Errorf("error unmarshaling config from %s: %v", DesiredConfigAnnotation, err)
 	}
 	return desiredConfig, nil
 }
@@ -193,7 +202,7 @@ func (a *Agent) getConfigMap(configMapName string) (*v1.ConfigMap, error) {
 }
 
 func configHasChanged(onDiskConfig, desiredConfig map[string]string, cm *v1.ConfigMap) bool {
-	if onDiskConfig[kubeletVersionKey] != desiredConfig[kubeletVersionKey] {
+	if onDiskConfig[KubeletVersionKey] != desiredConfig[KubeletVersionKey] {
 		return true
 	}
 	if cm == nil {
@@ -203,11 +212,11 @@ func configHasChanged(onDiskConfig, desiredConfig map[string]string, cm *v1.Conf
 }
 
 func validateConfig(desiredConfig map[string]string) error {
-	if _, ok := desiredConfig[kubeletVersionKey]; !ok {
-		return fmt.Errorf("configuration annotation does not contain required key: %s", kubeletVersionKey)
+	if _, ok := desiredConfig[KubeletVersionKey]; !ok {
+		return fmt.Errorf("configuration annotation does not contain required key: %s", KubeletVersionKey)
 	}
-	if _, ok := desiredConfig[kubeletConfigKey]; !ok {
-		return fmt.Errorf("configuration annotation does not contain required key: %s", kubeletConfigKey)
+	if _, ok := desiredConfig[KubeletConfigKey]; !ok {
+		return fmt.Errorf("configuration annotation does not contain required key: %s", KubeletConfigKey)
 	}
 	return nil
 }
@@ -218,7 +227,7 @@ func updateKubeletEnvFile(kubeletEnvPath string, conf, onDiskConfig map[string]s
 	for k, v := range onDiskConfig {
 		updatedConfig[k] = v
 	}
-	updatedConfig[kubeletVersionKey] = conf[kubeletVersionKey]
+	updatedConfig[KubeletVersionKey] = conf[KubeletVersionKey]
 	if cm != nil {
 		updatedConfig[kubeletFlagsKey] = cm.Data[configMapFlagsKey]
 	}

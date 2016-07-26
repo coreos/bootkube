@@ -1,0 +1,24 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: update-controller
+  namespace: kube-system
+  labels:
+    k8s-app: update-controller
+    version: v1.3.4_coreos.0
+spec:
+  template:
+    metadata:
+      labels:
+        k8s-app: update-controller
+        version: v1.3.4_coreos.0
+    spec:
+      containers:
+      - name: update-controller
+        image: quay.io/derek_parker/update-controller:v0.1.0
+        imagePullPolicy: Always
+        env:
+          - name: MY_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name

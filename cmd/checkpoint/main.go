@@ -57,6 +57,7 @@ func main() {
 func run() {
 	client := newAPIClient()
 	for {
+		sleepDuration := time.Minute
 		var podList v1.PodList
 		if err := json.Unmarshal(getPodsFromKubeletAPI(), &podList); err != nil {
 			glog.Fatal(err)
@@ -70,6 +71,7 @@ func run() {
 			if err := os.Remove(activeManifest); err != nil {
 				glog.Error(err)
 			}
+			sleepDuration = 5 * time.Minute
 		case kubeSystemAPIServerRunning(podList, client):
 			glog.Info("kube-apiserver found, creating temp-apiserver manifest")
 			// The self-hosted API Server is running. Let's snapshot the pod,
@@ -91,7 +93,7 @@ func run() {
 				}
 			}
 		}
-		time.Sleep(60 * time.Second)
+		time.Sleep(sleepDuration)
 	}
 }
 

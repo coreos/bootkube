@@ -43,6 +43,7 @@ var files = []struct {
 	{"kube-dns-rc.yaml", "DNSRcTemplate"},
 	{"kube-dns-svc.yaml", "DNSSvcTemplate"},
 	{"kube-system-ns.yaml", "SystemNSTemplate"},
+	{"update-controller.yaml", "UpdateController"},
 }
 
 type Data struct {
