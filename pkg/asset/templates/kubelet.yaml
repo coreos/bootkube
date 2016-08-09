@@ -34,56 +34,21 @@ spec:
         - --lock-file=/var/run/lock/kubelet.lock
         - --minimum-container-ttl-duration=3m0s
         env:
-          - name: MY_POD_IP
-            valueFrom:
-              fieldRef:
-                fieldPath: status.podIP
+        - name: MY_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: PATH
+          value: ./usr/local/sbin:./usr/local/bin:./usr/sbin:./usr/bin:./sbin:./bin
         securityContext:
           privileged: true
         volumeMounts:
-        - name: dev
-          mountPath: /dev
-        - name: run
-          mountPath: /run
-        - name: sys
-          mountPath: /sys
-          readOnly: true
-        - name: etc-kubernetes
-          mountPath: /etc/kubernetes
-          readOnly: true
         - name: etc-ssl-certs
           mountPath: /etc/ssl/certs
           readOnly: true
-        - name: var-lib-docker
-          mountPath: /var/lib/docker
-        - name: var-lib-kubelet
-          mountPath: /var/lib/kubelet
-        - name: var-lib-rkt
-          mountPath: /var/lib/rkt
       hostNetwork: true
       hostPID: true
       volumes:
-      - name: dev
-        hostPath:
-          path: /dev
-      - name: run
-        hostPath:
-          path: /run
-      - name: sys
-        hostPath:
-          path: /sys
-      - name: etc-kubernetes
-        hostPath:
-          path: /etc/kubernetes
       - name: etc-ssl-certs
         hostPath:
           path: /usr/share/ca-certificates
-      - name: var-lib-docker
-        hostPath:
-          path: /var/lib/docker
-      - name: var-lib-kubelet
-        hostPath:
-          path: /var/lib/kubelet
-      - name: var-lib-rkt
-        hostPath:
-          path: /var/lib/rkt
