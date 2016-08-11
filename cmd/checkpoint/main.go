@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/coreos/bootkube/pkg/atomic"
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -187,7 +188,7 @@ func writeManifest(manifest v1.Pod) {
 	if err != nil {
 		glog.Fatal(err)
 	}
-	writeAndAtomicCopy(m, checkpointManifest)
+	atomic.WriteAndCopy(m, checkpointManifest)
 }
 
 func parseAPIPodSpec(podList v1.PodList) v1.PodSpec {
@@ -243,18 +244,6 @@ func copySecretsToDisk(client clientset.Interface, secretName, basePath string) 
 	}
 	for name, value := range s.Data {
 		path := filepath.Join(basePath, name)
-		writeAndAtomicCopy(value, path)
-	}
-}
-
-func writeAndAtomicCopy(data []byte, path string) {
-	// First write a "temp" file.
-	tmpfile := filepath.Join(filepath.Dir(path), "."+filepath.Base(path))
-	if err := ioutil.WriteFile(tmpfile, data, 0644); err != nil {
-		glog.Fatal(err)
-	}
-	// Finally, copy that file to the correct location.
-	if err := os.Rename(tmpfile, path); err != nil {
-		glog.Fatal(err)
+		atomic.WriteAndCopy(value, path)
 	}
 }
