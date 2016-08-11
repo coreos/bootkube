@@ -37,6 +37,7 @@ func main() {
 	if err != nil {
 		glog.Fatal(err)
 	}
+	defer sysdConn.Close()
 
 	run(client, nodename, sysdConn)
 }
