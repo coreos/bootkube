@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/coreos/bootkube/pkg/atomic"
-	"github.com/coreos/go-systemd/dbus"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -28,9 +27,14 @@ type Agent struct {
 	Client clientset.Interface
 	// SysdConn is a sytemd dbus connection, used for restarting the on-host
 	// kubelet via systemd.
-	SysdConn *dbus.Conn
+	SysdConn dbusConn
 	// ConfigMapStore is updated via an informer.
 	ConfigMapStore cache.Store
+}
+
+type dbusConn interface {
+	Reload() error
+	RestartUnit(string, string, chan<- string) (int, error)
 }
 
 const (
@@ -39,7 +43,7 @@ const (
 	kubeletVersionKey       = "KUBELET_VERSION"
 	kubeletConfigKey        = "KUBELET_CONFIG"
 	kubeletFlagsKey         = "KUBELET_OPTS"
-	kubeletEnvPath          = "/etc/kubernetes/kubelet.env"
+	defaultKubeletEnvPath   = "/etc/kubernetes/kubelet.env"
 	kubeletService          = "kubelet.service"
 	configMapFlagsKey       = "kubelet-flags"
 )
@@ -57,71 +61,83 @@ func (a *Agent) NodeUpdateCallback(_, newObj interface{}) {
 		return
 	}
 
-	onDiskConfig, err := parseKubeletEnvFile(kubeletEnvPath)
+	var desiredConfig map[string]string
+
+	onDiskConfig, err := parseKubeletEnvFile(defaultKubeletEnvPath)
 	if err != nil {
 		glog.Error(err)
-		return
+		goto update
 	}
 
 	// Check annotations on Node.
 	if node.Annotations == nil {
 		node.Annotations = make(map[string]string)
 	}
-	// If we don't have a current config, set it to the value of the
-	// on disk config. This gives insight to cluster admins, and allows
-	// them to use the data in this annotation to update the config
-	// via configmaps.
-	if _, ok := node.Annotations[currentConfigAnnotation]; !ok {
-		a.setCurrentConfigAnnotation(node, onDiskConfig)
-	}
 
 	// Obtain and validate the desired configuration.
-	desiredConfig, err := a.getDesiredConfig(node)
+	desiredConfig, err = a.getDesiredConfig(node)
 	if err != nil {
 		glog.Error(err)
-		return
-	}
-	if err = validateConfig(desiredConfig); err != nil {
-		glog.Error(err)
-		return
+		goto update
 	}
 
-	// Get the ConfigMap specified in the annotation from the API server.
-	cm, err := a.getConfigMap(desiredConfig[kubeletConfigKey])
+update:
+	updatedNode, err := a.handleConfigUpdate(*node, onDiskConfig, desiredConfig, defaultKubeletEnvPath)
 	if err != nil {
 		glog.Error(err)
-		return
-	}
-
-	// Check desired config / ConfigMap against the on disk config.
-	if configHasChanged(onDiskConfig, desiredConfig, cm) {
-		// Update on disk config.
-		if err = updateKubeletEnvFile(desiredConfig, onDiskConfig, cm); err != nil {
-			glog.Error(err)
-			return
-		}
-		// Restart kubelet via systemd to pick up new config.
-		if err = a.restartKubeletService(); err != nil {
-			glog.Error(err)
-			return
-		}
-	}
-
-	// Re-parse on disk config as it is source of truth.
-	onDiskConfig, err = parseKubeletEnvFile(kubeletEnvPath)
-	if err != nil {
-		glog.Error(err)
-		return
 	}
 
 	// Always update annotation at end of sync loop.
+	if err := a.updateNode(updatedNode); err != nil {
+		glog.Error(err)
+	}
+}
+
+func (a *Agent) handleConfigUpdate(node v1.Node, onDiskConfig, desiredConfig map[string]string, kubeletEnvPath string) (*v1.Node, error) {
+	// `node` is already a copy, but just to make things clear, assign to new var
+	newNode := node
+
+	// Get the ConfigMap specified in the annotation from the local cache.
+	cm, err := a.getConfigMap(desiredConfig[kubeletConfigKey])
+	if err != nil {
+		glog.Error(err)
+	}
+
+	err = validateConfig(desiredConfig)
+	if err != nil {
+		glog.Error(err)
+	}
+
+	// Check desired config / ConfigMap against the on disk config.
+	if err == nil && configHasChanged(onDiskConfig, desiredConfig, cm) {
+		// Update on disk config.
+		onDiskConfig, err = updateKubeletEnvFile(kubeletEnvPath, desiredConfig, onDiskConfig, cm)
+		if err != nil {
+			// Log error but continue, we still want to update config.
+			glog.Error(err)
+		}
+		// Restart kubelet via systemd to pick up new config.
+		if err = a.restartKubeletService(); err != nil {
+			// Log error but continue, we still want to update config.
+			glog.Error(err)
+		}
+	}
+
+	configName := desiredConfig[kubeletConfigKey]
+	if configName == "" {
+		configName = "on-disk configuration"
+	}
+
 	updatedConfig := make(map[string]string)
 	updatedConfig[kubeletVersionKey] = onDiskConfig[kubeletVersionKey]
 	updatedConfig[kubeletFlagsKey] = onDiskConfig[kubeletFlagsKey]
-	updatedConfig[kubeletConfigKey] = desiredConfig[kubeletConfigKey]
-	if err := a.updateCurrentConfigNodeAnnotation(node, updatedConfig); err != nil {
-		glog.Error(err)
+	updatedConfig[kubeletConfigKey] = configName
+	newConf, err := json.Marshal(updatedConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error attempting to marshal current config: %s", err)
 	}
+	newNode.Annotations[currentConfigAnnotation] = string(newConf)
+	return &newNode, nil
 }
 
 func (a *Agent) getDesiredConfig(node *v1.Node) (map[string]string, error) {
@@ -138,23 +154,8 @@ func (a *Agent) getDesiredConfig(node *v1.Node) (map[string]string, error) {
 	return desiredConfig, nil
 }
 
-func (a *Agent) setCurrentConfigAnnotation(node *v1.Node, onDiskConfig map[string]string) {
-	currentConfig := make(map[string]string)
-	currentConfig[kubeletVersionKey] = onDiskConfig[kubeletVersionKey]
-	currentConfig[kubeletFlagsKey] = onDiskConfig[kubeletFlagsKey]
-	currentConfig[kubeletConfigKey] = "on-disk configuration"
-	if err := a.updateCurrentConfigNodeAnnotation(node, currentConfig); err != nil {
-		glog.Error(err)
-	}
-}
-
-func (a *Agent) updateCurrentConfigNodeAnnotation(node *v1.Node, conf map[string]string) error {
-	newConf, err := json.Marshal(conf)
-	if err != nil {
-		return fmt.Errorf("error attempting to marshal current config: %s", err)
-	}
-	node.Annotations[currentConfigAnnotation] = string(newConf)
-	_, err = a.Client.Core().Nodes().Update(node)
+func (a *Agent) updateNode(node *v1.Node) error {
+	_, err := a.Client.Core().Nodes().Update(node)
 	return err
 }
 
@@ -196,10 +197,10 @@ func configHasChanged(onDiskConfig, desiredConfig map[string]string, cm *v1.Conf
 	if onDiskConfig[kubeletVersionKey] != desiredConfig[kubeletVersionKey] {
 		return true
 	}
-	if onDiskConfig[kubeletFlagsKey] != cm.Data[configMapFlagsKey] {
-		return true
+	if cm == nil {
+		return false
 	}
-	return false
+	return onDiskConfig[kubeletFlagsKey] != cm.Data[configMapFlagsKey]
 }
 
 func validateConfig(desiredConfig map[string]string) error {
@@ -212,18 +213,20 @@ func validateConfig(desiredConfig map[string]string) error {
 	return nil
 }
 
-func updateKubeletEnvFile(conf, onDiskConfig map[string]string, cm *v1.ConfigMap) error {
+func updateKubeletEnvFile(kubeletEnvPath string, conf, onDiskConfig map[string]string, cm *v1.ConfigMap) (map[string]string, error) {
 	var buf bytes.Buffer
 	updatedConfig := make(map[string]string)
 	for k, v := range onDiskConfig {
 		updatedConfig[k] = v
 	}
 	updatedConfig[kubeletVersionKey] = conf[kubeletVersionKey]
-	updatedConfig[kubeletFlagsKey] = cm.Data[configMapFlagsKey]
+	if cm != nil {
+		updatedConfig[kubeletFlagsKey] = cm.Data[configMapFlagsKey]
+	}
 	for k, v := range updatedConfig {
 		buf.WriteString(fmt.Sprintf("%s=%s\n", k, v))
 	}
-	return atomic.WriteAndCopy(buf.Bytes(), kubeletEnvPath)
+	return updatedConfig, atomic.WriteAndCopy(buf.Bytes(), kubeletEnvPath)
 }
 
 func parseKubeletEnvFile(path string) (map[string]string, error) {
