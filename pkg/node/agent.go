@@ -61,6 +61,11 @@ func (a *Agent) NodeUpdateCallback(_, newObj interface{}) {
 		return
 	}
 
+	// Check annotations on Node.
+	if node.Annotations == nil {
+		node.Annotations = make(map[string]string)
+	}
+
 	var desiredConfig map[string]string
 
 	onDiskConfig, err := parseKubeletEnvFile(defaultKubeletEnvPath)
@@ -69,16 +74,10 @@ func (a *Agent) NodeUpdateCallback(_, newObj interface{}) {
 		goto update
 	}
 
-	// Check annotations on Node.
-	if node.Annotations == nil {
-		node.Annotations = make(map[string]string)
-	}
-
 	// Obtain and validate the desired configuration.
 	desiredConfig, err = a.getDesiredConfig(node)
 	if err != nil {
 		glog.Error(err)
-		goto update
 	}
 
 update:
