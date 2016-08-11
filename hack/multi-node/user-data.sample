@@ -19,29 +19,30 @@ coreos:
           [Unit]
           Requires=flanneld.service
           After=flanneld.service
-    - name: kubelet.service
+    - name: kubelet-initial-config.service
       enable: true
       command: start
       content: |
         [Service]
+        ExecStart=/home/core/install-initial-kubelet-config
+
+        [Install]
+        WantedBy=multi-user.target
+    - name: kubelet.service
+      enable: true
+      command: start
+      content: |
+        [Unit]
+        After=kubelet-initial-config.service
+
+        [Service]
         EnvironmentFile=/etc/environment
+        EnvironmentFile=/etc/kubernetes/kubelet.env
         Environment=KUBELET_ACI=quay.io/coreos/hyperkube
-        Environment=KUBELET_VERSION=v1.3.4_coreos.0
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests
         ExecStartPre=/bin/mkdir -p /srv/kubernetes/manifests
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/checkpoint-secrets
-        ExecStart=/usr/lib/coreos/kubelet-wrapper \
-          --api-servers=https://172.17.4.101:443 \
-          --kubeconfig=/etc/kubernetes/kubeconfig \
-          --lock-file=/var/run/lock/kubelet.lock \
-          --exit-on-lock-contention \
-          --config=/etc/kubernetes/manifests \
-          --allow-privileged \
-          --hostname-override=${COREOS_PUBLIC_IPV4} \
-          --node-labels=master=true \
-          --minimum-container-ttl-duration=3m0s \
-          --cluster_dns=10.3.0.10 \
-          --cluster_domain=cluster.local
+        ExecStart=/usr/lib/coreos/kubelet-wrapper $PERSISTENT_KUBELET_OPTS $KUBELET_OPTS
         Restart=always
         RestartSec=5
 
@@ -49,6 +50,18 @@ coreos:
         WantedBy=multi-user.target
 
 write_files:
+  - path: "/home/core/install-initial-kubelet-config"
+    permissions: "0744"
+    owner: core
+    content: |
+      #!/bin/bash
+
+      if [[ ! -f /etc/kubernetes/kubelet.env ]]; then
+          /bin/echo \
+          "KUBELET_OPTS='--api-servers=https://172.17.4.101:443 --kubeconfig=/etc/kubernetes/kubeconfig --lock-file=/var/run/lock/kubelet.lock --allow-privileged --config=/etc/kubernetes/manifests --minimum-container-ttl-duration=3m0s --cluster_dns=10.3.0.10 --cluster_domain=cluster.local'
+      PERSISTENT_KUBELET_OPTS='--exit-on-lock-contention=true --node-labels=master=true --hostname-override=$public_ipv4'
+      KUBELET_VERSION=v1.3.4_coreos.0" > /etc/kubernetes/kubelet.env
+      fi
   - path: "/etc/kubernetes/kubeconfig"
     permissions: "0644"
     owner: core

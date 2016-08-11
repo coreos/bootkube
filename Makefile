@@ -32,6 +32,10 @@ _output/bin/%/checkpoint: cmd/checkpoint/main.go
 	mkdir -p $(dir $@)
 	GOOS=$* go build -o _output/bin/$*/checkpoint github.com/coreos/bootkube/cmd/checkpoint
 
+_output/bin/%/node-agent: cmd/node-agent/main.go
+	mkdir -p $(dir $@)
+	GOOS=$* go build -o _output/bin/$*/node-agent github.com/coreos/bootkube/cmd/node-agent
+
 _output/release/bootkube.tar.gz: _output/bin/linux/bootkube _output/bin/darwin/bootkube _output/bin/linux/checkpoint
 	mkdir -p $(dir $@)
 	tar czf $@ -C _output bin/linux/bootkube bin/darwin/bootkube bin/linux/checkpoint
