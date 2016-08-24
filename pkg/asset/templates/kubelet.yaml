@@ -27,17 +27,11 @@ spec:
         - --api-servers={{ index .APIServers 0 }}
         - --config=/etc/kubernetes/manifests
         - --allow-privileged
-        - --hostname-override=$(MY_POD_IP)
         - --cluster-dns=10.3.0.10
         - --cluster-domain=cluster.local
         - --kubeconfig=/etc/kubernetes/kubeconfig
         - --lock-file=/var/run/lock/kubelet.lock
         - --minimum-container-ttl-duration=3m0s
-        env:
-          - name: MY_POD_IP
-            valueFrom:
-              fieldRef:
-                fieldPath: status.podIP
         securityContext:
           privileged: true
         volumeMounts:
