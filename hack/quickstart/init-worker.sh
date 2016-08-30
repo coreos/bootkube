@@ -13,22 +13,6 @@ function usage() {
     exit 1
 }
 
-function configure_flannel() {
-    [ -f "/etc/flannel/options.env" ] || {
-        mkdir -p /etc/flannel
-        echo "FLANNELD_IFACE=${COREOS_PRIVATE_IPV4}" >> /etc/flannel/options.env
-        echo "FLANNELD_ETCD_ENDPOINTS=http://${MASTER_PRIV}:2379" >> /etc/flannel/options.env
-    }
-
-    # Make sure options are re-used on reboot
-    local TEMPLATE=/etc/systemd/system/flanneld.service.d/10-symlink.conf.conf
-    [ -f $TEMPLATE ] || {
-        mkdir -p $(dirname $TEMPLATE)
-        echo "[Service]" >> $TEMPLATE
-        echo "ExecStartPre=/usr/bin/ln -sf /etc/flannel/options.env /run/flannel/options.env" >> $TEMPLATE
-    }
-}
-
 function extract_master_endpoint (){
     grep 'certificate-authority-data' ${KUBECONFIG} | awk '{print $2}' | base64 -d > /home/core/ca.crt
     grep 'client-certificate-data' ${KUBECONFIG} | awk '{print $2}'| base64 -d > /home/core/client.crt
@@ -46,7 +30,6 @@ function extract_master_endpoint (){
 # Initialize a worker node
 function init_worker_node() {
     extract_master_endpoint
-    configure_flannel
 
     # Setup kubeconfig
     mkdir -p /etc/kubernetes
@@ -58,7 +41,6 @@ function init_worker_node() {
     # Start services
     systemctl daemon-reload
     systemctl stop update-engine; systemctl mask update-engine
-    systemctl enable flanneld; sudo systemctl start flanneld
     systemctl enable kubelet; sudo systemctl start kubelet
 }
 

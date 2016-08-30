@@ -31,33 +31,6 @@ EOF
     }
 }
 
-function configure_flannel() {
-    # Configure Flannel options
-    [ -f "/etc/flannel/options.env" ] || {
-        mkdir -p /etc/flannel
-        echo "FLANNELD_IFACE=${COREOS_PRIVATE_IPV4}" >> /etc/flannel/options.env
-        echo "FLANNELD_ETCD_ENDPOINTS=http://127.0.0.1:2379" >> /etc/flannel/options.env
-    }
-
-    # Make sure options are re-used on reboot
-    local TEMPLATE=/etc/systemd/system/flanneld.service.d/10-symlink.conf.conf
-    [ -f $TEMPLATE ] || {
-        mkdir -p $(dirname $TEMPLATE)
-        echo "[Service]" >> $TEMPLATE
-        echo "ExecStartPre=/usr/bin/ln -sf /etc/flannel/options.env /run/flannel/options.env" >> $TEMPLATE
-    }
-}
-
-# wait until etcd is available, then configure the flannel pod-network settings.
-function configure_network() {
-    while true; do
-        echo "Waiting for etcd..."
-        /usr/bin/etcdctl cluster-health && break
-        sleep 1
-    done
-    /usr/bin/etcdctl set /coreos.com/network/config '{ "Network": "10.2.0.0/16", "Backend":{"Type":"vxlan"}}'
-}
-
 # Initialize a Master node
 function init_master_node() {
     systemctl daemon-reload
@@ -65,12 +38,7 @@ function init_master_node() {
 
     # Start etcd and configure network settings
     configure_etcd
-    configure_flannel
     systemctl enable etcd2; sudo systemctl start etcd2
-    configure_network
-
-    # Start flannel
-    systemctl enable flanneld; sudo systemctl start flanneld
 
     # Render cluster assets
     /usr/bin/rkt run \

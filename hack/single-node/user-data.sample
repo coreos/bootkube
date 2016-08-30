@@ -1,25 +1,9 @@
 #cloud-config
 
 coreos:
-  flannel:
-    interface: $public_ipv4
   units:
     - name: etcd2.service
       command: start
-    - name: flanneld.service
-      command: start
-      drop-ins:
-      - name: 50-network-config.conf
-        content: |
-          [Service]
-          ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{ "Network": "10.2.0.0/16" }'
-    - name: docker.service
-      drop-ins:
-      - name: 50-flannel.conf
-        content: |
-          [Unit]
-          Requires=flanneld.service
-          After=flanneld.service
     - name: kubelet.service
       enable: true
       command: start
@@ -28,19 +12,23 @@ coreos:
         EnvironmentFile=/etc/environment
         Environment=KUBELET_ACI=quay.io/coreos/hyperkube
         Environment=KUBELET_VERSION=v1.5.1_coreos.0
+        Environment="RKT_OPTS=--volume var-lib-cni,kind=host,source=/var/lib/cni --mount volume=var-lib-cni,target=/var/lib/cni"
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests
-        ExecStartPre=/bin/mkdir -p /srv/kubernetes/manifests
+        ExecStartPre=/bin/mkdir -p /etc/kubernetes/cni/net.d
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/checkpoint-secrets
+        ExecStartPre=/bin/mkdir -p /srv/kubernetes/manifests
+        ExecStartPre=/bin/mkdir -p /var/lib/cni
         ExecStart=/usr/lib/coreos/kubelet-wrapper \
           --kubeconfig=/etc/kubernetes/kubeconfig \
           --require-kubeconfig \
+          --cni-conf-dir=/etc/kubernetes/cni/net.d \
+          --network-plugin=cni \
           --lock-file=/var/run/lock/kubelet.lock \
           --exit-on-lock-contention=true \
           --allow-privileged \
           --pod-manifest-path=/etc/kubernetes/manifests \
           --hostname-override=${COREOS_PUBLIC_IPV4} \
           --node-labels=master=true \
-          --minimum-container-ttl-duration=3m0s \
           --cluster_dns=10.3.0.10 \
           --cluster_domain=cluster.local
 
