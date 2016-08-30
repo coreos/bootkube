@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package dockertools
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"path"
@@ -34,22 +35,25 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
 	dockerstrslice "github.com/docker/engine-api/types/strslice"
+	"github.com/golang/mock/gomock"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/network/mock_network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 	kubetypes "k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -100,6 +104,10 @@ func (f *fakeRuntimeHelper) GetPodDir(kubetypes.UID) string {
 	return ""
 }
 
+func (f *fakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *api.Pod) []int64 {
+	return nil
+}
+
 func createTestDockerManager(fakeHTTPClient *fakeHTTP, fakeDocker *FakeDockerClient) (*DockerManager, *FakeDockerClient) {
 	if fakeHTTPClient == nil {
 		fakeHTTPClient = &fakeHTTP{}
@@ -109,14 +117,21 @@ func createTestDockerManager(fakeHTTPClient *fakeHTTP, fakeDocker *FakeDockerCli
 	}
 	fakeRecorder := &record.FakeRecorder{}
 	containerRefManager := kubecontainer.NewRefManager()
-	networkPlugin, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone, "10.0.0.0/8")
+	networkPlugin, _ := network.InitNetworkPlugin(
+		[]network.NetworkPlugin{},
+		"",
+		nettest.NewFakeHost(nil),
+		componentconfig.HairpinNone,
+		"10.0.0.0/8",
+		network.UseDefaultMTU)
+
 	dockerManager := NewFakeDockerManager(
 		fakeDocker,
 		fakeRecorder,
 		proberesults.NewManager(),
 		containerRefManager,
 		&cadvisorapi.MachineInfo{},
-		options.GetDefaultPodInfraContainerImage(),
+		"",
 		0, 0, "",
 		&containertest.FakeOS{},
 		networkPlugin,
@@ -552,7 +567,7 @@ func generatePodInfraContainerHash(pod *api.Pod) uint64 {
 
 	container := &api.Container{
 		Name:            PodInfraContainerName,
-		Image:           options.GetDefaultPodInfraContainerImage(),
+		Image:           "",
 		Ports:           ports,
 		ImagePullPolicy: podInfraContainerImagePullPolicy,
 	}
@@ -611,6 +626,7 @@ func TestSyncPodCreateNetAndContainer(t *testing.T) {
 	for _, c := range fakeDocker.RunningContainerList {
 		if c.Image == "pod_infra_image" && strings.HasPrefix(c.Names[0], "/k8s_POD") {
 			found = true
+			break
 		}
 	}
 	if !found {
@@ -985,7 +1001,7 @@ func TestSyncPodWithRestartPolicy(t *testing.T) {
 }
 
 func TestSyncPodBackoff(t *testing.T) {
-	var fakeClock = util.NewFakeClock(time.Now())
+	var fakeClock = clock.NewFakeClock(time.Now())
 	startTime := fakeClock.Now()
 
 	dm, fakeDocker := newTestDockerManager()
@@ -1624,7 +1640,7 @@ func TestSyncPodWithPullPolicy(t *testing.T) {
 		{kubecontainer.StartContainer, "bar2", nil, ""},
 		{kubecontainer.StartContainer, "bar3", nil, ""},
 		{kubecontainer.StartContainer, "bar4", nil, ""},
-		{kubecontainer.StartContainer, "bar5", kubecontainer.ErrImageNeverPull,
+		{kubecontainer.StartContainer, "bar5", images.ErrImageNeverPull,
 			"Container image \"pull_never_image\" is not present with pull policy of Never"},
 	}
 
@@ -1664,7 +1680,7 @@ func TestSyncPodWithFailure(t *testing.T) {
 			api.Container{Name: "bar", Image: "realImage", ImagePullPolicy: api.PullAlways},
 			map[string]error{},
 			[]error{fmt.Errorf("can't pull image")},
-			[]*kubecontainer.SyncResult{{kubecontainer.StartContainer, "bar", kubecontainer.ErrImagePull, "can't pull image"}},
+			[]*kubecontainer.SyncResult{{kubecontainer.StartContainer, "bar", images.ErrImagePull, "can't pull image"}},
 		},
 		"CreateContainerFailure": {
 			api.Container{Name: "bar", Image: "alreadyPresent"},
@@ -1703,7 +1719,7 @@ func verifySyncResults(t *testing.T, expectedResults []*kubecontainer.SyncResult
 	if len(expectedResults) != len(realResult.SyncResults) {
 		t.Errorf("expected sync result number %d, got %d", len(expectedResults), len(realResult.SyncResults))
 		for _, r := range expectedResults {
-			t.Errorf("expected result: %+v", r)
+			t.Errorf("expected result: %#v", r)
 		}
 		for _, r := range realResult.SyncResults {
 			t.Errorf("real result: %+v", r)
@@ -1720,16 +1736,16 @@ func verifySyncResults(t *testing.T, expectedResults []*kubecontainer.SyncResult
 				// We use Contains() here because the message format may be changed, but at least we should
 				// make sure that the expected message is contained.
 				if realR.Error != expectR.Error || !strings.Contains(realR.Message, expectR.Message) {
-					t.Errorf("expected sync result %+v, got %+v", expectR, realR)
+					t.Errorf("expected sync result %#v, got %+v", expectR, realR)
 				}
 				found++
 			}
 		}
 		if found == 0 {
-			t.Errorf("not found expected result %+v", expectR)
+			t.Errorf("not found expected result %#v", expectR)
 		}
 		if found > 1 {
-			t.Errorf("got %d duplicate expected result %+v", found, expectR)
+			t.Errorf("got %d duplicate expected result %#v", found, expectR)
 		}
 	}
 }
@@ -1764,6 +1780,70 @@ func TestSecurityOptsOperator(t *testing.T) {
 	}
 	if expected := []string{"seccomp=unconfined"}; len(opts) != 1 || opts[0] != expected[0] {
 		t.Fatalf("security opts for Docker 1.11: expected %v, got: %v", expected, opts)
+	}
+}
+
+func TestGetSecurityOpts(t *testing.T) {
+	const containerName = "bar"
+	makePod := func(annotations map[string]string) *api.Pod {
+		return &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				UID:         "12345678",
+				Name:        "foo",
+				Namespace:   "new",
+				Annotations: annotations,
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{Name: containerName},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		msg          string
+		pod          *api.Pod
+		expectedOpts []string
+	}{{
+		msg:          "No security annotations",
+		pod:          makePod(nil),
+		expectedOpts: []string{"seccomp=unconfined"},
+	}, {
+		msg: "Seccomp default",
+		pod: makePod(map[string]string{
+			api.SeccompContainerAnnotationKeyPrefix + containerName: "docker/default",
+		}),
+		expectedOpts: nil,
+	}, {
+		msg: "AppArmor runtime/default",
+		pod: makePod(map[string]string{
+			apparmor.ContainerAnnotationKeyPrefix + containerName: apparmor.ProfileRuntimeDefault,
+		}),
+		expectedOpts: []string{"seccomp=unconfined"},
+	}, {
+		msg: "AppArmor local profile",
+		pod: makePod(map[string]string{
+			apparmor.ContainerAnnotationKeyPrefix + containerName: apparmor.ProfileNamePrefix + "foo",
+		}),
+		expectedOpts: []string{"seccomp=unconfined", "apparmor=foo"},
+	}, {
+		msg: "AppArmor and seccomp profile",
+		pod: makePod(map[string]string{
+			api.SeccompContainerAnnotationKeyPrefix + containerName: "docker/default",
+			apparmor.ContainerAnnotationKeyPrefix + containerName:   apparmor.ProfileNamePrefix + "foo",
+		}),
+		expectedOpts: []string{"apparmor=foo"},
+	}}
+
+	dm, _ := newTestDockerManagerWithVersion("1.11.1", "1.23")
+	for i, test := range tests {
+		opts, err := dm.getSecurityOpts(test.pod, containerName)
+		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
+		assert.Len(t, opts, len(test.expectedOpts), "TestCase[%d]: %s", i, test.msg)
+		for _, opt := range test.expectedOpts {
+			assert.Contains(t, opts, opt, "TestCase[%d]: %s", i, test.msg)
+		}
 	}
 }
 
@@ -2078,6 +2158,58 @@ func TestCheckVersionCompatibility(t *testing.T) {
 	}
 }
 
+func TestNewDockerVersion(t *testing.T) {
+	cases := []struct {
+		value string
+		out   string
+		err   bool
+	}{
+		{value: "1", err: true},
+		{value: "1.8", err: true},
+		{value: "1.8.1", out: "1.8.1"},
+		{value: "1.8.1-fc21.other", out: "1.8.1-fc21.other"},
+		{value: "1.8.1-beta.12", out: "1.8.1-beta.12"},
+	}
+	for _, test := range cases {
+		v, err := newDockerVersion(test.value)
+		switch {
+		case err != nil && test.err:
+			continue
+		case (err != nil) != test.err:
+			t.Errorf("error for %q: expected %t, got %v", test.value, test.err, err)
+			continue
+		}
+		if v.String() != test.out {
+			t.Errorf("unexpected parsed version %q for %q", v, test.value)
+		}
+	}
+}
+
+func TestDockerVersionComparison(t *testing.T) {
+	v, err := newDockerVersion("1.10.3")
+	assert.NoError(t, err)
+	for i, test := range []struct {
+		version string
+		compare int
+		err     bool
+	}{
+		{version: "1.9.2", compare: 1},
+		{version: "1.9.2-rc2", compare: 1},
+		{version: "1.10.3", compare: 0},
+		{version: "1.10.3-rc3", compare: 1},
+		{version: "1.10.4", compare: -1},
+		{version: "1.10.4-rc1", compare: -1},
+		{version: "1.11.1", compare: -1},
+		{version: "1.11.1-rc4", compare: -1},
+		{version: "invalid", compare: -1, err: true},
+	} {
+		testCase := fmt.Sprintf("test case #%d test version %q", i, test.version)
+		res, err := v.Compare(test.version)
+		assert.Equal(t, test.compare, res, testCase)
+		assert.Equal(t, test.err, err != nil, testCase)
+	}
+}
+
 func TestVersion(t *testing.T) {
 	expectedVersion := "1.8.1"
 	expectedAPIVersion := "1.20"
@@ -2178,5 +2310,178 @@ func TestPruneInitContainers(t *testing.T) {
 	sort.Sort(sort.StringSlice(fake.Removed))
 	if !reflect.DeepEqual([]string{"init1-new-2", "init1-old-1", "init2-old-1"}, fake.Removed) {
 		t.Fatal(fake.Removed)
+	}
+}
+
+func TestGetPodStatusFromNetworkPlugin(t *testing.T) {
+	cases := []struct {
+		pod                *api.Pod
+		fakePodIP          string
+		containerID        string
+		infraContainerID   string
+		networkStatusError error
+		expectRunning      bool
+		expectUnknown      bool
+	}{
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					UID:       "12345678",
+					Name:      "foo",
+					Namespace: "new",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Name: "container"}},
+				},
+			},
+			fakePodIP:          "10.10.10.10",
+			containerID:        "123",
+			infraContainerID:   "9876",
+			networkStatusError: nil,
+			expectRunning:      true,
+			expectUnknown:      false,
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					UID:       "12345678",
+					Name:      "foo",
+					Namespace: "new",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Name: "container"}},
+				},
+			},
+			fakePodIP:          "",
+			containerID:        "123",
+			infraContainerID:   "9876",
+			networkStatusError: fmt.Errorf("CNI plugin error"),
+			expectRunning:      false,
+			expectUnknown:      true,
+		},
+	}
+	for _, test := range cases {
+		dm, fakeDocker := newTestDockerManager()
+		ctrl := gomock.NewController(t)
+		fnp := mock_network.NewMockNetworkPlugin(ctrl)
+		dm.networkPlugin = fnp
+
+		fakeDocker.SetFakeRunningContainers([]*FakeContainer{
+			{
+				ID:      test.containerID,
+				Name:    fmt.Sprintf("/k8s_container_%s_%s_%s_42", test.pod.Name, test.pod.Namespace, test.pod.UID),
+				Running: true,
+			},
+			{
+				ID:      test.infraContainerID,
+				Name:    fmt.Sprintf("/k8s_POD.%s_%s_%s_%s_42", strconv.FormatUint(generatePodInfraContainerHash(test.pod), 16), test.pod.Name, test.pod.Namespace, test.pod.UID),
+				Running: true,
+			},
+		})
+
+		fnp.EXPECT().Name().Return("someNetworkPlugin").AnyTimes()
+		var podNetworkStatus *network.PodNetworkStatus
+		if test.fakePodIP != "" {
+			podNetworkStatus = &network.PodNetworkStatus{IP: net.ParseIP(test.fakePodIP)}
+		}
+		fnp.EXPECT().GetPodNetworkStatus(test.pod.Namespace, test.pod.Name, kubecontainer.DockerID(test.infraContainerID).ContainerID()).Return(podNetworkStatus, test.networkStatusError)
+
+		podStatus, err := dm.GetPodStatus(test.pod.UID, test.pod.Name, test.pod.Namespace)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if podStatus.IP != test.fakePodIP {
+			t.Errorf("Got wrong ip, expected %v, got %v", test.fakePodIP, podStatus.IP)
+		}
+
+		expectedStatesCount := 0
+		var expectedState kubecontainer.ContainerState
+		if test.expectRunning {
+			expectedState = kubecontainer.ContainerStateRunning
+		} else if test.expectUnknown {
+			expectedState = kubecontainer.ContainerStateUnknown
+		} else {
+			t.Errorf("Some state has to be expected")
+		}
+		for _, containerStatus := range podStatus.ContainerStatuses {
+			if containerStatus.State == expectedState {
+				expectedStatesCount++
+			}
+		}
+		if expectedStatesCount < 1 {
+			t.Errorf("Invalid count of containers with expected state")
+		}
+	}
+}
+
+func TestSyncPodGetsPodIPFromNetworkPlugin(t *testing.T) {
+	const (
+		containerID      = "123"
+		infraContainerID = "9876"
+		fakePodIP        = "10.10.10.10"
+	)
+	dm, fakeDocker := newTestDockerManager()
+	dm.podInfraContainerImage = "pod_infra_image"
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	fnp := mock_network.NewMockNetworkPlugin(ctrl)
+	dm.networkPlugin = fnp
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "bar"},
+			},
+		},
+	}
+
+	// Can be called multiple times due to GetPodStatus
+	fnp.EXPECT().Name().Return("someNetworkPlugin").AnyTimes()
+	fnp.EXPECT().GetPodNetworkStatus("new", "foo", gomock.Any()).Return(&network.PodNetworkStatus{IP: net.ParseIP(fakePodIP)}, nil).AnyTimes()
+	fnp.EXPECT().SetUpPod("new", "foo", gomock.Any()).Return(nil)
+
+	runSyncPod(t, dm, fakeDocker, pod, nil, false)
+	verifyCalls(t, fakeDocker, []string{
+		// Create pod infra container.
+		"create", "start", "inspect_container", "inspect_container",
+		// Create container.
+		"create", "start", "inspect_container",
+	})
+}
+
+// only test conditions "if inspect == nil || inspect.Config == nil || inspect.Config.Labels == nil" now
+func TestContainerAndPodFromLabels(t *testing.T) {
+	tests := []struct {
+		inspect       *dockertypes.ContainerJSON
+		expectedError error
+	}{
+		{
+			inspect:       nil,
+			expectedError: errNoPodOnContainer,
+		},
+		{
+			inspect:       &dockertypes.ContainerJSON{},
+			expectedError: errNoPodOnContainer,
+		},
+		{
+			inspect: &dockertypes.ContainerJSON{
+				Config: &dockercontainer.Config{
+					Hostname: "foo",
+				},
+			},
+			expectedError: errNoPodOnContainer,
+		},
+	}
+
+	for k, v := range tests {
+		pod, container, err := containerAndPodFromLabels(v.inspect)
+		if pod != nil || container != nil || err != v.expectedError {
+			t.Errorf("case[%q]: expected: nil, nil, %v, got: %v, %v, %v", k, v.expectedError, pod, container, err)
+		}
 	}
 }

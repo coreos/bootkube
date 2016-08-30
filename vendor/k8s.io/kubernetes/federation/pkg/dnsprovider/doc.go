@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,4 +18,4 @@ limitations under the License.
 dnsprovider supplies interfaces for dns service providers (e.g. Google Cloud DNS, AWS route53, etc).
 Implementations exist in the providers sub-package
 */
-package dnsprovider
+package dnsprovider // import "k8s.io/kubernetes/federation/pkg/dnsprovider"

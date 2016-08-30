@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
@@ -31,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/populator"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -44,6 +47,10 @@ const (
 	// reconcilerLoopSleepPeriod is the amount of time the reconciler loop waits
 	// between successive executions
 	reconcilerLoopSleepPeriod time.Duration = 100 * time.Millisecond
+
+	// reconcilerReconstructSleepPeriod is the amount of time the reconciler reconstruct process
+	// waits between successive executions
+	reconcilerReconstructSleepPeriod time.Duration = 3 * time.Minute
 
 	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
 	// DesiredStateOfWorldPopulator loop waits between successive executions
@@ -75,6 +82,10 @@ const (
 	// operation is waiting it only blocks other operations on the same device,
 	// other devices are not affected.
 	waitForAttachTimeout time.Duration = 10 * time.Minute
+
+	// reconcilerStartGracePeriod is the maximum amount of time volume manager
+	// can wait to start reconciler
+	reconcilerStartGracePeriod time.Duration = 60 * time.Second
 )
 
 // VolumeManager runs a set of asynchronous loops that figure out which volumes
@@ -82,7 +93,7 @@ const (
 // this node and makes it so.
 type VolumeManager interface {
 	// Starts the volume manager and all the asynchronous loops that it controls
-	Run(stopCh <-chan struct{})
+	Run(sourcesReady config.SourcesReady, stopCh <-chan struct{})
 
 	// WaitForAttachAndMount processes the volumes referenced in the specified
 	// pod and blocks until they are all attached and mounted (reflected in
@@ -98,16 +109,10 @@ type VolumeManager interface {
 	// volumes.
 	GetMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap
 
-	// GetVolumesForPodAndApplySupplementalGroups, like GetVolumesForPod returns
-	// a VolumeMap containing the volumes referenced by the specified pod that
-	// are successfully attached and mounted. The key in the map is the
-	// OuterVolumeSpecName (i.e. pod.Spec.Volumes[x].Name).
-	// It returns an empty VolumeMap if pod has no volumes.
-	// In addition for every volume that specifies a VolumeGidValue, it appends
-	// the SecurityContext.SupplementalGroups for the specified pod.
-	// XXX: https://github.com/kubernetes/kubernetes/issues/27197 mutating the
-	// pod object is bad, and should be avoided.
-	GetVolumesForPodAndAppendSupplementalGroups(pod *api.Pod) container.VolumeMap
+	// GetExtraSupplementalGroupsForPod returns a list of the extra
+	// supplemental groups for the Pod. These extra supplemental groups come
+	// from annotations on persistent volumes that the pod depends on.
+	GetExtraSupplementalGroupsForPod(pod *api.Pod) []int64
 
 	// Returns a list of all volumes that implement the volume.Attacher
 	// interface and are currently in use according to the actual and desired
@@ -142,7 +147,11 @@ func NewVolumeManager(
 	podManager pod.Manager,
 	kubeClient internalclientset.Interface,
 	volumePluginMgr *volume.VolumePluginMgr,
-	kubeContainerRuntime kubecontainer.Runtime) (VolumeManager, error) {
+	kubeContainerRuntime kubecontainer.Runtime,
+	mounter mount.Interface,
+	kubeletPodsDir string,
+	recorder record.EventRecorder) (VolumeManager, error) {
+
 	vm := &volumeManager{
 		kubeClient:          kubeClient,
 		volumePluginMgr:     volumePluginMgr,
@@ -150,18 +159,23 @@ func NewVolumeManager(
 		actualStateOfWorld:  cache.NewActualStateOfWorld(hostName, volumePluginMgr),
 		operationExecutor: operationexecutor.NewOperationExecutor(
 			kubeClient,
-			volumePluginMgr),
+			volumePluginMgr,
+			recorder),
 	}
 
 	vm.reconciler = reconciler.NewReconciler(
 		kubeClient,
 		controllerAttachDetachEnabled,
 		reconcilerLoopSleepPeriod,
+		reconcilerReconstructSleepPeriod,
 		waitForAttachTimeout,
 		hostName,
 		vm.desiredStateOfWorld,
 		vm.actualStateOfWorld,
-		vm.operationExecutor)
+		vm.operationExecutor,
+		mounter,
+		volumePluginMgr,
+		kubeletPodsDir)
 	vm.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		kubeClient,
 		desiredStateOfWorldPopulatorLoopSleepPeriod,
@@ -211,12 +225,14 @@ type volumeManager struct {
 	desiredStateOfWorldPopulator populator.DesiredStateOfWorldPopulator
 }
 
-func (vm *volumeManager) Run(stopCh <-chan struct{}) {
+func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
-	glog.Infof("Starting Kubelet Volume Manager")
 
-	go vm.reconciler.Run(stopCh)
 	go vm.desiredStateOfWorldPopulator.Run(stopCh)
+	glog.V(2).Infof("The desired_state_of_world populator starts")
+
+	glog.Infof("Starting Kubelet Volume Manager")
+	go vm.reconciler.Run(sourcesReady, stopCh)
 
 	<-stopCh
 	glog.Infof("Shutting down Kubelet Volume Manager")
@@ -224,12 +240,34 @@ func (vm *volumeManager) Run(stopCh <-chan struct{}) {
 
 func (vm *volumeManager) GetMountedVolumesForPod(
 	podName types.UniquePodName) container.VolumeMap {
-	return vm.getVolumesForPodHelper(podName, nil /* pod */)
+	podVolumes := make(container.VolumeMap)
+	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
+		podVolumes[mountedVolume.OuterVolumeSpecName] = container.VolumeInfo{Mounter: mountedVolume.Mounter}
+	}
+	return podVolumes
 }
 
-func (vm *volumeManager) GetVolumesForPodAndAppendSupplementalGroups(
-	pod *api.Pod) container.VolumeMap {
-	return vm.getVolumesForPodHelper("" /* podName */, pod)
+func (vm *volumeManager) GetExtraSupplementalGroupsForPod(pod *api.Pod) []int64 {
+	podName := volumehelper.GetUniquePodName(pod)
+	supplementalGroups := sets.NewString()
+
+	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
+		if mountedVolume.VolumeGidValue != "" {
+			supplementalGroups.Insert(mountedVolume.VolumeGidValue)
+		}
+	}
+
+	result := make([]int64, 0, supplementalGroups.Len())
+	for _, group := range supplementalGroups.List() {
+		iGroup, extra := getExtraSupplementalGid(group, pod)
+		if !extra {
+			continue
+		}
+
+		result = append(result, int64(iGroup))
+	}
+
+	return result
 }
 
 func (vm *volumeManager) GetVolumesInUse() []api.UniqueVolumeName {
@@ -274,33 +312,6 @@ func (vm *volumeManager) VolumeIsAttached(
 func (vm *volumeManager) MarkVolumesAsReportedInUse(
 	volumesReportedAsInUse []api.UniqueVolumeName) {
 	vm.desiredStateOfWorld.MarkVolumesReportedInUse(volumesReportedAsInUse)
-}
-
-// getVolumesForPodHelper is a helper method implements the common logic for
-// the GetVolumesForPod methods.
-// XXX: https://github.com/kubernetes/kubernetes/issues/27197 mutating the pod
-// object is bad, and should be avoided.
-func (vm *volumeManager) getVolumesForPodHelper(
-	podName types.UniquePodName, pod *api.Pod) container.VolumeMap {
-	if pod != nil {
-		podName = volumehelper.GetUniquePodName(pod)
-	}
-	podVolumes := make(container.VolumeMap)
-	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
-		podVolumes[mountedVolume.OuterVolumeSpecName] =
-			container.VolumeInfo{Mounter: mountedVolume.Mounter}
-		if pod != nil {
-			err := applyPersistentVolumeAnnotations(
-				mountedVolume.VolumeGidValue, pod)
-			if err != nil {
-				glog.Errorf("applyPersistentVolumeAnnotations failed for pod %q volume %q with: %v",
-					podName,
-					mountedVolume.VolumeName,
-					err)
-			}
-		}
-	}
-	return podVolumes
 }
 
 func (vm *volumeManager) WaitForAttachAndMount(pod *api.Pod) error {
@@ -392,32 +403,26 @@ func getExpectedVolumes(pod *api.Pod) []string {
 	return expectedVolumes
 }
 
-// applyPersistentVolumeAnnotations appends a pod
-// SecurityContext.SupplementalGroups if a GID annotation is provided.
-// XXX: https://github.com/kubernetes/kubernetes/issues/27197 mutating the pod
-// object is bad, and should be avoided.
-func applyPersistentVolumeAnnotations(
-	volumeGidValue string, pod *api.Pod) error {
-	if volumeGidValue != "" {
-		gid, err := strconv.ParseInt(volumeGidValue, 10, 64)
-		if err != nil {
-			return fmt.Errorf(
-				"Invalid value for %s %v",
-				volumehelper.VolumeGidAnnotationKey,
-				err)
-		}
-
-		if pod.Spec.SecurityContext == nil {
-			pod.Spec.SecurityContext = &api.PodSecurityContext{}
-		}
-		for _, existingGid := range pod.Spec.SecurityContext.SupplementalGroups {
-			if gid == existingGid {
-				return nil
-			}
-		}
-		pod.Spec.SecurityContext.SupplementalGroups =
-			append(pod.Spec.SecurityContext.SupplementalGroups, gid)
+// getExtraSupplementalGid returns the value of an extra supplemental GID as
+// defined by an annotation on a volume and a boolean indicating whether the
+// volume defined a GID that the pod doesn't already request.
+func getExtraSupplementalGid(volumeGidValue string, pod *api.Pod) (int64, bool) {
+	if volumeGidValue == "" {
+		return 0, false
 	}
 
-	return nil
+	gid, err := strconv.ParseInt(volumeGidValue, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+
+	if pod.Spec.SecurityContext != nil {
+		for _, existingGid := range pod.Spec.SecurityContext.SupplementalGroups {
+			if gid == existingGid {
+				return 0, false
+			}
+		}
+	}
+
+	return gid, true
 }

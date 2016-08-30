@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,17 +34,19 @@ completion of kubectl commands.
 	completion_example = `
 $ source <(kubectl completion bash)
 
-will load the kubectl completion code for bash. Note that this depends on the bash-completion
-framework. It must be sourced before sourcing the kubectl completion, i.e. on the Mac:
+will load the kubectl completion code for bash. Note that this depends on the
+bash-completion framework. It must be sourced before sourcing the kubectl
+completion, e.g. on the Mac:
 
 $ brew install bash-completion
 $ source $(brew --prefix)/etc/bash_completion
 $ source <(kubectl completion bash)
 
-If you use zsh, the following will load kubectl zsh completion:
+If you use zsh*, the following will load kubectl zsh completion:
 
 $ source <(kubectl completion zsh)
-`
+
+* zsh completions are only supported in versions of zsh >= 5.2`
 )
 
 var (
@@ -95,7 +97,7 @@ func runCompletionBash(out io.Writer, kubectl *cobra.Command) error {
 }
 
 func runCompletionZsh(out io.Writer, kubectl *cobra.Command) error {
-	zsh_initialilzation := `# Copyright 2016 The Kubernetes Authors All rights reserved.
+	zsh_initialilzation := `# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

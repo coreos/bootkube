@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,12 +30,6 @@ import (
 
 const (
 	kubectlAnnotationPrefix = "kubectl.kubernetes.io/"
-	// TODO: auto-generate this
-	PossibleResourceTypes = `Possible resource types include (case insensitive): pods (po), services (svc), deployments,
-replicasets (rs), replicationcontrollers (rc), nodes (no), events (ev), limitranges (limits),
-persistentvolumes (pv), persistentvolumeclaims (pvc), resourcequotas (quota), namespaces (ns),
-serviceaccounts (sa), ingresses (ing), horizontalpodautoscalers (hpa), daemonsets (ds), configmaps,
-componentstatuses (cs), endpoints (ep), and secrets.`
 )
 
 type NamespaceInfo struct {
@@ -127,12 +121,16 @@ func (e ShortcutExpander) ResourceFor(resource unversioned.GroupVersionResource)
 	return e.RESTMapper.ResourceFor(expandResourceShortcut(resource))
 }
 
-func (e ShortcutExpander) ResourceSingularizer(resource string) (string, error) {
-	return e.RESTMapper.ResourceSingularizer(expandResourceShortcut(unversioned.GroupVersionResource{Resource: resource}).Resource)
-}
-
 func (e ShortcutExpander) RESTMapping(gk unversioned.GroupKind, versions ...string) (*meta.RESTMapping, error) {
 	return e.RESTMapper.RESTMapping(gk, versions...)
+}
+
+func (e ShortcutExpander) RESTMappings(gk unversioned.GroupKind) ([]*meta.RESTMapping, error) {
+	return e.RESTMapper.RESTMappings(gk)
+}
+
+func (e ShortcutExpander) ResourceSingularizer(resource string) (string, error) {
+	return e.RESTMapper.ResourceSingularizer(expandResourceShortcut(unversioned.GroupVersionResource{Resource: resource}).Resource)
 }
 
 func (e ShortcutExpander) AliasesForResource(resource string) ([]string, bool) {
@@ -144,7 +142,10 @@ var shortForms = map[string]string{
 	// Please keep this alphabetized
 	// If you add an entry here, please also take a look at pkg/kubectl/cmd/cmd.go
 	// and add an entry to valid_resources when appropriate.
+	"cm":     "configmaps",
 	"cs":     "componentstatuses",
+	"csr":    "certificatesigningrequests",
+	"deploy": "deployments",
 	"ds":     "daemonsets",
 	"ep":     "endpoints",
 	"ev":     "events",
@@ -162,6 +163,19 @@ var shortForms = map[string]string{
 	"rs":     "replicasets",
 	"sa":     "serviceaccounts",
 	"svc":    "services",
+}
+
+// Look-up for resource short forms by value
+func ResourceShortFormFor(resource string) (string, bool) {
+	var alias string
+	exists := false
+	for k, val := range shortForms {
+		if val == resource {
+			alias = k
+			exists = true
+		}
+	}
+	return alias, exists
 }
 
 // expandResourceShortcut will return the expanded version of resource

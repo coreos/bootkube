@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -120,7 +120,7 @@ func packageForGroup(gv unversioned.GroupVersion, typeList []*types.Type, packag
 			return generators
 		},
 		FilterFunc: func(c *generator.Context, t *types.Type) bool {
-			return types.ExtractCommentTags("+", t.SecondClosestCommentLines)["genclient"] == "true"
+			return extractBoolTagOrDie("genclient", t.SecondClosestCommentLines) == true
 		},
 	}
 }
@@ -190,7 +190,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			} else {
 				// User has not specified any override for this group version.
 				// filter out types which dont have genclient=true.
-				if types.ExtractCommentTags("+", t.SecondClosestCommentLines)["genclient"] != "true" {
+				if extractBoolTagOrDie("genclient", t.SecondClosestCommentLines) == false {
 					continue
 				}
 			}

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -292,8 +292,9 @@ func (e *endpointController) syncService(key string) {
 
 	subsets := []api.EndpointSubset{}
 	containerPortAnnotations := map[string]string{} // by <HostIP>:<Port>
-	for i := range pods.Items {
-		pod := &pods.Items[i]
+	for i := range pods {
+		// TODO: Do we need to copy here?
+		pod := &(*pods[i])
 
 		for i := range service.Spec.Ports {
 			servicePort := &service.Spec.Ports[i]

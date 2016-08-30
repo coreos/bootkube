@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -49,7 +49,7 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string, useAnnotatio
 			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 		},
 		ObjectMeta: api.ObjectMeta{
-			Name:      "dns-test-" + string(util.NewUUID()),
+			Name:      "dns-test-" + string(uuid.NewUUID()),
 			Namespace: namespace,
 		},
 		Spec: api.PodSpec{
@@ -245,7 +245,8 @@ func verifyDNSPodIsRunning(f *framework.Framework) {
 	if len(dnsPods.Items) < 1 {
 		framework.Failf("No pods match the label selector %v", dnsServiceLabelSelector.String())
 	}
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, dnsPods.Items[0].Name, api.NamespaceSystem))
+	pod := dnsPods.Items[0]
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, &pod))
 }
 
 func createServiceSpec(serviceName string, isHeadless bool, selector map[string]string) *api.Service {

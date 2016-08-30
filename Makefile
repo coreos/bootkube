@@ -7,19 +7,26 @@ GOFILES:=$(shell find . -name '*.go' | grep -v -E '(./vendor|internal/templates.
 TEMPLATES:=$(shell find pkg/asset/templates -type f)
 GOPATH_BIN:=$(shell echo ${GOPATH} | awk 'BEGIN { FS = ":" }; { print $1 }')/bin
 
+.PHONY: all
 all: \
 	_output/bin/linux/bootkube \
 	_output/bin/darwin/bootkube \
 	_output/bin/linux/checkpoint
 
+.PHONY: release
 release: clean check \
 	_output/release/bootkube.tar.gz
 
+.PHONY: templates
+templates: $(GOFILES) pkg/asset/internal/templates.go
+
+.PHONY: check
 check: pkg/asset/internal/templates.go
 	@find . -name vendor -prune -o -name '*.go' -exec gofmt -s -d {} +
 	@go vet $(shell go list ./... | grep -v '/vendor/')
 	@go test -v $(shell go list ./... | grep -v '/vendor/')
 
+.PHONY: install
 install: _output/bin/$(LOCAL_OS)/bootkube
 	cp $< $(GOPATH_BIN)
 
@@ -50,21 +57,25 @@ conformance-%: clean all
 
 # This will naively try and create a vendor dir from a k8s release
 # USE: make vendor VENDOR_VERSION=vX.Y.Z
-VENDOR_VERSION = v1.3.4+coreos.0
+VENDOR_VERSION = coreos-hyperkube-v1.4.0-alpha.3
+
+.PHONY: vendor
 vendor: vendor-$(VENDOR_VERSION)
 
+#TODO(aaron): the k8s.io/client-go upstream package is a symlink with relative path.
+# Just making note here because we change the symlink path -- but this is all likely temporary
 vendor-$(VENDOR_VERSION):
 	@echo "Creating k8s vendor dir: $@"
 	@mkdir -p $@/k8s.io/kubernetes
 	@git clone --branch=$(VENDOR_VERSION) --depth=1 https://github.com/coreos/kubernetes $@/k8s.io/kubernetes > /dev/null 2>&1
 	@cd $@/k8s.io/kubernetes && git checkout $(VENDOR_VERSION) > /dev/null 2>&1
 	@cd $@/k8s.io/kubernetes && rm -rf docs examples hack cluster Godeps
-	@cd $@/k8s.io/kubernetes/vendor && mv k8s.io/heapster $(abspath $@/k8s.io) && rmdir k8s.io
+	@cd $@/k8s.io/kubernetes/vendor && mv k8s.io/* $(abspath $@/k8s.io) && rmdir k8s.io
 	@mv $@/k8s.io/kubernetes/vendor/* $(abspath $@)
+	@cd $@/k8s.io/ && ln -sf kubernetes/staging/src/k8s.io/client-go client-go
 	@rm -rf $@/k8s.io/kubernetes/vendor $@/k8s.io/kubernetes/.git
 
+.PHONY: clean
 clean:
 	rm -rf _output
 	rm -rf pkg/asset/internal
-
-.PHONY: all check clean install release vendor

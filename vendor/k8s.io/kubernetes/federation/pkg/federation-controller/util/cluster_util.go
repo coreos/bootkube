@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	federation_v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -129,4 +130,14 @@ var KubeconfigGetterForSecret = func(secretName string) clientcmd.KubeconfigGett
 		}
 		return clientcmd.Load(data)
 	}
+}
+
+// Retruns Clientset for the given cluster.
+func GetClientsetForCluster(cluster *federation_v1beta1.Cluster) (*federation_release_1_4.Clientset, error) {
+	clusterConfig, err := BuildClusterConfig(cluster)
+	if err != nil && clusterConfig != nil {
+		clientset := federation_release_1_4.NewForConfigOrDie(restclient.AddUserAgent(clusterConfig, userAgentName))
+		return clientset, nil
+	}
+	return nil, err
 }

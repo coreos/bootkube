@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,25 +21,39 @@ package app
 
 import (
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
+	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
+	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
+	"k8s.io/kubernetes/pkg/registry/clusterrole"
+	clusterroleetcd "k8s.io/kubernetes/pkg/registry/clusterrole/etcd"
+	"k8s.io/kubernetes/pkg/registry/clusterrolebinding"
+	clusterrolebindingetcd "k8s.io/kubernetes/pkg/registry/clusterrolebinding/etcd"
 	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/registry/role"
+	roleetcd "k8s.io/kubernetes/pkg/registry/role/etcd"
+	"k8s.io/kubernetes/pkg/registry/rolebinding"
+	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rolebinding/etcd"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 func NewAPIServerCommand() *cobra.Command {
-	s := genericoptions.NewServerRunOptions()
+	s := options.NewServerRunOptions()
 	s.AddFlags(pflag.CommandLine)
 	cmd := &cobra.Command{
 		Use: "federation-apiserver",
@@ -50,13 +64,13 @@ cluster's shared state through which all other components interact.`,
 		Run: func(cmd *cobra.Command, args []string) {
 		},
 	}
-
 	return cmd
 }
 
 // Run runs the specified APIServer.  This should never exit.
-func Run(s *genericoptions.ServerRunOptions) error {
-	genericapiserver.DefaultAndValidateRunOptions(s)
+func Run(s *options.ServerRunOptions) error {
+	genericvalidation.VerifyEtcdServersList(s.ServerRunOptions)
+	genericapiserver.DefaultAndValidateRunOptions(s.ServerRunOptions)
 
 	// TODO: register cluster federation resources here.
 	resourceConfig := genericapiserver.NewResourceConfig()
@@ -68,7 +82,7 @@ func Run(s *genericoptions.ServerRunOptions) error {
 	storageFactory, err := genericapiserver.BuildDefaultStorageFactory(
 		s.StorageConfig, s.DefaultStorageMediaType, api.Codecs,
 		genericapiserver.NewDefaultResourceEncodingConfig(), storageGroupsToEncodingVersion,
-		resourceConfig, s.RuntimeConfig)
+		[]unversioned.GroupVersionResource{}, resourceConfig, s.RuntimeConfig)
 	if err != nil {
 		glog.Fatalf("error in initializing storage factory: %s", err)
 	}
@@ -109,7 +123,40 @@ func Run(s *genericoptions.ServerRunOptions) error {
 	}
 
 	authorizationModeNames := strings.Split(s.AuthorizationMode, ",")
-	authorizer, err := apiserver.NewAuthorizerFromAuthorizationConfig(authorizationModeNames, s.AuthorizationConfig)
+
+	modeEnabled := func(mode string) bool {
+		for _, m := range authorizationModeNames {
+			if m == mode {
+				return true
+			}
+		}
+		return false
+	}
+
+	authorizationConfig := authorizer.AuthorizationConfig{
+		PolicyFile:                  s.AuthorizationPolicyFile,
+		WebhookConfigFile:           s.AuthorizationWebhookConfigFile,
+		WebhookCacheAuthorizedTTL:   s.AuthorizationWebhookCacheAuthorizedTTL,
+		WebhookCacheUnauthorizedTTL: s.AuthorizationWebhookCacheUnauthorizedTTL,
+		RBACSuperUser:               s.AuthorizationRBACSuperUser,
+	}
+	if modeEnabled(genericoptions.ModeRBAC) {
+		mustGetRESTOptions := func(resource string) generic.RESTOptions {
+			config, err := storageFactory.NewConfig(rbac.Resource(resource))
+			if err != nil {
+				glog.Fatalf("Unable to get %s storage: %v", resource, err)
+			}
+			return generic.RESTOptions{StorageConfig: config, Decorator: generic.UndecoratedStorage, ResourcePrefix: storageFactory.ResourcePrefix(rbac.Resource(resource))}
+		}
+
+		// For initial bootstrapping go directly to etcd to avoid privillege escalation check.
+		authorizationConfig.RBACRoleRegistry = role.NewRegistry(roleetcd.NewREST(mustGetRESTOptions("roles")))
+		authorizationConfig.RBACRoleBindingRegistry = rolebinding.NewRegistry(rolebindingetcd.NewREST(mustGetRESTOptions("rolebindings")))
+		authorizationConfig.RBACClusterRoleRegistry = clusterrole.NewRegistry(clusterroleetcd.NewREST(mustGetRESTOptions("clusterroles")))
+		authorizationConfig.RBACClusterRoleBindingRegistry = clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(mustGetRESTOptions("clusterrolebindings")))
+	}
+
+	authorizer, err := authorizer.NewAuthorizerFromAuthorizationConfig(authorizationModeNames, authorizationConfig)
 	if err != nil {
 		glog.Fatalf("Invalid Authorization Config: %v", err)
 	}
@@ -119,14 +166,20 @@ func Run(s *genericoptions.ServerRunOptions) error {
 	if err != nil {
 		glog.Errorf("Failed to create clientset: %v", err)
 	}
-	admissionController := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile)
+	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
+	pluginInitializer := admission.NewPluginInitializer(sharedInformers)
 
-	genericConfig := genericapiserver.NewConfig(s)
+	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile, pluginInitializer)
+	if err != nil {
+		glog.Fatalf("Failed to initialize plugins: %v", err)
+	}
+	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)
 	// TODO: Move the following to generic api server as well.
 	genericConfig.StorageFactory = storageFactory
 	genericConfig.Authenticator = authenticator
 	genericConfig.SupportsBasicAuth = len(s.BasicAuthFile) > 0
 	genericConfig.Authorizer = authorizer
+	genericConfig.AuthorizerRBACSuperUser = s.AuthorizationRBACSuperUser
 	genericConfig.AdmissionControl = admissionController
 	genericConfig.APIResourceConfigSource = storageFactory.APIResourceConfigSource
 	genericConfig.MasterServiceNamespace = s.MasterServiceNamespace
@@ -134,6 +187,7 @@ func Run(s *genericoptions.ServerRunOptions) error {
 
 	// TODO: Move this to generic api server (Need to move the command line flag).
 	if s.EnableWatchCache {
+		cachesize.InitializeWatchCacheSizes(s.TargetRAMMB)
 		cachesize.SetWatchCacheSizes(s.WatchCacheSizes)
 	}
 
@@ -144,19 +198,22 @@ func Run(s *genericoptions.ServerRunOptions) error {
 
 	installFederationAPIs(s, m, storageFactory)
 	installCoreAPIs(s, m, storageFactory)
+	installExtensionsAPIs(s, m, storageFactory)
 
-	m.Run(s)
+	sharedInformers.Start(wait.NeverStop)
+	m.Run(s.ServerRunOptions)
 	return nil
 }
 
-func createRESTOptionsOrDie(s *genericoptions.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory, resource unversioned.GroupResource) generic.RESTOptions {
-	storage, err := f.New(resource)
+func createRESTOptionsOrDie(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory, resource unversioned.GroupResource) generic.RESTOptions {
+	config, err := f.NewConfig(resource)
 	if err != nil {
-		glog.Fatalf("Unable to find storage destination for %v, due to %v", resource, err.Error())
+		glog.Fatalf("Unable to find storage config for %v, due to %v", resource, err.Error())
 	}
 	return generic.RESTOptions{
-		Storage:                 storage,
+		StorageConfig:           config,
 		Decorator:               g.StorageDecorator(),
 		DeleteCollectionWorkers: s.DeleteCollectionWorkers,
+		ResourcePrefix:          f.ResourcePrefix(resource),
 	}
 }

@@ -74,6 +74,8 @@ func NewBootkube(config Config) (*bootkube, error) {
 		"--master=" + insecureAPIAddr,
 		"--service-account-private-key-file=" + filepath.Join(config.AssetDir, asset.AssetPathServiceAccountPrivKey),
 		"--root-ca-file=" + filepath.Join(config.AssetDir, asset.AssetPathCACert),
+		"--allocate-node-cidrs=true",
+		"--cluster-cidr=10.2.0.0/16",
 		"--leader-elect=true",
 	})
 

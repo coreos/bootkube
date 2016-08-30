@@ -25,6 +25,8 @@ const (
 	AssetPathManifests               = "manifests"
 	AssetPathKubelet                 = "manifests/kubelet.yaml"
 	AssetPathProxy                   = "manifests/kube-proxy.yaml"
+	AssetPathKubeFlannel             = "manifests/kube-flannel.yaml"
+	AssetPathKubeFlannelCfg          = "manifests/kube-flannel-cfg.yaml"
 	AssetPathAPIServerSecret         = "manifests/kube-apiserver-secret.yaml"
 	AssetPathAPIServer               = "manifests/kube-apiserver.yaml"
 	AssetPathControllerManager       = "manifests/kube-controller-manager.yaml"

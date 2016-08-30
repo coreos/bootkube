@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	federation_release_1_3 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
+	federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/controller"
@@ -54,7 +54,7 @@ func (sc *ServiceController) clusterEndpointWorker() {
 
 // Whenever there is change on endpoint, the federation service should be updated
 // key is the namespaced name of endpoint
-func (cc *clusterClientCache) syncEndpoint(key, clusterName string, clusterCache *clusterCache, serviceCache *serviceCache, fedClient federation_release_1_3.Interface, serviceController *ServiceController) error {
+func (cc *clusterClientCache) syncEndpoint(key, clusterName string, clusterCache *clusterCache, serviceCache *serviceCache, fedClient federation_release_1_4.Interface, serviceController *ServiceController) error {
 	cachedService, ok := serviceCache.get(key)
 	if !ok {
 		// here we filtered all non-federation services
@@ -105,7 +105,8 @@ func (cc *clusterClientCache) processEndpointDeletion(cachedService *cachedServi
 		glog.V(4).Infof("Cached endpoint was found for %s/%s, cluster %s, removing", cachedService.lastState.Namespace, cachedService.lastState.Name, clusterName)
 		delete(cachedService.endpointMap, clusterName)
 		for i := 0; i < clientRetryCount; i++ {
-			if err := serviceController.ensureDnsRecords(clusterName, cachedService); err == nil {
+			err := serviceController.ensureDnsRecords(clusterName, cachedService)
+			if err == nil {
 				return nil
 			}
 			glog.V(4).Infof("Error ensuring DNS Records: %v", err)
@@ -119,6 +120,7 @@ func (cc *clusterClientCache) processEndpointDeletion(cachedService *cachedServi
 // We do not care about the endpoint info, what we need to make sure here is len(endpoints.subsets)>0
 func (cc *clusterClientCache) processEndpointUpdate(cachedService *cachedService, endpoint *v1.Endpoints, clusterName string, serviceController *ServiceController) error {
 	glog.V(4).Infof("Processing endpoint update for %s/%s, cluster %s", endpoint.Namespace, endpoint.Name, clusterName)
+	var err error
 	cachedService.rwlock.Lock()
 	var reachable bool
 	defer cachedService.rwlock.Unlock()
@@ -134,17 +136,15 @@ func (cc *clusterClientCache) processEndpointUpdate(cachedService *cachedService
 			// first time get endpoints, update dns record
 			glog.V(4).Infof("Reachable endpoint was found for %s/%s, cluster %s, building endpointMap", endpoint.Namespace, endpoint.Name, clusterName)
 			cachedService.endpointMap[clusterName] = 1
-			if err := serviceController.ensureDnsRecords(clusterName, cachedService); err != nil {
-				glog.V(4).Infof("Error ensuring DNS Records: %v", err)
-				for i := 0; i < clientRetryCount; i++ {
-					time.Sleep(cachedService.nextDNSUpdateDelay())
-					err := serviceController.ensureDnsRecords(clusterName, cachedService)
-					if err == nil {
-						return nil
-					}
+			for i := 0; i < clientRetryCount; i++ {
+				err := serviceController.ensureDnsRecords(clusterName, cachedService)
+				if err == nil {
+					return nil
 				}
-				return err
+				glog.V(4).Infof("Error ensuring DNS Records: %v", err)
+				time.Sleep(cachedService.nextDNSUpdateDelay())
 			}
+			return err
 		}
 	} else {
 		for _, subset := range endpoint.Subsets {
@@ -157,17 +157,15 @@ func (cc *clusterClientCache) processEndpointUpdate(cachedService *cachedService
 			// first time get endpoints, update dns record
 			glog.V(4).Infof("Reachable endpoint was lost for %s/%s, cluster %s, deleting endpointMap", endpoint.Namespace, endpoint.Name, clusterName)
 			delete(cachedService.endpointMap, clusterName)
-			if err := serviceController.ensureDnsRecords(clusterName, cachedService); err != nil {
-				glog.V(4).Infof("Error ensuring DNS Records: %v", err)
-				for i := 0; i < clientRetryCount; i++ {
-					time.Sleep(cachedService.nextDNSUpdateDelay())
-					err := serviceController.ensureDnsRecords(clusterName, cachedService)
-					if err == nil {
-						return nil
-					}
+			for i := 0; i < clientRetryCount; i++ {
+				err := serviceController.ensureDnsRecords(clusterName, cachedService)
+				if err == nil {
+					return nil
 				}
-				return err
+				glog.V(4).Infof("Error ensuring DNS Records: %v", err)
+				time.Sleep(cachedService.nextDNSUpdateDelay())
 			}
+			return err
 		}
 	}
 	return nil

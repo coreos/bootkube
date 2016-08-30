@@ -5,24 +5,25 @@ metadata:
   namespace: kube-system
   labels:
     k8s_app: kube-proxy
-    version: v1.3.4_coreos.0
+    version: v1.4.0-alpha.3_aaron.0
 spec:
   template:
     metadata:
       labels:
         k8s_app: kube-proxy
-        version: v1.3.4_coreos.0
+        version: v1.4.0-alpha.3_aaron.0
     spec:
       hostNetwork: true
       containers:
       - name: kube-proxy
-        image: quay.io/coreos/hyperkube:v1.3.4_coreos.0
+        image: quay.io/peanutbutter/hyperkube:v1.4.0-alpha.3_aaron.0
         command:
         - /hyperkube
         - proxy
         - --master={{ index .APIServers 0 }}
         - --kubeconfig=/etc/kubernetes/kubeconfig
         - --proxy-mode=iptables
+        - --masquerade-all=true #NOTE(aaron): this is necessary for vagrant when eth0 IP is not routable
         securityContext:
           privileged: true
         volumeMounts:

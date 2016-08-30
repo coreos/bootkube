@@ -5,22 +5,24 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: kube-controller-manager
-    version: v1.3.4_coreos.0
+    version: v1.4.0-alpha.3_aaron.0
 spec:
   template:
     metadata:
       labels:
         k8s-app: kube-controller-manager
-        version: v1.3.4_coreos.0
+        version: v1.4.0-alpha.3_aaron.0
     spec:
       containers:
       - name: kube-controller-manager
-        image: quay.io/coreos/hyperkube:v1.3.4_coreos.0
+        image: quay.io/peanutbutter/hyperkube:v1.4.0-alpha.3_aaron.0
         command:
         - ./hyperkube
         - controller-manager
         - --root-ca-file=/etc/kubernetes/secrets/ca.crt
         - --service-account-private-key-file=/etc/kubernetes/secrets/service-account.key
+        - --allocate-node-cidrs=true
+        - --cluster-cidr=10.2.0.0/16
         - --leader-elect=true
         volumeMounts:
         - name: secrets

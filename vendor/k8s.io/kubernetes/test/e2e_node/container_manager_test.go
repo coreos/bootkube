@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -29,21 +29,24 @@ import (
 )
 
 var _ = framework.KubeDescribe("Kubelet Container Manager", func() {
-	f := NewDefaultFramework("kubelet-container-manager")
+	f := framework.NewDefaultFramework("kubelet-container-manager")
+	var podClient *framework.PodClient
+
+	BeforeEach(func() {
+		podClient = f.PodClient()
+	})
+
 	Describe("oom score adjusting", func() {
 		Context("when scheduling a busybox command that always fails in a pod", func() {
 			var podName string
 
 			BeforeEach(func() {
-				podName = "bin-false" + string(util.NewUUID())
-				pod := &api.Pod{
+				podName = "bin-false" + string(uuid.NewUUID())
+				podClient.Create(&api.Pod{
 					ObjectMeta: api.ObjectMeta{
-						Name:      podName,
-						Namespace: f.Namespace.Name,
+						Name: podName,
 					},
 					Spec: api.PodSpec{
-						// Force the Pod to schedule to the node without a scheduler running
-						NodeName: *nodeName,
 						// Don't restart the Pod since it is expected to exit
 						RestartPolicy: api.RestartPolicyNever,
 						Containers: []api.Container{
@@ -54,15 +57,12 @@ var _ = framework.KubeDescribe("Kubelet Container Manager", func() {
 							},
 						},
 					},
-				}
-
-				_, err := f.Client.Pods(f.Namespace.Name).Create(pod)
-				Expect(err).To(BeNil(), fmt.Sprintf("Error creating Pod %v", err))
+				})
 			})
 
 			It("should have an error terminated reason", func() {
 				Eventually(func() error {
-					podData, err := f.Client.Pods(f.Namespace.Name).Get(podName)
+					podData, err := podClient.Get(podName)
 					if err != nil {
 						return err
 					}
@@ -81,7 +81,7 @@ var _ = framework.KubeDescribe("Kubelet Container Manager", func() {
 			})
 
 			It("should be possible to delete", func() {
-				err := f.Client.Pods(f.Namespace.Name).Delete(podName, &api.DeleteOptions{})
+				err := podClient.Delete(podName, &api.DeleteOptions{})
 				Expect(err).To(BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
 			})
 		})

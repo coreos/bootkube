@@ -6,9 +6,9 @@ import (
 	"net/url"
 
 	"github.com/spf13/cobra"
-	"k8s.io/kubernetes/pkg/util"
 
 	"github.com/coreos/bootkube/pkg/bootkube"
+	"github.com/coreos/bootkube/pkg/util"
 )
 
 var (

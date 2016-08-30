@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2016 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ while read -ra LINE; do
         sed -i -e "s|^bind.*$|bind ${LINE}|" ${CFG}
     elif [ "$(/opt/redis/redis-cli -h $LINE info | grep role | sed 's,\r$,,')" = "role:master" ]; then
         # TODO: More restrictive regex?
-        sed -i -e "s|^.*slaveof.*$|slaveof ${LINE} ${PORT}|" ${CFG}
+        sed -i -e "s|^# slaveof.*$|slaveof ${LINE} ${PORT}|" ${CFG}
     fi
 done
 

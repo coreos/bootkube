@@ -3,8 +3,8 @@ Requires=docker.service etcd2.service flanneld.service
 After=docker.service etcd2.service flanneld.service
 
 [Service]
-Environment=KUBELET_ACI=quay.io/coreos/hyperkube
-Environment=KUBELET_VERSION=v1.3.4_coreos.0
+Environment=KUBELET_ACI=quay.io/peanutbutter/hyperkube
+Environment=KUBELET_VERSION=v1.4.0-alpha.3_aaron.0
 Environment="RKT_OPTS=--volume etc-resolv,kind=host,source=/etc/resolv.conf --mount volume=etc-resolv,target=/etc/resolv.conf"
 EnvironmentFile=/etc/environment
 

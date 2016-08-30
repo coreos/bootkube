@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -62,7 +62,7 @@ func TestProcessServiceUpdate(t *testing.T) {
 			&cachedService{
 				lastState: &v1.Service{Status: v1.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip1", ""}})}},
 				serviceStatusMap: map[string]v1.LoadBalancerStatus{
-					"foo1": {Ingress: []v1.LoadBalancerIngress{{"ip1", ""}}},
+					"foo1": {Ingress: []v1.LoadBalancerIngress{{IP: "ip1", Hostname: ""}}},
 				},
 			},
 			&v1.Service{Status: v1.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip1", ""}})}},
@@ -77,7 +77,7 @@ func TestProcessServiceUpdate(t *testing.T) {
 					ObjectMeta: v1.ObjectMeta{Name: "bar1"},
 				},
 				serviceStatusMap: map[string]v1.LoadBalancerStatus{
-					"foo2": {Ingress: []v1.LoadBalancerIngress{{"ip1", ""}}},
+					"foo2": {Ingress: []v1.LoadBalancerIngress{{IP: "ip1", Hostname: ""}}},
 				},
 			},
 			&v1.Service{Status: v1.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip1", ""}})}},
@@ -127,7 +127,7 @@ func TestProcessServiceDeletion(t *testing.T) {
 			&cachedService{
 				lastState: &v1.Service{Status: v1.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip1", ""}})}},
 				serviceStatusMap: map[string]v1.LoadBalancerStatus{
-					"foo1": {Ingress: []v1.LoadBalancerIngress{{"ip1", ""}}},
+					"foo1": {Ingress: []v1.LoadBalancerIngress{{IP: "ip1", Hostname: ""}}},
 				},
 			},
 			&v1.Service{Status: v1.ServiceStatus{LoadBalancer: buildServiceStatus([][]string{{"ip1", ""}})}},

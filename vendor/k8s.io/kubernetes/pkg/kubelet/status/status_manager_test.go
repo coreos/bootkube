@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -526,16 +526,12 @@ func TestStaticPodStatus(t *testing.T) {
 	mirrorPod.UID = "new-mirror-pod"
 	mirrorPod.Status = api.PodStatus{}
 	m.podManager.AddPod(mirrorPod)
-	// Expect update to new mirrorPod.
+
+	// Expect no update to mirror pod, since UID has changed.
 	m.testSyncBatch()
 	verifyActions(t, m.kubeClient, []core.Action{
 		core.GetActionImpl{ActionImpl: core.ActionImpl{Verb: "get", Resource: unversioned.GroupVersionResource{Resource: "pods"}}},
-		core.UpdateActionImpl{ActionImpl: core.ActionImpl{Verb: "update", Resource: unversioned.GroupVersionResource{Resource: "pods"}, Subresource: "status"}},
 	})
-	updateAction = client.Actions()[1].(core.UpdateActionImpl)
-	updatedPod = updateAction.Object.(*api.Pod)
-	assert.Equal(t, mirrorPod.UID, updatedPod.UID, "Expected mirrorPod (%q), but got %q", mirrorPod.UID, updatedPod.UID)
-	assert.True(t, isStatusEqual(&status, &updatedPod.Status), "Expected: %+v, Got: %+v", status, updatedPod.Status)
 }
 
 func TestSetContainerReadiness(t *testing.T) {
@@ -620,11 +616,11 @@ func TestSetContainerReadiness(t *testing.T) {
 	status = expectPodStatus(t, m, pod)
 	verifyReadiness("all ready", &status, true, true, true)
 
-	t.Log("Setting non-existant container readiness should fail.")
+	t.Log("Setting non-existent container readiness should fail.")
 	m.SetContainerReadiness(pod.UID, kubecontainer.ContainerID{Type: "test", ID: "foo"}, true)
 	verifyUpdates(t, m, 0)
 	status = expectPodStatus(t, m, pod)
-	verifyReadiness("ignore non-existant", &status, true, true, true)
+	verifyReadiness("ignore non-existent", &status, true, true, true)
 }
 
 func TestSyncBatchCleanupVersions(t *testing.T) {
@@ -677,7 +673,7 @@ func TestReconcilePodStatus(t *testing.T) {
 
 	podStatus, ok := syncer.GetPodStatus(testPod.UID)
 	if !ok {
-		t.Fatalf("Should find pod status for pod: %+v", testPod)
+		t.Fatalf("Should find pod status for pod: %#v", testPod)
 	}
 	testPod.Status = podStatus
 

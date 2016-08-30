@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/golang/glog"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -34,13 +35,18 @@ import (
 
 var sshOptions = flag.String("ssh-options", "", "Commandline options passed to ssh.")
 var sshEnv = flag.String("ssh-env", "", "Use predefined ssh options for environment.  Options: gce")
-var testTimeoutSeconds = flag.Int("test-timeout", 45*60, "How long (in seconds) to wait for ginkgo tests to complete.")
+var testTimeoutSeconds = flag.Duration("test-timeout", 45*time.Minute, "How long (in golang duration format) to wait for ginkgo tests to complete.")
 var resultsDir = flag.String("results-dir", "/tmp/", "Directory to scp test results to.")
-var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify additional flags such as --skip=.")
 
 var sshOptionsMap map[string]string
 
-const archiveName = "e2e_node_test.tar.gz"
+const (
+	archiveName  = "e2e_node_test.tar.gz"
+	CNIRelease   = "8a936732094c0941e1543ef5d292a1f4fffa1ac5"
+	CNIDirectory = "cni"
+)
+
+var CNIURL = fmt.Sprintf("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-%s.tar.gz", CNIRelease)
 
 var hostnameIpOverrides = struct {
 	sync.RWMutex
@@ -76,29 +82,14 @@ func GetHostnameOrIp(hostname string) string {
 // the binaries k8s required for node e2e tests
 func CreateTestArchive() (string, error) {
 	// Build the executables
-	buildGo()
+	if err := buildGo(); err != nil {
+		return "", fmt.Errorf("failed to build the depedencies: %v", err)
+	}
 
 	// Make sure we can find the newly built binaries
 	buildOutputDir, err := getK8sBuildOutputDir()
 	if err != nil {
-		glog.Fatalf("Failed to locate kubernetes build output directory %v", err)
-	}
-
-	ginkgoTest := filepath.Join(buildOutputDir, "e2e_node.test")
-	if _, err := os.Stat(ginkgoTest); err != nil {
-		return "", fmt.Errorf("failed to locate test binary %s", ginkgoTest)
-	}
-	kubelet := filepath.Join(buildOutputDir, "kubelet")
-	if _, err := os.Stat(kubelet); err != nil {
-		return "", fmt.Errorf("failed to locate binary %s", kubelet)
-	}
-	apiserver := filepath.Join(buildOutputDir, "kube-apiserver")
-	if _, err := os.Stat(apiserver); err != nil {
-		return "", fmt.Errorf("failed to locate binary %s", apiserver)
-	}
-	ginkgo := filepath.Join(buildOutputDir, "ginkgo")
-	if _, err := os.Stat(apiserver); err != nil {
-		return "", fmt.Errorf("failed to locate binary %s", ginkgo)
+		return "", fmt.Errorf("failed to locate kubernetes build output directory %v", err)
 	}
 
 	glog.Infof("Building archive...")
@@ -109,25 +100,20 @@ func CreateTestArchive() (string, error) {
 	defer os.RemoveAll(tardir)
 
 	// Copy binaries
-	out, err := exec.Command("cp", ginkgoTest, filepath.Join(tardir, "e2e_node.test")).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to copy e2e_node.test %v.", err)
-	}
-	out, err = exec.Command("cp", kubelet, filepath.Join(tardir, "kubelet")).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to copy kubelet %v.", err)
-	}
-	out, err = exec.Command("cp", apiserver, filepath.Join(tardir, "kube-apiserver")).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to copy kube-apiserver %v.", err)
-	}
-	out, err = exec.Command("cp", ginkgo, filepath.Join(tardir, "ginkgo")).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to copy ginkgo %v.", err)
+	requiredBins := []string{"kubelet", "e2e_node.test", "ginkgo"}
+	for _, bin := range requiredBins {
+		source := filepath.Join(buildOutputDir, bin)
+		if _, err := os.Stat(source); err != nil {
+			return "", fmt.Errorf("failed to locate test binary %s: %v", bin, err)
+		}
+		out, err := exec.Command("cp", source, filepath.Join(tardir, bin)).CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("failed to copy %q: %v Output: %q", bin, err, out)
+		}
 	}
 
 	// Build the tar
-	out, err = exec.Command("tar", "-zcvf", archiveName, "-C", tardir, ".").CombinedOutput()
+	out, err := exec.Command("tar", "-zcvf", archiveName, "-C", tardir, ".").CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to build tar %v.  Output:\n%s", err, out)
 	}
@@ -140,7 +126,7 @@ func CreateTestArchive() (string, error) {
 }
 
 // Returns the command output, whether the exit was ok, and any errors
-func RunRemote(archive string, host string, cleanup bool, junitFileNumber int, setupNode bool) (string, bool, error) {
+func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string, setupNode bool, testArgs string, ginkgoFlags string) (string, bool, error) {
 	if setupNode {
 		uname, err := user.Current()
 		if err != nil {
@@ -167,6 +153,15 @@ func RunRemote(archive string, host string, cleanup bool, junitFileNumber int, s
 				glog.Errorf("failed to cleanup tmp directory %s on host %v.  Output:\n%s", tmp, err, output)
 			}
 		}()
+	}
+
+	// Install the cni plugin.
+	cniPath := filepath.Join(tmp, CNIDirectory)
+	if _, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c",
+		getSshCommand(" ; ", fmt.Sprintf("sudo mkdir -p %s", cniPath),
+			fmt.Sprintf("sudo wget -O - %s | sudo tar -xz -C %s", CNIURL, cniPath))); err != nil {
+		// Exit failure with the error
+		return "", false, err
 	}
 
 	// Copy the archive to the staging directory
@@ -196,11 +191,11 @@ func RunRemote(archive string, host string, cleanup bool, junitFileNumber int, s
 		// Exit failure with the error
 		return "", false, err
 	}
-
 	// Run the tests
 	cmd = getSshCommand(" && ",
 		fmt.Sprintf("cd %s", tmp),
-		fmt.Sprintf("timeout -k 30s %ds ./ginkgo %s ./e2e_node.test -- --logtostderr --v 2 --build-services=false --stop-services=%t --node-name=%s --report-dir=%s/results --junit-file-number=%d", *testTimeoutSeconds, *ginkgoFlags, cleanup, host, tmp, junitFileNumber),
+		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --logtostderr --v 2 --build-services=false --stop-services=%t --node-name=%s --report-dir=%s/results --report-prefix=%s %s",
+			testTimeoutSeconds.Seconds(), ginkgoFlags, cleanup, host, tmp, junitFilePrefix, testArgs),
 	)
 	aggErrs := []error{}
 

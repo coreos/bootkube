@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ const (
 )
 
 var _ = Describe("Image Container Conformance Test", func() {
-	Describe("[FLAKY] image conformance blackbox test", func() {
+	Describe("[Flaky] image conformance blackbox test", func() {
 		Context("when testing images that exist", func() {
 			var conformImages []ConformanceImage
 			BeforeEach(func() {

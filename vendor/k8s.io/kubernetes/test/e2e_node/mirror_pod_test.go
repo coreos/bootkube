@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	goerrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -34,16 +35,16 @@ import (
 )
 
 var _ = framework.KubeDescribe("MirrorPod", func() {
-	f := NewDefaultFramework("mirror-pod")
+	f := framework.NewDefaultFramework("mirror-pod")
 	Context("when create a mirror pod ", func() {
-		var staticPodName, mirrorPodName string
+		var ns, staticPodName, mirrorPodName string
 		BeforeEach(func() {
-			ns := f.Namespace.Name
-			staticPodName = "static-pod-" + string(util.NewUUID())
-			mirrorPodName = staticPodName + "-" + e2es.nodeName
+			ns = f.Namespace.Name
+			staticPodName = "static-pod-" + string(uuid.NewUUID())
+			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
 
 			By("create the static pod")
-			err := createStaticPod(e2es.kubeletStaticPodDir, staticPodName, ns, ImageRegistry[nginxImage], api.RestartPolicyAlways)
+			err := createStaticPod(framework.TestContext.ManifestPath, staticPodName, ns, ImageRegistry[nginxImage], api.RestartPolicyAlways)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be running")
@@ -52,7 +53,6 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 		})
 		It("should be updated when static pod updated", func() {
-			ns := f.Namespace.Name
 			By("get mirror pod uid")
 			pod, err := f.Client.Pods(ns).Get(mirrorPodName)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -60,7 +60,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 
 			By("update the static pod container image")
 			image := ImageRegistry[pauseImage]
-			err = createStaticPod(e2es.kubeletStaticPodDir, staticPodName, ns, image, api.RestartPolicyAlways)
+			err = createStaticPod(framework.TestContext.ManifestPath, staticPodName, ns, image, api.RestartPolicyAlways)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be updated")
@@ -75,7 +75,6 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 			Expect(pod.Spec.Containers[0].Image).Should(Equal(image))
 		})
 		It("should be recreated when mirror pod gracefully deleted", func() {
-			ns := f.Namespace.Name
 			By("get mirror pod uid")
 			pod, err := f.Client.Pods(ns).Get(mirrorPodName)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -91,7 +90,6 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 		})
 		It("should be recreated when mirror pod forcibly deleted", func() {
-			ns := f.Namespace.Name
 			By("get mirror pod uid")
 			pod, err := f.Client.Pods(ns).Get(mirrorPodName)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -107,9 +105,8 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 		})
 		AfterEach(func() {
-			ns := f.Namespace.Name
 			By("delete the static pod")
-			err := deleteStaticPod(e2es.kubeletStaticPodDir, staticPodName, ns)
+			err := deleteStaticPod(framework.TestContext.ManifestPath, staticPodName, ns)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to disappear")
@@ -160,7 +157,7 @@ func checkMirrorPodDisappear(cl *client.Client, name, namespace string) error {
 	if errors.IsNotFound(err) {
 		return nil
 	}
-	return err
+	return goerrors.New("pod not disappear")
 }
 
 func checkMirrorPodRunning(cl *client.Client, name, namespace string) error {

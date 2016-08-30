@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,21 +28,29 @@ import (
 	"github.com/golang/glog"
 )
 
-var k8sBinDir = flag.String("k8s-bin-dir", "", "Directory containing k8s kubelet and kube-apiserver binaries.")
+var k8sBinDir = flag.String("k8s-bin-dir", "", "Directory containing k8s kubelet binaries.")
 
-func buildGo() {
+var buildTargets = []string{
+	"cmd/kubelet",
+	"test/e2e_node/e2e_node.test",
+	"vendor/github.com/onsi/ginkgo/ginkgo",
+}
+
+func buildGo() error {
 	glog.Infof("Building k8s binaries...")
 	k8sRoot, err := getK8sRootDir()
 	if err != nil {
-		glog.Fatalf("Failed to locate kubernetes root directory %v.", err)
+		return fmt.Errorf("failed to locate kubernetes root directory %v.", err)
 	}
-	cmd := exec.Command(filepath.Join(k8sRoot, "hack/build-go.sh"))
+	targets := strings.Join(buildTargets, " ")
+	cmd := exec.Command("make", "-C", k8sRoot, fmt.Sprintf("WHAT=%s", targets))
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
 	if err != nil {
-		glog.Fatalf("Failed to build go packages %v\n", err)
+		return fmt.Errorf("failed to build go packages %v\n", err)
 	}
+	return nil
 }
 
 func getK8sBin(bin string) (string, error) {
@@ -53,7 +61,7 @@ func getK8sBin(bin string) (string, error) {
 			return "", err
 		}
 		if _, err := os.Stat(filepath.Join(*k8sBinDir, bin)); err != nil {
-			return "", fmt.Errorf("Could not find kube-apiserver under directory %s.", absPath)
+			return "", fmt.Errorf("Could not find %s under directory %s.", bin, absPath)
 		}
 		return filepath.Join(absPath, bin), nil
 	}
@@ -105,30 +113,10 @@ func getK8sBuildOutputDir() (string, error) {
 	return buildOutputDir, nil
 }
 
-func getK8sNodeTestDir() (string, error) {
-	k8sRoot, err := getK8sRootDir()
-	if err != nil {
-		return "", err
-	}
-	buildOutputDir := filepath.Join(k8sRoot, "test/e2e_node")
-	if _, err := os.Stat(buildOutputDir); err != nil {
-		return "", err
-	}
-	return buildOutputDir, nil
-}
-
 func getKubeletServerBin() string {
 	bin, err := getK8sBin("kubelet")
 	if err != nil {
 		glog.Fatalf("Could not locate kubelet binary %v.", err)
-	}
-	return bin
-}
-
-func getApiServerBin() string {
-	bin, err := getK8sBin("kube-apiserver")
-	if err != nil {
-		glog.Fatalf("Could not locate kube-apiserver binary %v.", err)
 	}
 	return bin
 }

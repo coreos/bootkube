@@ -1,4 +1,4 @@
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -94,7 +94,7 @@ function create-federation-api-objects {
     export FEDERATION_API_NODEPORT=32111
     export FEDERATION_NAMESPACE
     export FEDERATION_NAME="${FEDERATION_NAME:-federation}"
-    export DNS_ZONE_NAME="${DNS_ZONE_NAME:-federation.example}"  # See https://tools.ietf.org/html/rfc2606
+    export DNS_ZONE_NAME="${DNS_ZONE_NAME:-federation.example.}"  # See https://tools.ietf.org/html/rfc2606
 
     template="go run ${KUBE_ROOT}/federation/cluster/template.go"
 
@@ -144,6 +144,8 @@ function create-federation-api-objects {
 
     FEDERATION_API_TOKEN="$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)"
     export FEDERATION_API_KNOWN_TOKENS="${FEDERATION_API_TOKEN},admin,admin"
+    gen-kube-basicauth
+    export FEDERATION_API_BASIC_AUTH="${KUBE_PASSWORD},${KUBE_USER},admin"
 
     # Create a kubeconfig with credentails for federation-apiserver. We will
     # then use this kubeconfig to create a secret which the federation
@@ -152,11 +154,13 @@ function create-federation-api-objects {
     KUBECONFIG_DIR=$(dirname ${KUBECONFIG:-$DEFAULT_KUBECONFIG})
     CONTEXT=federation-cluster \
 	   KUBE_BEARER_TOKEN="$FEDERATION_API_TOKEN" \
+           KUBE_USER="${KUBE_USER}" \
+           KUBE_PASSWORD="${KUBE_PASSWORD}" \
            KUBECONFIG="${KUBECONFIG_DIR}/federation/federation-apiserver/kubeconfig" \
 	   create-kubeconfig
 
     # Create secret with federation-apiserver's kubeconfig
-    $host_kubectl create secret generic federation-apiserver-secret --from-file="${KUBECONFIG_DIR}/federation/federation-apiserver/kubeconfig" --namespace="${FEDERATION_NAMESPACE}"
+    $host_kubectl create secret generic federation-apiserver-kubeconfig --from-file="${KUBECONFIG_DIR}/federation/federation-apiserver/kubeconfig" --namespace="${FEDERATION_NAMESPACE}"
 
     # Create secrets with all the kubernetes-apiserver's kubeconfigs.
     # Note: This is used only by the test setup (where kubernetes clusters are
@@ -174,6 +178,17 @@ function create-federation-api-objects {
       $host_kubectl create secret generic ${name} --from-file="${dir}/kubeconfig" --namespace="${FEDERATION_NAMESPACE}"
     done
 
+    # Create server certificates.
+    ensure-temp-dir
+    echo "Creating federation apiserver certs for IP: $FEDERATION_API_HOST"
+    MASTER_NAME="federation-apiserver" create-federation-apiserver-certs ${FEDERATION_API_HOST}
+    export FEDERATION_APISERVER_CA_CERT_BASE64="${FEDERATION_APISERVER_CA_CERT_BASE64}"
+    export FEDERATION_APISERVER_CERT_BASE64="${FEDERATION_APISERVER_CERT_BASE64}"
+    export FEDERATION_APISERVER_KEY_BASE64="${FEDERATION_APISERVER_KEY_BASE64}"
+
+    # Enable the NamespaceLifecycle admission control by default.
+    export FEDERATION_ADMISSION_CONTROL="${FEDERATION_ADMISSION_CONTROL:-NamespaceLifecycle}"
+
     for file in federation-etcd-pvc.yaml federation-apiserver-{deployment,secrets}.yaml federation-controller-manager-deployment.yaml; do
       $template "${manifests_root}/${file}" | $host_kubectl create -f -
     done
@@ -181,6 +196,8 @@ function create-federation-api-objects {
     # Update the users kubeconfig to include federation-apiserver credentials.
     CONTEXT=federation-cluster \
 	   KUBE_BEARER_TOKEN="$FEDERATION_API_TOKEN" \
+           KUBE_USER="${KUBE_USER}" \
+           KUBE_PASSWORD="${KUBE_PASSWORD}" \
 	   SECONDARY_KUBECONFIG=true \
 	   create-kubeconfig
 
@@ -221,6 +238,32 @@ function create-federation-api-objects {
     done
 )
 }
+
+# Creates the required certificates for federation apiserver.
+# $1: The public IP for the master.
+#
+# Assumed vars
+#   KUBE_TEMP
+#   MASTER_NAME
+#
+function create-federation-apiserver-certs {
+  local -r primary_cn="${1}"
+  local sans="IP:${1},DNS:${MASTER_NAME}"
+
+  echo "Generating certs for alternate-names: ${sans}"
+
+  local kube_temp="${KUBE_TEMP}/federation"
+  mkdir -p "${kube_temp}"
+  KUBE_TEMP="${kube_temp}" PRIMARY_CN="${primary_cn}" SANS="${sans}" generate-certs
+
+  local cert_dir="${kube_temp}/easy-rsa-master/easyrsa3"
+  # By default, linux wraps base64 output every 76 cols, so we use 'tr -d' to remove whitespaces.
+  # Note 'base64 -w0' doesn't work on Mac OS X, which has different flags.
+  FEDERATION_APISERVER_CA_CERT_BASE64=$(cat "${cert_dir}/pki/ca.crt" | base64 | tr -d '\r\n')
+  FEDERATION_APISERVER_CERT_BASE64=$(cat "${cert_dir}/pki/issued/${MASTER_NAME}.crt" | base64 | tr -d '\r\n')
+  FEDERATION_APISERVER_KEY_BASE64=$(cat "${cert_dir}/pki/private/${MASTER_NAME}.key" | base64 | tr -d '\r\n')
+}
+
 
 # Required
 # FEDERATION_PUSH_REPO_BASE: the docker repo where federated images will be pushed

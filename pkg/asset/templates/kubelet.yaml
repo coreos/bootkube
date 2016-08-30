@@ -5,26 +5,23 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: kubelet
-    version: v1.3.4_coreos.0
+    version: v1.4.0-alpha.3_aaron.0
 spec:
   template:
     metadata:
       labels:
         k8s-app: kubelet
-        version: v1.3.4_coreos.0
+        version: v1.4.0-alpha.3_aaron.0
     spec:
       containers:
       - name: kubelet
-        image: quay.io/coreos/hyperkube:v1.3.4_coreos.0
+        image: quay.io/peanutbutter/hyperkube:v1.4.0-alpha.3_aaron.0
         command:
-        - /nsenter
-        - --target=1
-        - --mount
-        - --wd=.
-        - --
         - ./hyperkube
         - kubelet
         - --api-servers={{ index .APIServers 0 }}
+        - --network-plugin-dir=/etc/kubernetes/cni/net.d
+        - --network-plugin=cni
         - --config=/etc/kubernetes/manifests
         - --allow-privileged
         - --hostname-override=$(MY_POD_IP)
@@ -33,6 +30,8 @@ spec:
         - --kubeconfig=/etc/kubernetes/kubeconfig
         - --lock-file=/var/run/lock/kubelet.lock
         - --minimum-container-ttl-duration=3m0s
+        - --containerized
+        - --v=4
         env:
           - name: MY_POD_IP
             valueFrom:
@@ -60,6 +59,8 @@ spec:
           mountPath: /var/lib/kubelet
         - name: var-lib-rkt
           mountPath: /var/lib/rkt
+        - name: rootfs
+          mountPath: /rootfs
       hostNetwork: true
       hostPID: true
       volumes:
@@ -87,3 +88,6 @@ spec:
       - name: var-lib-rkt
         hostPath:
           path: /var/lib/rkt
+      - name: rootfs
+        hostPath:
+          path: /
