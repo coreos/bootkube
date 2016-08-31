@@ -1,0 +1,26 @@
+apiVersion: extensions/v1beta1
+kind: Job
+metadata:
+  name: kube-flannel-config
+  namespace: kube-system
+  labels:
+    k8s-app: kube-flannel-config
+    version: v1.0.0
+spec:
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-flannel-config
+        version: v1.0.0
+    spec:
+      hostNetwork: true
+      activeDeadlineSeconds: 30
+      containers:
+      - name: kube-flannel-config
+        image: gcr.io/google_containers/etcd-amd64:2.2.1
+        command:
+        - etcdctl
+        - set
+        - /coreos.com/network/config
+        - '{ "Network": "10.1.0.0/16", "Backend": { "Type": "udp" } }'
+      restartPolicy: Never

@@ -51,4 +51,6 @@ Vagrant.configure("2") do |config|
 
   config.vm.provision :file, :source => USER_DATA_PATH, :destination => "/tmp/vagrantfile-user-data"
   config.vm.provision :shell, :inline => "mv /tmp/vagrantfile-user-data /var/lib/coreos-vagrant/", :privileged => true
+  config.vm.synced_folder "cluster/flannel/etc/cni/net.d/", "/etc/cni/net.d"
+
 end

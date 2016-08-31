@@ -1,0 +1,40 @@
+apiVersion: "extensions/v1beta1"
+kind: DaemonSet
+metadata:
+  name: kube-flannel
+  namespace: kube-system
+  labels:
+    name: kube-flannel
+    version: v1.0.0
+    kubernetes.io/cluster-service: "true"
+spec:
+  template:
+    metadata:
+      labels:
+        name: kube-flannel
+        version: v1.0.0
+        kubernetes.io/cluster-service: "true"
+    spec:
+      hostNetwork: true
+      containers:
+        - name: kube-flannel
+          securityContext:
+            privileged: true
+          image: quay.io/coreos/flannel:0.5.5
+          command:
+            - /opt/bin/flanneld
+            - --ip-masq=true
+            - --iface=eth1
+            - --etcd-endpoints={{ range $i, $e := .EtcdServers }}{{ if $i }},{{end}}{{ $e }}{{end}}
+          volumeMounts:
+            - name: devnet
+              mountPath: /dev/net
+            - name: flannel-subnet
+              mountPath: /run/flannel
+      volumes:
+        - name: devnet
+          hostPath:
+            path: /dev/net
+        - name: flannel-subnet
+          hostPath:
+            path: /run/flannel

@@ -1,25 +1,9 @@
 #cloud-config
 
 coreos:
-  flannel:
-    interface: $public_ipv4
   units:
     - name: etcd2.service
       command: start
-    - name: flanneld.service
-      command: start
-      drop-ins:
-      - name: 50-network-config.conf
-        content: |
-          [Service]
-          ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{ "Network": "10.2.0.0/16" }'
-    - name: docker.service
-      drop-ins:
-      - name: 50-flannel.conf
-        content: |
-          [Unit]
-          Requires=flanneld.service
-          After=flanneld.service
     - name: kubelet.service
       enable: true
       command: start
@@ -46,6 +30,16 @@ coreos:
 
         Restart=always
         RestartSec=5
+
+        [Install]
+        WantedBy=multi-user.target
+    - name: flannelBins.service
+      command: start
+      content: |
+        [Service]
+        Type=oneshot
+        ExecStartPre=/bin/mkdir -p /opt/cni
+        ExecStart=/bin/bash -c '/bin/curl -sSL --retry 5 https://storage.googleapis.com/kubernetes-release/network-plugins/cni-8a936732094c0941e1543ef5d292a1f4fffa1ac5.tar.gz | /bin/tar -xz -C /opt/cni'
 
         [Install]
         WantedBy=multi-user.target

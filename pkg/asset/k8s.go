@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	secretNamespace     = "kube-system"
+	secretNamespace = "kube-system"
 	secretAPIServerName = "kube-apiserver"
-	secretCMName        = "kube-controller-manager"
+	secretCMName = "kube-controller-manager"
 )
 
 func newStaticAssets() Assets {
@@ -25,6 +25,9 @@ func newStaticAssets() Assets {
 		mustCreateAssetFromTemplate(AssetPathKubeDNSRc, internal.DNSRcTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathKubeDNSSvc, internal.DNSSvcTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathSystemNamespace, internal.SystemNSTemplate, noData),
+		mustCreateAssetFromTemplate(AssetPathFlannelNet10, internal.ContainernetTemplate10, noData),
+		mustCreateAssetFromTemplate(AssetPathFlannelNet99, internal.LoopbackTemplate99, noData),
+		mustCreateAssetFromTemplate(AssetPathFlannelConfig, internal.FlannelConfigTemplate, noData),
 	}
 }
 
@@ -33,6 +36,7 @@ func newDynamicAssets(conf Config) Assets {
 		mustCreateAssetFromTemplate(AssetPathKubelet, internal.KubeletTemplate, conf),
 		mustCreateAssetFromTemplate(AssetPathAPIServer, internal.APIServerTemplate, conf),
 		mustCreateAssetFromTemplate(AssetPathProxy, internal.ProxyTemplate, conf),
+		mustCreateAssetFromTemplate(AssetPathFlannel, internal.FlannelTemplate, conf),
 	}
 }
 

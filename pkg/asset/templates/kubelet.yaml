@@ -33,6 +33,8 @@ spec:
         - --kubeconfig=/etc/kubernetes/kubeconfig
         - --lock-file=/var/run/lock/kubelet.lock
         - --minimum-container-ttl-duration=3m0s
+        - --network-plugin=cni
+        - --network-plugin-dir=/etc/cni/net.d
         env:
           - name: MY_POD_IP
             valueFrom:
