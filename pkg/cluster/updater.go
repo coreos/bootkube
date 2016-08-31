@@ -171,18 +171,7 @@ func DaemonsetRollingUpdate(client clientset.Interface, name string, image *Cont
 				glog.Error(err)
 			} else {
 				if ds.Status.DesiredNumberScheduled == int32(len(upl.Items)) {
-					done := true
-				outer:
-					// Ensure all containers are running.
-					for _, p := range upl.Items {
-						for _, cs := range p.Status.ContainerStatuses {
-							if cs.State.Running == nil {
-								done = false
-								break outer
-							}
-						}
-					}
-					if done {
+					if allContainersRunning(upl) {
 						if name == "kube-apiserver" {
 							// Make sure the apiserver is back online before we continue.
 							re := regexp.MustCompile("v[0-9].[0-9].[0-9]")
@@ -242,6 +231,10 @@ func DeploymentRollingUpdate(client clientset.Interface, name string, image *Con
 	lo := api.ListOptions{
 		LabelSelector: l,
 	}
+	replicas := int32(1)
+	if dep.Spec.Replicas != nil {
+		replicas = *dep.Spec.Replicas
+	}
 	for {
 		glog.Info("checking that all new containers are up")
 		upl, err := client.Core().Pods(api.NamespaceSystem).List(lo)
@@ -249,17 +242,26 @@ func DeploymentRollingUpdate(client clientset.Interface, name string, image *Con
 			// TODO might be worth returning error here.
 			glog.Error(err)
 		} else {
-			replicas := int32(1)
-			if dep.Spec.Replicas != nil {
-				replicas = *dep.Spec.Replicas
-			}
 			if int32(len(upl.Items)) == replicas {
-				return nil
+				if allContainersRunning(upl) {
+					return nil
+				}
 			}
 			glog.Infof("not all new containers have started, expected %d got %d", dep.Status.Replicas, len(upl.Items))
 		}
 		time.Sleep(time.Second)
 	}
+}
+
+func allContainersRunning(pl *v1.PodList) bool {
+	for _, p := range pl.Items {
+		for _, cs := range p.Status.ContainerStatuses {
+			if cs.State.Running == nil {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // OnHostKubeletRollingUpdate will perform a safe rolling update of the on-host kubelets
