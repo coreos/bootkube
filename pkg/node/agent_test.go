@@ -6,44 +6,32 @@ import (
 	"os"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 )
 
 func TestConfigHasChanged(t *testing.T) {
 	testcases := []struct {
-		cm       *v1.ConfigMap
 		onDisk   map[string]string
 		desired  map[string]string
 		expected bool
 		desc     string
 	}{
 		{ // Nothing has changed.
-			cm:       &v1.ConfigMap{Data: map[string]string{configMapFlagsKey: "--api-servers='test'"}},
-			onDisk:   map[string]string{kubeletVersionKey: "version1", kubeletFlagsKey: "--api-servers='test'"},
-			desired:  map[string]string{kubeletVersionKey: "version1"},
+			onDisk:   map[string]string{KubeletVersionKey: "version1"},
+			desired:  map[string]string{KubeletVersionKey: "version1"},
 			expected: false,
 			desc:     "nothing changed",
 		},
 		{ // Version has changed.
-			cm:       &v1.ConfigMap{Data: map[string]string{configMapFlagsKey: "--api-servers='test'"}},
-			onDisk:   map[string]string{kubeletVersionKey: "version1", kubeletFlagsKey: "--api-servers='test'"},
-			desired:  map[string]string{kubeletVersionKey: "version2"},
+			onDisk:   map[string]string{KubeletVersionKey: "version1"},
+			desired:  map[string]string{KubeletVersionKey: "version2"},
 			expected: true,
 			desc:     "version changed",
-		},
-		{ // ConfigMap flags have changed.
-			cm:       &v1.ConfigMap{Data: map[string]string{configMapFlagsKey: "--api-servers='someting else'"}},
-			onDisk:   map[string]string{kubeletVersionKey: "version1", kubeletFlagsKey: "--api-servers='test'"},
-			desired:  map[string]string{kubeletVersionKey: "version1"},
-			expected: true,
-			desc:     "config map flags changed",
 		},
 	}
 
 	for _, tc := range testcases {
-		actual := configHasChanged(tc.onDisk, tc.desired, tc.cm)
+		actual := configHasChanged(tc.onDisk, tc.desired)
 		if actual != tc.expected {
 			t.Errorf("expected %v got %v for test %s", tc.expected, actual, tc.desc)
 		}
@@ -70,30 +58,21 @@ func TestHandleConfigUpdate(t *testing.T) {
 	testcases := []struct {
 		onDiskConfig         map[string]string
 		desiredConfig        map[string]string
-		configMap            *v1.ConfigMap
 		expectedAnnotation   map[string]string
 		expectedOnDiskConfig map[string]string
 		shouldRestartUnit    bool
 	}{
 		{ // Nothing changed
-			onDiskConfig:         map[string]string{kubeletVersionKey: "test1-version1", kubeletFlagsKey: "--api-servers='test1'", "TEST_VAR": "TEST_VAL"},
-			expectedOnDiskConfig: map[string]string{kubeletVersionKey: "test1-version1", kubeletFlagsKey: "--api-servers='test1'", "TEST_VAR": "TEST_VAL"},
-			expectedAnnotation:   map[string]string{kubeletVersionKey: "test1-version1", kubeletFlagsKey: "--api-servers='test1'", kubeletConfigKey: "on-disk configuration"},
+			onDiskConfig:         map[string]string{KubeletVersionKey: "test1-version1"},
+			expectedOnDiskConfig: map[string]string{KubeletVersionKey: "test1-version1"},
+			expectedAnnotation:   map[string]string{KubeletVersionKey: "test1-version1"},
 			shouldRestartUnit:    false,
 		},
 		{ // Version changed
-			onDiskConfig:         map[string]string{kubeletVersionKey: "test2-version1", kubeletFlagsKey: "--api-servers='test2'", "TEST_VAR": "TEST_VAL"},
-			desiredConfig:        map[string]string{kubeletVersionKey: "test2-version2", kubeletConfigKey: ""},
-			expectedOnDiskConfig: map[string]string{kubeletVersionKey: "test2-version2", kubeletFlagsKey: "--api-servers='test2'", "TEST_VAR": "TEST_VAL"},
-			expectedAnnotation:   map[string]string{kubeletVersionKey: "test2-version2", kubeletFlagsKey: "--api-servers='test2'", kubeletConfigKey: "on-disk configuration"},
-			shouldRestartUnit:    true,
-		},
-		{ // Config changed
-			onDiskConfig:         map[string]string{kubeletVersionKey: "test3-version1", kubeletFlagsKey: "--api-servers='test'", "TEST_VAR": "TEST_VAL"},
-			desiredConfig:        map[string]string{kubeletVersionKey: "test3-version1", kubeletConfigKey: "updated-config"},
-			configMap:            &v1.ConfigMap{ObjectMeta: v1.ObjectMeta{Name: "updated-config", Namespace: api.NamespaceSystem}, Data: map[string]string{configMapFlagsKey: "--api-servers='updated-test'"}},
-			expectedOnDiskConfig: map[string]string{kubeletVersionKey: "test3-version1", kubeletFlagsKey: "--api-servers='updated-test'", "TEST_VAR": "TEST_VAL"},
-			expectedAnnotation:   map[string]string{kubeletVersionKey: "test3-version1", kubeletFlagsKey: "--api-servers='updated-test'", kubeletConfigKey: "updated-config"},
+			onDiskConfig:         map[string]string{KubeletVersionKey: "test2-version1"},
+			desiredConfig:        map[string]string{KubeletVersionKey: "test2-version2"},
+			expectedOnDiskConfig: map[string]string{KubeletVersionKey: "test2-version2"},
+			expectedAnnotation:   map[string]string{KubeletVersionKey: "test2-version2"},
 			shouldRestartUnit:    true,
 		},
 	}
@@ -104,14 +83,7 @@ func TestHandleConfigUpdate(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		node.Annotations[desiredConfigAnnotation] = string(conf)
-
-		store := cache.NewStore(cache.MetaNamespaceKeyFunc)
-		if tc.configMap != nil {
-			if err := store.Add(tc.configMap); err != nil {
-				t.Fatal(err)
-			}
-		}
+		node.Annotations[DesiredConfigAnnotation] = string(conf)
 
 		tmpf, err := ioutil.TempFile("", "node-agent-test")
 		if err != nil {
@@ -122,15 +94,14 @@ func TestHandleConfigUpdate(t *testing.T) {
 
 		fakeSysD := &fakeDbusConn{}
 		a := &Agent{
-			SysdConn:       fakeSysD,
-			ConfigMapStore: store,
+			SysdConn: fakeSysD,
 		}
 
 		updatedNode, err := a.handleConfigUpdate(node, tc.onDiskConfig, tc.desiredConfig, tmpf.Name())
 		if err != nil {
 			t.Fatal(err)
 		}
-		actualAnnotation := updatedNode.Annotations[currentConfigAnnotation]
+		actualAnnotation := updatedNode.Annotations[CurrentConfigAnnotation]
 		expectedAnnotationB, err := json.Marshal(tc.expectedAnnotation)
 		if err != nil {
 			t.Fatal(err)

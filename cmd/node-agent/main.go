@@ -69,24 +69,6 @@ func run(client clientset.Interface, nodename string, sysdConn *dbus.Conn) {
 			UpdateFunc: a.NodeUpdateCallback,
 		},
 	)
-
-	configMapStore, configMapController := framework.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(lo api.ListOptions) (runtime.Object, error) {
-				return client.Core().ConfigMaps(api.NamespaceSystem).List(lo)
-			},
-			WatchFunc: func(lo api.ListOptions) (watch.Interface, error) {
-				return client.Core().ConfigMaps(api.NamespaceSystem).Watch(lo)
-			},
-		},
-		&v1.ConfigMap{},
-		30*time.Second,
-		framework.ResourceEventHandlerFuncs{},
-	)
-
-	a.ConfigMapStore = configMapStore
-
-	go configMapController.Run(wait.NeverStop)
 	nodeController.Run(wait.NeverStop)
 }
 
