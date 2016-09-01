@@ -30,7 +30,7 @@ const (
 	AssetPathControllerManager       = "manifests/kube-controller-manager.yaml"
 	AssetPathControllerManagerSecret = "manifests/kube-controller-manager-secret.yaml"
 	AssetPathScheduler               = "manifests/kube-scheduler.yaml"
-	AssetPathKubeDNSRc               = "manifests/kube-dns-rc.yaml"
+	AssetPathKubeDNSDeployment       = "manifests/kube-dns-deployment.yaml"
 	AssetPathKubeDNSSvc              = "manifests/kube-dns-svc.yaml"
 	AssetPathSystemNamespace         = "manifests/kube-system-ns.yaml"
 )

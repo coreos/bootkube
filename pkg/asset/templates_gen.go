@@ -40,7 +40,7 @@ var files = []struct {
 	{"kube-controller-manager.yaml", "ControllerManagerTemplate"},
 	{"kube-scheduler.yaml", "SchedulerTemplate"},
 	{"kube-proxy.yaml", "ProxyTemplate"},
-	{"kube-dns-rc.yaml", "DNSRcTemplate"},
+	{"kube-dns-deployment.yaml", "DNSDeploymentTemplate"},
 	{"kube-dns-svc.yaml", "DNSSvcTemplate"},
 	{"kube-system-ns.yaml", "SystemNSTemplate"},
 }
