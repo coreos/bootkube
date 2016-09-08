@@ -29,11 +29,11 @@ _output/bin/%: $(GOFILES)
 	mkdir -p $(dir $@)
 	GOOS=$(word 1, $(subst /, ,$*)) go build -ldflags "$(LDFLAGS)" -o $@ github.com/kubernetes-incubator/bootkube/cmd/$(notdir $@)
 
-_output/bin/%/node-agent: cmd/node-agent/main.go pkg/node/*.go
+_output/bin/%/node-agent: $(GOFILES)
 	mkdir -p $(dir $@)
 	GOOS=$* go build -o _output/bin/$*/node-agent github.com/coreos/bootkube/cmd/node-agent
 
-_output/bin/%/update-controller: cmd/update-controller/main.go pkg/cluster/*.go
+_output/bin/%/update-controller: $(GOFILES)
 	mkdir -p $(dir $@)
 	GOOS=$* go build -o _output/bin/$*/update-controller github.com/coreos/bootkube/cmd/update-controller
 
