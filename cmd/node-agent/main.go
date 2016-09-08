@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"time"
 
@@ -20,7 +19,7 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-const myPodNameEnvName = "MY_POD_NAME"
+const myPodNameEnvName = "POD_NAME"
 
 func main() {
 	myPodName := os.Getenv(myPodNameEnvName)
@@ -29,6 +28,8 @@ func main() {
 	}
 
 	client := newAPIClient()
+	// TODO: In k8s v1.4 we will have access to the node name
+	// via the downward API.
 	nodename, err := getNodeName(client, myPodName)
 	if err != nil {
 		glog.Fatal(err)
@@ -52,7 +53,7 @@ func run(client clientset.Interface, nodename string, sysdConn *dbus.Conn) {
 	}
 
 	nodeopts := api.ListOptions{
-		FieldSelector: fields.ParseSelectorOrDie(fmt.Sprintf("metadata.name=%s", nodename)),
+		FieldSelector: fields.OneTermEqualSelector("metadata.name", nodename),
 	}
 	_, nodeController := framework.NewInformer(
 		&cache.ListWatch{
