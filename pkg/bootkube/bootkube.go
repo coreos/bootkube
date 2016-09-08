@@ -26,7 +26,7 @@ const (
 	// as the bootkube, and the self-hosted api-server will continually retry binding to secure interface
 	// and doesn't end up in a race with bootkube for the insecure port. When bootkube dies, the self-hosted
 	// api-server is using the correct standard ports (443/8080).
-	insecureAPIAddr = "http://127.0.0.1:8081"
+	insecureAPIAddr = "http://127.0.0.1:8080"
 )
 
 var requiredPods = []string{
@@ -55,7 +55,7 @@ func NewBootkube(config Config) (*bootkube, error) {
 	fs.Parse([]string{
 		"--bind-address=0.0.0.0",
 		"--secure-port=443",
-		"--insecure-port=8081", // NOTE: temp hack for single-apiserver
+		"--insecure-port=8080",
 		"--allow-privileged=true",
 		"--tls-private-key-file=" + filepath.Join(config.AssetDir, asset.AssetPathAPIServerKey),
 		"--tls-cert-file=" + filepath.Join(config.AssetDir, asset.AssetPathAPIServerCert),
@@ -65,6 +65,7 @@ func NewBootkube(config Config) (*bootkube, error) {
 		"--service-account-key-file=" + filepath.Join(config.AssetDir, asset.AssetPathServiceAccountPubKey),
 		"--admission-control=ServiceAccount",
 		"--runtime-config=extensions/v1beta1/deployments=true,extensions/v1beta1/daemonsets=true",
+		"--token-auth-file=/etc/kubernetes/tokens",
 	})
 
 	cmServer := controller.NewCMServer()
@@ -77,6 +78,8 @@ func NewBootkube(config Config) (*bootkube, error) {
 		"--allocate-node-cidrs=true",
 		"--cluster-cidr=10.2.0.0/16",
 		"--leader-elect=true",
+		"--cluster-signing-cert-file=" + filepath.Join(config.AssetDir, asset.AssetPathCACert),
+		"--cluster-signing-key-file=" + filepath.Join(config.AssetDir, asset.AssetPathCAKey),
 	})
 
 	schedServer := scheduler.NewSchedulerServer()

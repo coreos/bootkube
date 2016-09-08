@@ -30,6 +30,9 @@ spec:
         - mountPath: /etc/ssl/certs
           name: ssl-certs-host
           readOnly: true
+        - name: var-run-kubernetes
+          mountPath: /var/run/kubernetes
+          readOnly: true
         - name: etc-kubernetes
           mountPath: /etc/kubernetes
           readOnly: true
@@ -37,6 +40,9 @@ spec:
       - hostPath:
           path: /usr/share/ca-certificates
         name: ssl-certs-host
+      - name: var-run-kubernetes
+        hostPath:
+          path: /var/run/kubernetes
       - name: etc-kubernetes
         hostPath:
           path: /etc/kubernetes

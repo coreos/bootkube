@@ -24,6 +24,8 @@ spec:
         - --allocate-node-cidrs=true
         - --cluster-cidr=10.2.0.0/16
         - --leader-elect=true
+        - --cluster-signing-cert-file=/etc/kubernetes/secrets/ca.crt
+        - --cluster-signing-key-file=/etc/kubernetes/secrets/ca.key
         volumeMounts:
         - name: secrets
           mountPath: /etc/kubernetes/secrets
