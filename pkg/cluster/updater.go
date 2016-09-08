@@ -1,7 +1,6 @@
 package cluster
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -54,15 +53,10 @@ type ClusterUpdater struct {
 	NewVersion *ContainerImage
 	// OldVersion is the version we are upgrading from.
 	OldVersion *ContainerImage
-	// RollbackFn is the function to use to roll an
-	// update back.
-	RollbackFn ClusterRollbackFunc
 	// Events is used to send events during the cluster update.
 	Events record.EventRecorder
 	// SelfObj is the runtime object for ourself to use for events.
 	SelfObj runtime.Object
-	// Config is the cluster config, which holds the version.
-	Config *v1.ConfigMap
 }
 
 // ComponentUpdater is responsible for updating
@@ -113,10 +107,8 @@ func NewClusterUpdater(client clientset.Interface, newVersion, oldVersion *Conta
 		Components: DefaultComponentUpdaterList,
 		NewVersion: newVersion,
 		OldVersion: oldVersion,
-		RollbackFn: DefaultRollback,
 		Events:     r,
 		SelfObj:    p,
-		Config:     config,
 	}, nil
 }
 
@@ -281,17 +273,7 @@ func OnHostKubeletRollingUpdate(client clientset.Interface, _ string, image *Con
 		if n.Annotations == nil {
 			n.Annotations = make(map[string]string)
 		}
-		currentConfig := make(map[string]string)
-		err = json.Unmarshal([]byte(n.Annotations[node.CurrentConfigAnnotation]), &currentConfig)
-		if err != nil {
-			return err
-		}
-		currentConfig[node.KubeletVersionKey] = image.Tag
-		b, err := json.Marshal(currentConfig)
-		if err != nil {
-			return err
-		}
-		n.Annotations[node.DesiredConfigAnnotation] = string(b)
+		n.Annotations[node.DesiredVersionAnnotation] = image.String()
 		_, err = client.Core().Nodes().Update(&n)
 		if err != nil {
 			return err
@@ -312,7 +294,7 @@ func OnHostKubeletRollingUpdate(client clientset.Interface, _ string, image *Con
 					glog.Infof("recieved unexpected type from Node watch. Expected *v1.Node, got: %T", e.Object.GetObjectKind())
 					continue
 				}
-				if nn.Annotations[node.DesiredConfigAnnotation] == nn.Annotations[node.CurrentConfigAnnotation] {
+				if nn.Annotations[node.DesiredVersionAnnotation] == nn.Annotations[node.CurrentVersionAnnotation] {
 					break
 				}
 				glog.Infof("Node %s update completed", nn.Name)
@@ -332,13 +314,8 @@ func OnHostKubeletRollingUpdate(client clientset.Interface, _ string, image *Con
 	return nil
 }
 
-// ClusterRollbackFunc is a function that can be used to
-// roll back an update to a cluster.
-type ClusterRollbackFunc func(clientset.Interface, *ContainerImage, *v1.ConfigMap) error
-
 // Update will update every component in the list of known components for
-// the instance of the ClusterUpdater. If any component should fail to update,
-// this method will automatically rollback the changes.
+// the instance of the ClusterUpdater.
 func (cu *ClusterUpdater) Update() error {
 	for _, c := range cu.Components {
 		cu.Events.Eventf(cu.SelfObj, api.EventTypeNormal, "Begin update of component: %s", c.Name)
@@ -349,24 +326,10 @@ func (cu *ClusterUpdater) Update() error {
 				c.Name, cu.OldVersion, cu.NewVersion)
 			glog.Errorf("Failed update of component: %s, rolling back to version: %s from %s due to: %v",
 				c.Name, cu.OldVersion, cu.NewVersion, err)
-			return cu.Rollback()
+			return err
 		}
 		glog.Infof("Finshed update of componenet: %s", c.Name)
 		cu.Events.Eventf(cu.SelfObj, api.EventTypeNormal, "Finished update of component: %s", c.Name)
 	}
 	return nil
-}
-
-// Rollback rolls back an update to the cluster.
-func (cu *ClusterUpdater) Rollback() error {
-	return cu.RollbackFn(cu.Client, cu.OldVersion, cu.Config)
-}
-
-// DefaultRollback is the default function used to roll back a cluster to an old version. It works by
-// simply updating the version resource, and letting the normal update mechanism take over from there.
-func DefaultRollback(client clientset.Interface, oldImage *ContainerImage, config *v1.ConfigMap) error {
-	updatedcm := *config
-	updatedcm.Data[ClusterVersionKey] = oldImage.String()
-	_, err := client.Core().ConfigMaps(api.NamespaceSystem).Update(&updatedcm)
-	return err
 }
