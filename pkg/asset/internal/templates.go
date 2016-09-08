@@ -143,7 +143,13 @@ spec:
         - --service-account-key-file=/etc/kubernetes/secrets/service-account.pub
         - --client-ca-file=/etc/kubernetes/secrets/ca.crt
         - --cloud-provider={{ .CloudProvider  }}
-        env:
+        {{ if .OIDCIssuer -}}
+        - --oidc-issuer-url={{.OIDCIssuer.IssuerURL}}
+        - --oidc-client-id={{.OIDCIssuer.ClientID}}
+        - --oidc-username-claim={{.OIDCIssuer.UsernameClaim}}
+        - --oidc-ca-file={{.OIDCIssuer.CAPath}}
+        {{ end }}
+				env:
           - name: MY_POD_IP
             valueFrom:
               fieldRef:
