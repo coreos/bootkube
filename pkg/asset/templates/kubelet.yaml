@@ -19,24 +19,25 @@ spec:
         command:
         - ./hyperkube
         - kubelet
-        - --api-servers={{ index .APIServers 0 }}
         - --network-plugin-dir=/etc/kubernetes/cni/net.d
         - --network-plugin=cni
         - --config=/etc/kubernetes/manifests
         - --allow-privileged
-        - --hostname-override=$(MY_POD_IP)
+        - --hostname-override=$(NODE_NAME)
         - --cluster-dns=10.3.0.10
         - --cluster-domain=cluster.local
+        - --experimental-bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubeconfig
         - --kubeconfig=/etc/kubernetes/kubeconfig
         - --lock-file=/var/run/lock/kubelet.lock
         - --minimum-container-ttl-duration=3m0s
         - --containerized
-        - --v=4
+        - --require-kubeconfig
+        - --v=10
         env:
-          - name: MY_POD_IP
+          - name: NODE_NAME
             valueFrom:
               fieldRef:
-                fieldPath: status.podIP
+                fieldPath: spec.nodeName
         securityContext:
           privileged: true
         volumeMounts:
@@ -49,7 +50,6 @@ spec:
           readOnly: true
         - name: etc-kubernetes
           mountPath: /etc/kubernetes
-          readOnly: true
         - name: etc-ssl-certs
           mountPath: /etc/ssl/certs
           readOnly: true

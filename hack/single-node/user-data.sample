@@ -17,8 +17,8 @@ coreos:
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/checkpoint-secrets
         ExecStartPre=/bin/mkdir -p /srv/kubernetes/manifests
         ExecStart=/usr/lib/coreos/kubelet-wrapper \
-          --api-servers=https://172.17.4.100:443 \
           --kubeconfig=/etc/kubernetes/kubeconfig \
+          --experimental-bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubeconfig \
           --network-plugin-dir=/etc/kubernetes/cni/net.d \
           --network-plugin=cni \
           --lock-file=/var/run/lock/kubelet.lock \
@@ -29,6 +29,8 @@ coreos:
           --node-labels=master=true \
           --minimum-container-ttl-duration=3m0s \
           --cluster_dns=10.3.0.10 \
+          --require-kubeconfig \
+          --v=10 \
           --cluster_domain=cluster.local
 
         Restart=always
@@ -38,7 +40,13 @@ coreos:
         WantedBy=multi-user.target
 
 write_files:
-  - path: "/etc/kubernetes/kubeconfig"
+  - path: "/etc/kubernetes/tokens"
+    permissions: "0644"
+    owner: core
+    content: |
+      bootstraptoken,kubelet,kubelet
+
+  - path: "/etc/kubernetes/bootstrap-kubeconfig"
     permissions: "0644"
     owner: core
     content: |

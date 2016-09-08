@@ -41,6 +41,7 @@ spec:
         - --tls-private-key-file=/etc/kubernetes/secrets/apiserver.key
         - --service-account-key-file=/etc/kubernetes/secrets/service-account.pub
         - --client-ca-file=/etc/kubernetes/secrets/ca.crt
+        - --token-auth-file=/etc/kubernetes/tokens
         env:
           - name: MY_POD_IP
             valueFrom:
@@ -50,6 +51,8 @@ spec:
         - mountPath: /etc/ssl/certs
           name: ssl-certs-host
           readOnly: true
+        - mountPath: /etc/kubernetes
+          name: etc-kubernetes
         - mountPath: /etc/kubernetes/secrets
           name: secrets
           readOnly: true
@@ -60,6 +63,9 @@ spec:
       - name: etc-k8s-manifests
         hostPath:
           path: /etc/kubernetes/manifests
+      - name: etc-kubernetes
+        hostPath:
+          path: /etc/kubernetes
       - name: secrets
         secret:
           secretName: kube-apiserver
