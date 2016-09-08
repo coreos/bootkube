@@ -43,7 +43,19 @@ coreos:
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests
         ExecStartPre=/bin/mkdir -p /srv/kubernetes/manifests
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/checkpoint-secrets
-        ExecStart=/usr/lib/coreos/kubelet-wrapper $PERSISTENT_KUBELET_OPTS $KUBELET_OPTS
+        ExecStart=/usr/lib/coreos/kubelet-wrapper \
+          --api-servers=https://172.17.4.100:443 \
+          --kubeconfig=/etc/kubernetes/kubeconfig \
+          --lock-file=/var/run/lock/kubelet.lock \
+          --allow-privileged \
+          --config=/etc/kubernetes/manifests \
+          --minimum-container-ttl-duration=3m0s \
+          --cluster_dns=10.3.0.10 \
+          --cluster_domain=cluster.local \
+          --exit-on-lock-contention=true \
+          --node-labels=master=true \
+          --hostname-override=$public_ipv4
+
         Restart=always
         RestartSec=5
 
@@ -59,9 +71,7 @@ write_files:
 
       if [[ ! -f /etc/kubernetes/kubelet.env ]]; then
           /bin/echo \
-          "KUBELET_OPTS='--api-servers=https://172.17.4.100:443 --kubeconfig=/etc/kubernetes/kubeconfig --lock-file=/var/run/lock/kubelet.lock --allow-privileged --config=/etc/kubernetes/manifests --minimum-container-ttl-duration=3m0s --cluster_dns=10.3.0.10 --cluster_domain=cluster.local'
-      PERSISTENT_KUBELET_OPTS='--exit-on-lock-contention=true --node-labels=master=true --hostname-override=$public_ipv4'
-      KUBELET_VERSION=v1.3.6_coreos.0" > /etc/kubernetes/kubelet.env
+          "KUBELET_VERSION=v1.3.6_coreos.0" > /etc/kubernetes/kubelet.env
       fi
   - path: "/etc/kubernetes/kubeconfig"
     permissions: "0644"
