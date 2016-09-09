@@ -280,7 +280,7 @@ func OnHostKubeletRollingUpdate(client clientset.Interface, _ string, image *Con
 		}
 		lo := api.ListOptions{
 			Watch:         true,
-			FieldSelector: fields.ParseSelectorOrDie(fmt.Sprintf("metadata.name=%s", n.Name)),
+			FieldSelector: fields.OneTermEqualSelector("metadata.name", n.Name),
 		}
 		w, err := client.Core().Nodes().Watch(lo)
 		if err != nil {
