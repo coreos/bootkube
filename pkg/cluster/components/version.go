@@ -18,24 +18,9 @@ func noAnnotationError(component, name string) error {
 // image information.
 type Version struct {
 	// Semver is the semver parsed version for comparisons.
-	Semver semver.Version
+	semver semver.Version
 	// Image is the container image for this version.
-	Image *ContainerImage
-}
-
-// ContainerImage describes a container image. It holds
-// the repo / tag for the image.
-type ContainerImage struct {
-	// Repo is the repository this image is in.
-	Repo string
-	// Tag is the image tag.
-	Tag string
-}
-
-// String returns a stringified version of the Containerimage
-// in the format of $repo:$tag.
-func (ci *ContainerImage) String() string {
-	return fmt.Sprintf("%s:%s", ci.Repo, ci.Tag)
+	image *ContainerImage
 }
 
 func ParseVersionFromImage(image string) (*Version, error) {
@@ -56,5 +41,30 @@ func ParseVersionFromImage(image string) (*Version, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Version{Semver: sv, Image: &ContainerImage{Repo: repo, Tag: tag}}, nil
+	return &Version{semver: sv, image: &ContainerImage{repo: repo, tag: tag}}, nil
+}
+
+// Semver returns a Semver object for version comparisons.
+func (v *Version) Semver() semver.Version {
+	return v.semver
+}
+
+// ContainerImage describes a container image. It holds
+// the repo / tag for the image.
+type ContainerImage struct {
+	// Repo is the repository this image is in.
+	repo string
+	// Tag is the image tag.
+	tag string
+}
+
+// Tag returns the tag for the image.
+func (ci *ContainerImage) Tag() string {
+	return ci.tag
+}
+
+// String returns a stringified version of the Containerimage
+// in the format of $repo:$tag.
+func (ci *ContainerImage) String() string {
+	return fmt.Sprintf("%s:%s", ci.repo, ci.tag)
 }

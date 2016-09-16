@@ -70,15 +70,15 @@ func (du *DeploymentUpdater) UpdateToVersion(v *Version) error {
 			// already in progress. It's possible we bailed
 			// before it was finished, and when we retry we
 			// should wait until it's finished if it is in progress.
-			if dv.Semver.EQ(v.Semver) {
+			if dv.Semver().EQ(v.Semver()) {
 				return nil
 			}
-			dep.Spec.Template.Spec.Containers[i].Image = v.Image.String()
+			dep.Spec.Template.Spec.Containers[i].Image = v.image.String()
 			break
 		}
 	}
-	dep.Labels["version"] = v.Image.Tag
-	dep.Spec.Template.Labels["version"] = v.Image.Tag
+	dep.Labels["version"] = v.image.tag
+	dep.Spec.Template.Labels["version"] = v.image.tag
 
 	oldGeneration := dep.Status.ObservedGeneration
 	// Update the deployment, which will trigger an update.

@@ -167,7 +167,7 @@ func (cu *UpdateController) getManagedComponentList() ([]Component, error) {
 		return nil, err
 	}
 	for _, ds := range dsl.Items {
-		dsu, err := components.NewDaemonSetUpdater(cu.Client, &ds, cu.pods)
+		dsu, err := components.NewDaemonSetUpdater(cu.Client, &ds, cu.daemonSets, cu.pods)
 		if err != nil {
 			return nil, err
 		}

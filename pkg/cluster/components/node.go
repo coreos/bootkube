@@ -49,10 +49,10 @@ func (nu *NodeUpdater) UpdateToVersion(v *Version) error {
 		if n.Annotations == nil {
 			n.Annotations = make(map[string]string)
 		}
-		if n.Annotations[node.CurrentVersionAnnotation] == v.Image.String() {
+		if n.Annotations[node.CurrentVersionAnnotation] == v.image.String() {
 			continue
 		}
-		n.Annotations[node.DesiredVersionAnnotation] = v.Image.String()
+		n.Annotations[node.DesiredVersionAnnotation] = v.image.String()
 		var out v1.Node
 		v1.Convert_api_Node_To_v1_Node(&n, &out, nil)
 		_, err := nu.client.Core().Nodes().Update(&out)

@@ -26,10 +26,14 @@ type DaemonSetUpdater struct {
 	// pods is backed by an informer, contains list of Pods
 	// that belong to the DaemonSet.
 	pods StoreToPodLister
+	// daemonsets is a cache of DaemonSets backed by an informer.
+	daemonsets cache.StoreToDaemonSetLister
 	// selector is the DaemonSet selector.
 	selector labels.Selector
 	// priority is the update priority for this DaemonSet.
 	priority int
+	// obj is the DaemonSet Object.
+	obj *extensions.DaemonSet
 }
 
 // StoreToPodLister is a mirror of the cache.StoreToPodLister.
@@ -49,7 +53,16 @@ func (s *StoreToPodLister) List(selector labels.Selector) (pods []*api.Pod, err 
 	return pods, nil
 }
 
-func NewDaemonSetUpdater(client clientset.Interface, ds *extensions.DaemonSet, pods StoreToPodLister) (*DaemonSetUpdater, error) {
+// Exists returns true if a pod matching the namespace/name of the given pod exists in the store.
+func (s *StoreToPodLister) Exists(pod *api.Pod) (bool, error) {
+	_, exists, err := s.Store.Get(pod)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+func NewDaemonSetUpdater(client clientset.Interface, ds *extensions.DaemonSet, daemonsets cache.StoreToDaemonSetLister, pods StoreToPodLister) (*DaemonSetUpdater, error) {
 	selector, err := unversioned.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		return nil, err
@@ -66,11 +79,13 @@ func NewDaemonSetUpdater(client clientset.Interface, ds *extensions.DaemonSet, p
 		return nil, err
 	}
 	return &DaemonSetUpdater{
-		name:     ds.Name,
-		client:   client,
-		pods:     pods,
-		selector: selector,
-		priority: priority,
+		name:       ds.Name,
+		client:     client,
+		pods:       pods,
+		daemonsets: daemonsets,
+		selector:   selector,
+		priority:   priority,
+		obj:        ds,
 	}, nil
 }
 
@@ -92,12 +107,12 @@ func (dsu *DaemonSetUpdater) UpdateToVersion(v *Version) error {
 		return err
 	}
 	// Create new DS.
-	ds.Labels["version"] = v.Image.Tag
-	ds.Spec.Template.Labels["version"] = v.Image.Tag
+	ds.Labels["version"] = v.image.tag
+	ds.Spec.Template.Labels["version"] = v.image.tag
 	for i, c := range ds.Spec.Template.Spec.Containers {
 		if c.Name == dsu.Name() {
 			glog.Infof("updating image for container: %s", c.Name)
-			ds.Spec.Template.Spec.Containers[i].Image = v.Image.String()
+			ds.Spec.Template.Spec.Containers[i].Image = v.image.String()
 			break
 		}
 	}
@@ -109,12 +124,13 @@ func (dsu *DaemonSetUpdater) UpdateToVersion(v *Version) error {
 	if err != nil {
 		return err
 	}
-	for i, p := range pods {
+	for _, p := range pods {
 		pv, err := getPodVersion(p)
 		if err != nil {
-			return fmt.Errorf("unable to update DaemonSet %s: %#v", dsu.Name(), err)
+			return fmt.Errorf("unable to get Pod %s Version: %#v", p.Name, err)
 		}
-		if pv.Semver.EQ(v.Semver) {
+		// If this Pod has already been updated, skip it.
+		if pv.Semver().EQ(v.Semver()) {
 			continue
 		}
 		// Delete old DS Pod.
@@ -126,11 +142,21 @@ func (dsu *DaemonSetUpdater) UpdateToVersion(v *Version) error {
 		glog.Infof("Deleted pod %s", p.Name)
 
 		// Wait for all pods to be available before moving on.
-		err = wait.Poll(time.Second, 10*time.Minute, func() (bool, error) {
+		err = wait.Poll(time.Second, 2*time.Minute, func() (bool, error) {
 			glog.Infof("checking new pod availability for DS: %s", dsu.Name)
 
-			updatedPodCount := i + 1
-			if dsu.podsRunningNewVersion(v) == updatedPodCount && dsu.allPodsAvailable() {
+			// Make sure the pod we deleted above is removed from the cache.
+			exists, err := dsu.pods.Exists(p)
+			if exists {
+				return false, err
+			}
+
+			pl, err := dsu.getPods()
+			if err != nil {
+				return false, nil
+			}
+
+			if dsu.numberOfDesiredPods() == len(pl) && dsu.allPodsAvailable() {
 				return true, nil
 			}
 
@@ -162,22 +188,17 @@ func (dsu *DaemonSetUpdater) allPodsAvailable() bool {
 	return true
 }
 
-func (dsu *DaemonSetUpdater) podsRunningNewVersion(v *Version) int {
-	pods, err := dsu.getPods()
+func (dsu *DaemonSetUpdater) numberOfDesiredPods() int {
+	dsl, err := dsu.daemonsets.List()
 	if err != nil {
 		return 0
 	}
-
-	count := 0
-	for _, p := range pods {
-		for _, c := range p.Spec.Containers {
-			if c.Image == v.Image.String() {
-				count++
-				break
-			}
+	for _, ds := range dsl.Items {
+		if ds.Name == dsu.Name() {
+			return int(ds.Status.DesiredNumberScheduled)
 		}
 	}
-	return count
+	return 0
 }
 
 func getPodVersion(pod *api.Pod) (*Version, error) {
@@ -190,7 +211,7 @@ func getPodVersion(pod *api.Pod) (*Version, error) {
 			}
 			if v == nil {
 				v = ver
-			} else if v.Semver.GT(ver.Semver) {
+			} else if v.Semver().GT(ver.Semver()) {
 				v = ver
 			}
 			break
