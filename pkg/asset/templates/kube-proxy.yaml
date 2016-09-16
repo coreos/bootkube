@@ -6,6 +6,7 @@ metadata:
   labels:
     k8s-app: kube-proxy
     version: v1.3.6_coreos.0
+    update-controller-managed: true
 spec:
   selector:
     matchLabels:

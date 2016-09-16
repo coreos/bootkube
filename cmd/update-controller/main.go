@@ -1,22 +1,24 @@
 package main
 
 import (
-	"fmt"
+	"os"
 	"time"
 
 	"github.com/coreos/bootkube/pkg/cluster"
 	"github.com/coreos/bootkube/pkg/cluster/components"
+
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -25,19 +27,30 @@ func main() {
 	if err != nil {
 		glog.Fatal(err)
 	}
-	run(clientset.NewForConfigOrDie(config))
+	c := clientset.NewForConfigOrDie(config)
+	uc, err := client.New(config)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	run(c, uc)
 }
 
-func run(client clientset.Interface) {
+func run(c clientset.Interface, uc client.Interface) {
 	glog.Info("update controller running")
-	versionChan := make(chan *components.Version)
+	cu, err := cluster.NewClusterUpdater(c)
+	if err != nil {
+		glog.Error(err)
+		return
+	}
 	handleConfigChange := func(newConfigMap *v1.ConfigMap) {
 		newVersion, err := parseNewVersion(newConfigMap)
 		if err != nil {
 			glog.Error(err)
 			return
 		}
-		versionChan <- newVersion
+		if err := cu.UpdateToVersion(newVersion); err != nil {
+			glog.Error(err)
+		}
 	}
 	updateCallback := func(_, newObj interface{}) {
 		glog.Info("begin update callback")
@@ -52,33 +65,21 @@ func run(client clientset.Interface) {
 		glog.Info("begin add callback")
 		newConfigMap, ok := obj.(*v1.ConfigMap)
 		if !ok {
-			glog.Infof("Wrong type for update callback, expected *v1.ConfigMap, got: %T", obj)
+			glog.Infof("Wrong type for add callback, expected *v1.ConfigMap, got: %T", obj)
 			return
 		}
 		handleConfigChange(newConfigMap)
 	}
-	cu, err := cluster.NewClusterUpdater(client)
-	if err != nil {
-		glog.Error(err)
-		return
-	}
-	go func(client clientset.Interface, updater *cluster.ClusterUpdater) {
-		for v := range versionChan {
-			if err := updater.UpdateToVersion(v); err != nil {
-				glog.Error(err)
-			}
-		}
-	}(client, cu)
 	opts := api.ListOptions{
-		FieldSelector: fields.ParseSelectorOrDie(fmt.Sprintf("metadata.name=%s", cluster.ClusterConfigMapName)),
+		FieldSelector: fields.OneTermEqualSelector("metadata.name", cluster.ClusterConfigMapName),
 	}
 	_, configMapController := framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(lo api.ListOptions) (runtime.Object, error) {
-				return client.Core().ConfigMaps(api.NamespaceSystem).List(opts)
+				return c.Core().ConfigMaps(api.NamespaceSystem).List(opts)
 			},
 			WatchFunc: func(lo api.ListOptions) (watch.Interface, error) {
-				return client.Core().ConfigMaps(api.NamespaceSystem).Watch(opts)
+				return c.Core().ConfigMaps(api.NamespaceSystem).Watch(opts)
 			},
 		},
 		&v1.ConfigMap{},
@@ -88,8 +89,24 @@ func run(client clientset.Interface) {
 			UpdateFunc: updateCallback,
 		},
 	)
-	configMapController.Run(wait.NeverStop)
-	close(versionChan)
+
+	stopChan := make(chan struct{})
+	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+		EndpointsMeta: api.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "kube-update-controller",
+		},
+		Client:   uc,
+		Identity: os.Getenv("POD_NAME"),
+		Callbacks: leaderelection.LeaderCallbacks{
+			OnStartedLeading: func(stop <-chan struct{}) {
+				go configMapController.Run(stopChan)
+			},
+			OnStoppedLeading: func() {
+				stopChan <- struct{}{}
+			},
+		},
+	})
 }
 
 func parseNewVersion(config *v1.ConfigMap) (*components.Version, error) {

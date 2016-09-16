@@ -4,11 +4,10 @@
 
 The Node Agent is a process that runs on each node of a Kubernetes cluster. The
 purpose of this process is to monitor a specific annotation on the node object.
-This annotation holds a JSON object which describes the version to be used for
-the on-host kubelet.
+This annotation holds the version to be used for the on-host kubelet.
 
 This is useful for upgrading your on-host kubelet without ever having to ssh
-into a machine. Simply update the annotation with the desired version, and the
+into a machine. Simply update the annotation with the desired version,
 and the Node Agent will ensure that the on-host kubelet matches that value,
 and will restart the on-host kubelet so those new changes take effect.
 

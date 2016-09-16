@@ -6,11 +6,14 @@ metadata:
   labels:
     k8s-app: kube-scheduler
     version: v1.3.6_coreos.0
+    update-controller-managed: true
 spec:
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
   selector:
     matchLabels:
       k8s-app: kube-scheduler
-  replicas: 2
   template:
     metadata:
       labels:

@@ -1,7 +1,7 @@
 package components
 
 import (
-	"fmt"
+	"strconv"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -15,39 +15,44 @@ import (
 type DeploymentUpdater struct {
 	// name of the Deployment object.
 	name string
-	// Client is an API Server client.
+	// client is an API Server client.
 	client clientset.Interface
+	// priority is the priority to update this Deployment.
+	priority int
 }
 
-func NewDeploymentUpdater(client clientset.Interface, dep *v1beta1.Deployment) *DeploymentUpdater {
-	return &DeploymentUpdater{
-		name:   dep.Name,
-		client: client,
+func NewDeploymentUpdater(client clientset.Interface, dep *extensions.Deployment) (*DeploymentUpdater, error) {
+	if dep.Annotations == nil {
+		return nil, noAnnotationError("Deployment", dep.Name)
 	}
+	ps, ok := dep.Annotations[updatePriorityAnnotation]
+	if !ok {
+		return nil, noAnnotationError("Deployment", dep.Name)
+	}
+	priority, err := strconv.Atoi(ps)
+	if err != nil {
+		return nil, err
+	}
+	return &DeploymentUpdater{
+		name:     dep.Name,
+		client:   client,
+		priority: priority,
+	}, nil
 }
 
 // Name returns the name of the Deployment this updater
 // is responsible for.
-func (dsu *DeploymentUpdater) Name() string {
-	return dsu.name
+func (du *DeploymentUpdater) Name() string {
+	return du.name
 }
 
-// CurrentVersion is the current version of this Deployment.
-func (du *DeploymentUpdater) CurrentVersion() (*Version, error) {
-	dp, err := du.client.Extensions().Deployments(api.NamespaceSystem).Get(du.Name())
-	if err != nil {
-		return nil, err
-	}
-	for _, c := range dp.Spec.Template.Spec.Containers {
-		if c.Name == du.Name() {
-			return ParseVersionFromImage(c.Image)
-		}
-	}
-	return nil, fmt.Errorf("unable to get current version for Deployment %s", du.Name())
+// Priority is the priority to update this Deployment.
+func (du *DeploymentUpdater) Priority() int {
+	return du.priority
 }
 
 // UpdateToVersion will update the Deployment to the given version.
-func (du *DeploymentUpdater) UpdateToVersion(client clientset.Interface, v *Version) error {
+func (du *DeploymentUpdater) UpdateToVersion(v *Version) error {
 	// Get the current deployment.
 	dep, err := du.client.Extensions().Deployments(api.NamespaceSystem).Get(du.Name())
 	if err != nil {
@@ -55,14 +60,26 @@ func (du *DeploymentUpdater) UpdateToVersion(client clientset.Interface, v *Vers
 	}
 	// Update the image in the specific container we care about (should match name
 	// of the deployment itself, per convention).
-	dep.Labels["version"] = v.Image.Tag
-	dep.Spec.Template.Labels["version"] = v.Image.Tag
 	for i, c := range dep.Spec.Template.Spec.Containers {
 		if c.Name == du.Name() {
+			dv, err := ParseVersionFromImage(dep.Spec.Template.Spec.Containers[i].Image)
+			if err != nil {
+				return err
+			}
+			// TODO we should also check that an update is not
+			// already in progress. It's possible we bailed
+			// before it was finished, and when we retry we
+			// should wait until it's finished if it is in progress.
+			if dv.Semver.EQ(v.Semver) {
+				return nil
+			}
 			dep.Spec.Template.Spec.Containers[i].Image = v.Image.String()
 			break
 		}
 	}
+	dep.Labels["version"] = v.Image.Tag
+	dep.Spec.Template.Labels["version"] = v.Image.Tag
+
 	oldGeneration := dep.Status.ObservedGeneration
 	// Update the deployment, which will trigger an update.
 	_, err = du.client.Extensions().Deployments(api.NamespaceSystem).Update(dep)

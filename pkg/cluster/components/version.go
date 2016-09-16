@@ -7,6 +7,12 @@ import (
 	"github.com/blang/semver"
 )
 
+const updatePriorityAnnotation = "alpha.coreos.com/update-controller/priority"
+
+func noAnnotationError(component, name string) error {
+	return fmt.Errorf("no priority annotation for %s %s", component, name)
+}
+
 // Version represents versioned cluster information,
 // including the semver information and container
 // image information.
