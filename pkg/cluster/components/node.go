@@ -37,6 +37,34 @@ func (nu *NodeUpdater) Priority() int {
 	return 0
 }
 
+// Version returns the highest version of any
+// Node in the store.
+func (nu *NodeUpdater) Version() (*Version, error) {
+	nl, err := nu.nodes.List()
+	if err != nil {
+		return nil, err
+	}
+	var highest *Version
+	for _, n := range nl.Items {
+		versionString, ok := n.Annotations[node.CurrentVersionAnnotation]
+		if !ok {
+			return nil, fmt.Errorf("no version annotation for Node %s", n.Name)
+		}
+		v, err := ParseVersionFromImage(versionString)
+		if err != nil {
+			return nil, err
+		}
+		if highest == nil {
+			highest = v
+			continue
+		}
+		if v.Semver().GT(highest.Semver()) {
+			highest = v
+		}
+	}
+	return highest, nil
+}
+
 // UpdateToVersion will update the Node to the given version.
 func (nu *NodeUpdater) UpdateToVersion(v *Version) error {
 	nl, err := nu.nodes.List()

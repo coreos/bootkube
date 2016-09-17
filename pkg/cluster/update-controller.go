@@ -59,6 +59,8 @@ type Component interface {
 	UpdateToVersion(*components.Version) error
 	// Priority is the priority level for this component.
 	Priority() int
+	// Version of the component.
+	Version() (*components.Version, error)
 }
 
 // NewClusterUpdater returns a ClusterUpdater struct with defaults.
@@ -137,7 +139,7 @@ func NewClusterUpdater(client clientset.Interface) (*UpdateController, error) {
 
 // UpdateToVersion will update the cluster to the given version.
 func (cu *UpdateController) UpdateToVersion(v *components.Version) error {
-	comps, err := cu.getManagedComponentList()
+	comps, err := cu.getPrioritizedManagedComponentList(v)
 	if err != nil {
 		return err
 	}
@@ -153,13 +155,19 @@ func (cu *UpdateController) UpdateToVersion(v *components.Version) error {
 	return nil
 }
 
-type ByPriority []Component
+type ByAscendingPriority []Component
 
-func (a ByPriority) Len() int           { return len(a) }
-func (a ByPriority) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByPriority) Less(i, j int) bool { return a[i].Priority() < a[j].Priority() }
+func (a ByAscendingPriority) Len() int           { return len(a) }
+func (a ByAscendingPriority) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByAscendingPriority) Less(i, j int) bool { return a[i].Priority() < a[j].Priority() }
 
-func (cu *UpdateController) getManagedComponentList() ([]Component, error) {
+type ByDescendingPriority []Component
+
+func (a ByDescendingPriority) Len() int           { return len(a) }
+func (a ByDescendingPriority) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByDescendingPriority) Less(i, j int) bool { return a[i].Priority() > a[j].Priority() }
+
+func (cu *UpdateController) getPrioritizedManagedComponentList(v *components.Version) ([]Component, error) {
 	var comps []Component
 	// Add DaemonSets
 	dsl, err := cu.daemonSets.List()
@@ -187,8 +195,21 @@ func (cu *UpdateController) getManagedComponentList() ([]Component, error) {
 	}
 
 	// Sort list before we append our Node updater. Nodes should
-	// always be updated last.
-	sort.Sort(ByPriority(comps))
+	// always be updated last. We need to sort in asc/desc order
+	// based on the version skew.
+	// If the version is higher than the highest versioned component
+	// in the cluster, then we execute the update in ascending priority.
+	// If the version is lower than the highest versioned component
+	// in the cluster, then we execute the update in descending priority.
+	hv, err := highestClusterVersion(comps)
+	if err != nil {
+		return nil, err
+	}
+	if hv.Semver().GT(v.Semver()) {
+		sort.Sort(ByAscendingPriority(comps))
+	} else {
+		sort.Sort(ByDescendingPriority(comps))
+	}
 
 	// Finally, add Nodes
 	nu, err := components.NewNodeUpdater(cu.Client, cu.nodes)
@@ -197,4 +218,22 @@ func (cu *UpdateController) getManagedComponentList() ([]Component, error) {
 	}
 	comps = append(comps, nu)
 	return comps, nil
+}
+
+func highestClusterVersion(comps []Component) (*components.Version, error) {
+	var highestVersion *components.Version
+	for _, comp := range comps {
+		cv, err := comp.Version()
+		if err != nil {
+			return nil, err
+		}
+		if highestVersion == nil {
+			highestVersion = cv
+			continue
+		}
+		if cv.Semver().GT(highestVersion.Semver()) {
+			highestVersion = cv
+		}
+	}
+	return highestVersion, nil
 }

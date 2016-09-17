@@ -95,6 +95,30 @@ func (dsu *DaemonSetUpdater) Name() string {
 	return dsu.name
 }
 
+// Version returns the highest version of any Pod managed
+// by this DaemonSet.
+func (dsu *DaemonSetUpdater) Version() (*Version, error) {
+	pods, err := dsu.getPods()
+	if err != nil {
+		return nil, err
+	}
+	var highest *Version
+	for _, p := range pods {
+		pv, err := getPodVersion(p)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get Pod %s Version: %#v", p.Name, err)
+		}
+		if highest == nil {
+			highest = pv
+			continue
+		}
+		if pv.Semver().GT(highest.Semver()) {
+			highest = pv
+		}
+	}
+	return highest, nil
+}
+
 // Priority is the priority of updating this component.
 func (dsu *DaemonSetUpdater) Priority() int {
 	return dsu.priority

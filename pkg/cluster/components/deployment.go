@@ -1,6 +1,7 @@
 package components
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 
@@ -44,6 +45,20 @@ func NewDeploymentUpdater(client clientset.Interface, dep *extensions.Deployment
 // is responsible for.
 func (du *DeploymentUpdater) Name() string {
 	return du.name
+}
+
+// Version returns the version of the Deployment.
+func (du *DeploymentUpdater) Version() (*Version, error) {
+	dep, err := du.client.Extensions().Deployments(api.NamespaceSystem).Get(du.Name())
+	if err != nil {
+		return nil, err
+	}
+	for i, c := range dep.Spec.Template.Spec.Containers {
+		if c.Name == du.Name() {
+			return ParseVersionFromImage(dep.Spec.Template.Spec.Containers[i].Image)
+		}
+	}
+	return nil, fmt.Errorf("could not determine version for Deployment %s", du.Name())
 }
 
 // Priority is the priority to update this Deployment.
