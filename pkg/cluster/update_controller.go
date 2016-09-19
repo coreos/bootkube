@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"fmt"
 	"sort"
 	"time"
 
@@ -31,17 +32,25 @@ const (
 	clusterManagedLabel = "update-controller-managed"
 )
 
-// ClusterUpdater is responsible for safely updating an entire cluster.
+type NonNodeComponentsGetterFn func(clientset.Interface, cache.StoreToDaemonSetLister, cache.StoreToDeploymentLister, components.StoreToPodLister, cache.StoreToNodeLister) ([]Component, error)
+
+// UpdateController is responsible for safely updating an entire cluster.
 type UpdateController struct {
 	// Client is a generic API server client.
 	Client clientset.Interface
+	// AllNonNodeManagedComponentsFn is a function that should return
+	// a list of every non-Node component the update controller is managing.
+	GetAllNonNodeManagedComponentsFn NonNodeComponentsGetterFn
+
+	// AllManagedNodesFn should return a list of every managed Node in the cluster.
+	GetAllManagedNodesFn func(clientset.Interface, cache.StoreToNodeLister) ([]Component, error)
 
 	// These stores hold all of the managed components.
 	nodes       cache.StoreToNodeLister
 	deployments cache.StoreToDeploymentLister
 	daemonSets  cache.StoreToDaemonSetLister
 
-	// pods managed by DaemonSets.
+	// pods managed by DaemonSets. Allows lookup by DaemonSet selector.
 	pods components.StoreToPodLister
 }
 
@@ -56,7 +65,7 @@ type Component interface {
 	Name() string
 	// UpdateToVersion is the function used to update this component to the
 	// provided version.
-	UpdateToVersion(*components.Version) error
+	UpdateToVersion(*components.Version) (bool, error)
 	// Priority is the priority level for this component.
 	Priority() int
 	// Version of the component.
@@ -129,95 +138,136 @@ func NewClusterUpdater(client clientset.Interface) (*UpdateController, error) {
 	go podController.Run(wait.NeverStop)
 
 	return &UpdateController{
-		Client:      client,
-		nodes:       cache.StoreToNodeLister{nodeStore},
-		deployments: cache.StoreToDeploymentLister{deploymentStore},
-		daemonSets:  cache.StoreToDaemonSetLister{daemonSetStore},
-		pods:        components.StoreToPodLister{podStore},
+		Client: client,
+		GetAllNonNodeManagedComponentsFn: DefaultGetAllManagedNonNodeComponentsFn,
+		GetAllManagedNodesFn:             DefaultGetManagedNodeComponentsFn,
+		nodes:                            cache.StoreToNodeLister{nodeStore},
+		deployments:                      cache.StoreToDeploymentLister{deploymentStore},
+		daemonSets:                       cache.StoreToDaemonSetLister{daemonSetStore},
+		pods:                             components.StoreToPodLister{podStore},
 	}, nil
 }
 
 // UpdateToVersion will update the cluster to the given version.
 func (cu *UpdateController) UpdateToVersion(v *components.Version) error {
-	comps, err := cu.getPrioritizedManagedComponentList(v)
+	comps, err := cu.GetAllNonNodeManagedComponentsFn(
+		cu.Client,
+		cu.daemonSets,
+		cu.deployments,
+		cu.pods,
+		cu.nodes,
+	)
 	if err != nil {
 		return err
 	}
+	hv, err := highestClusterVersion(comps)
+	if err != nil {
+		return err
+	}
+	comps = sortComponentsByPriority(v, hv, comps)
+	nodeComps, err := cu.GetAllManagedNodesFn(cu.Client, cu.nodes)
+	if err != nil {
+		return err
+	}
+	comps = append(comps, nodeComps...)
 	for _, c := range comps {
 		glog.Infof("Begin update of component: %s", c.Name())
-		if err := c.UpdateToVersion(v); err != nil {
-			glog.Errorf("Failed update of component: %s due to: %v",
-				c.Name(), err)
+		updated, err := c.UpdateToVersion(v)
+		if err != nil {
+			err = fmt.Errorf("Failed update of component: %s due to: %v", c.Name(), err)
+			glog.Error(err)
 			return err
 		}
-		glog.Infof("Finshed update of componenet: %s", c.Name)
+		glog.Infof("Finished update of componenet: %s", c.Name)
+		// Return once we've updated a component and then re-check the list the next
+		// time around. This ensures that we're always keeping every component at
+		// the correct version, even if they are updated out-of-band during the
+		// course of an upgrade.
+		if updated {
+			return nil
+		}
 	}
 	return nil
 }
 
-type ByAscendingPriority []Component
+func DefaultGetAllManagedNonNodeComponentsFn(client clientset.Interface,
+	daemonsets cache.StoreToDaemonSetLister,
+	deployments cache.StoreToDeploymentLister,
+	pods components.StoreToPodLister,
+	nodes cache.StoreToNodeLister) ([]Component, error) {
 
-func (a ByAscendingPriority) Len() int           { return len(a) }
-func (a ByAscendingPriority) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByAscendingPriority) Less(i, j int) bool { return a[i].Priority() < a[j].Priority() }
-
-type ByDescendingPriority []Component
-
-func (a ByDescendingPriority) Len() int           { return len(a) }
-func (a ByDescendingPriority) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByDescendingPriority) Less(i, j int) bool { return a[i].Priority() > a[j].Priority() }
-
-func (cu *UpdateController) getPrioritizedManagedComponentList(v *components.Version) ([]Component, error) {
 	var comps []Component
 	// Add DaemonSets
-	dsl, err := cu.daemonSets.List()
+	dsl, err := daemonsets.List()
 	if err != nil {
 		return nil, err
 	}
 	for _, ds := range dsl.Items {
-		dsu, err := components.NewDaemonSetUpdater(cu.Client, &ds, cu.daemonSets, cu.pods)
+		dsu, err := components.NewDaemonSetUpdater(client, &ds, daemonsets, pods)
 		if err != nil {
 			return nil, err
 		}
 		comps = append(comps, dsu)
 	}
 	// Add Deployments
-	dpls, err := cu.deployments.List()
+	dpls, err := deployments.List()
 	if err != nil {
 		return nil, err
 	}
 	for _, dp := range dpls {
-		du, err := components.NewDeploymentUpdater(cu.Client, &dp)
+		du, err := components.NewDeploymentUpdater(client, &dp)
 		if err != nil {
 			return nil, err
 		}
 		comps = append(comps, du)
 	}
-
-	// Sort list before we append our Node updater. Nodes should
-	// always be updated last. We need to sort in asc/desc order
-	// based on the version skew.
-	// If the version is higher than the highest versioned component
-	// in the cluster, then we execute the update in ascending priority.
-	// If the version is lower than the highest versioned component
-	// in the cluster, then we execute the update in descending priority.
-	hv, err := highestClusterVersion(comps)
-	if err != nil {
-		return nil, err
-	}
-	if hv.Semver().GT(v.Semver()) {
-		sort.Sort(ByAscendingPriority(comps))
-	} else {
-		sort.Sort(ByDescendingPriority(comps))
-	}
-
-	// Finally, add Nodes
-	nu, err := components.NewNodeUpdater(cu.Client, cu.nodes)
-	if err != nil {
-		return nil, err
-	}
-	comps = append(comps, nu)
 	return comps, nil
+}
+
+func DefaultGetManagedNodeComponentsFn(client clientset.Interface, nodes cache.StoreToNodeLister) ([]Component, error) {
+	nl, err := nodes.List()
+	if err != nil {
+		return nil, err
+	}
+	var comps []Component
+	for _, n := range nl.Items {
+		nu, err := components.NewNodeUpdater(client, &n, nodes)
+		if err != nil {
+			return nil, err
+		}
+		comps = append(comps, nu)
+	}
+	return comps, nil
+}
+
+type byAscendingPriority []Component
+
+func (a byAscendingPriority) Len() int           { return len(a) }
+func (a byAscendingPriority) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a byAscendingPriority) Less(i, j int) bool { return a[i].Priority() < a[j].Priority() }
+
+type byDescendingPriority []Component
+
+func (a byDescendingPriority) Len() int           { return len(a) }
+func (a byDescendingPriority) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a byDescendingPriority) Less(i, j int) bool { return a[i].Priority() > a[j].Priority() }
+
+// We need to sort in asc/desc order based on the version skew.
+//
+// For example:
+//
+// If the version is higher than the highest versioned component
+// in the cluster, then we execute the update in ascending priority.
+//
+// If the version is lower than the highest versioned component
+// in the cluster, then we execute the update in descending priority.
+func sortComponentsByPriority(highestClusterVersion, newVersion *components.Version, comps []Component) []Component {
+	if newVersion.Semver().GT(highestClusterVersion.Semver()) {
+		sort.Sort(byAscendingPriority(comps))
+	} else {
+		sort.Sort(byDescendingPriority(comps))
+	}
+	return comps
 }
 
 func highestClusterVersion(comps []Component) (*components.Version, error) {

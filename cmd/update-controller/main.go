@@ -73,6 +73,9 @@ func run(c clientset.Interface, uc client.Interface) {
 	opts := api.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector("metadata.name", cluster.ClusterConfigMapName),
 	}
+	// TODO Once we switch to Third Party Resources, we should skip the informer,
+	// and from there move to a simple polling solution that checks all
+	// version 3rd party resource objects.
 	_, configMapController := framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(lo api.ListOptions) (runtime.Object, error) {
@@ -83,7 +86,7 @@ func run(c clientset.Interface, uc client.Interface) {
 			},
 		},
 		&v1.ConfigMap{},
-		30*time.Minute,
+		30*time.Second,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    addCallback,
 			UpdateFunc: updateCallback,

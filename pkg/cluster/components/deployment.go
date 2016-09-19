@@ -67,11 +67,11 @@ func (du *DeploymentUpdater) Priority() int {
 }
 
 // UpdateToVersion will update the Deployment to the given version.
-func (du *DeploymentUpdater) UpdateToVersion(v *Version) error {
+func (du *DeploymentUpdater) UpdateToVersion(v *Version) (bool, error) {
 	// Get the current deployment.
 	dep, err := du.client.Extensions().Deployments(api.NamespaceSystem).Get(du.Name())
 	if err != nil {
-		return err
+		return false, err
 	}
 	// Update the image in the specific container we care about (should match name
 	// of the deployment itself, per convention).
@@ -79,14 +79,14 @@ func (du *DeploymentUpdater) UpdateToVersion(v *Version) error {
 		if c.Name == du.Name() {
 			dv, err := ParseVersionFromImage(dep.Spec.Template.Spec.Containers[i].Image)
 			if err != nil {
-				return err
+				return false, err
 			}
 			// TODO we should also check that an update is not
 			// already in progress. It's possible we bailed
 			// before it was finished, and when we retry we
 			// should wait until it's finished if it is in progress.
 			if dv.Semver().EQ(v.Semver()) {
-				return nil
+				return false, nil
 			}
 			dep.Spec.Template.Spec.Containers[i].Image = v.image.String()
 			break
@@ -99,10 +99,10 @@ func (du *DeploymentUpdater) UpdateToVersion(v *Version) error {
 	// Update the deployment, which will trigger an update.
 	_, err = du.client.Extensions().Deployments(api.NamespaceSystem).Update(dep)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	return deployment.WaitForObservedDeployment(func() (*extensions.Deployment, error) {
+	err = deployment.WaitForObservedDeployment(func() (*extensions.Deployment, error) {
 		dp, err := du.client.Extensions().Deployments(api.NamespaceSystem).Get(du.Name())
 		if err != nil {
 			return nil, err
@@ -111,4 +111,8 @@ func (du *DeploymentUpdater) UpdateToVersion(v *Version) error {
 		v1beta1.Convert_v1beta1_Deployment_To_extensions_Deployment(dp, &out, nil)
 		return &out, nil
 	}, oldGeneration+1, time.Second, 10*time.Minute)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }

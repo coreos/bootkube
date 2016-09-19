@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/coreos/bootkube/pkg/node"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
@@ -18,17 +19,20 @@ type NodeUpdater struct {
 	client clientset.Interface
 	// nodeStore is cache of node backed by an informer.
 	nodes cache.StoreToNodeLister
+	// node is the node this updater is responsible for.
+	node *api.Node
 }
 
-func NewNodeUpdater(client clientset.Interface, nodes cache.StoreToNodeLister) (*NodeUpdater, error) {
+func NewNodeUpdater(client clientset.Interface, node *api.Node, nodes cache.StoreToNodeLister) (*NodeUpdater, error) {
 	return &NodeUpdater{
 		client: client,
 		nodes:  nodes,
+		node:   node,
 	}, nil
 }
 
 func (nu *NodeUpdater) Name() string {
-	return "nodes"
+	return nu.node.Name
 }
 
 // Node priority is not used, Nodes are always
@@ -66,45 +70,48 @@ func (nu *NodeUpdater) Version() (*Version, error) {
 }
 
 // UpdateToVersion will update the Node to the given version.
-func (nu *NodeUpdater) UpdateToVersion(v *Version) error {
-	nl, err := nu.nodes.List()
+func (nu *NodeUpdater) UpdateToVersion(v *Version) (bool, error) {
+	ni, exists, err := nu.nodes.Get(nu.node)
 	if err != nil {
-		return err
+		return false, err
 	}
-	for _, n := range nl.Items {
-		// First step: update the annotation on the Node object. This will
-		// trigger the node-agent running on that node to update the Node.
-		if n.Annotations == nil {
-			n.Annotations = make(map[string]string)
-		}
-		if n.Annotations[node.CurrentVersionAnnotation] == v.image.String() {
-			continue
-		}
-		n.Annotations[node.DesiredVersionAnnotation] = v.image.String()
-		var out v1.Node
-		v1.Convert_api_Node_To_v1_Node(&n, &out, nil)
-		_, err := nu.client.Core().Nodes().Update(&out)
-		if err != nil {
-			return err
-		}
-		// Second step: wait until the node-agent has updated the Node.
-		err = wait.Poll(time.Second, 10*time.Minute, func() (bool, error) {
-			v, ok, err := nu.nodes.Get(n)
-			if err != nil {
-				return false, err
-			}
-			if !ok {
-				return false, fmt.Errorf("unable to find Node %s in store", n.Name)
-			}
-			nn := v.(*v1.Node)
-			if nn.Annotations[node.DesiredVersionAnnotation] == nn.Annotations[node.CurrentVersionAnnotation] {
-				return true, nil
-			}
-			return false, nil
-		})
-		if err != nil {
-			return err
-		}
+	if !exists {
+		return false, fmt.Errorf("Node %s does not exist in local store", nu.node.Name)
 	}
-	return nil
+	n, ok := ni.(*v1.Node)
+	if !ok {
+		return false, fmt.Errorf("got incorrect type from node store, expected *v1.Node, got %t", n)
+	}
+	// First step: update the annotation on the Node object. This will
+	// trigger the node-agent running on that node to update the Node.
+	if n.Annotations == nil {
+		n.Annotations = make(map[string]string)
+	}
+	if n.Annotations[node.CurrentVersionAnnotation] == v.image.String() {
+		return false, nil
+	}
+	n.Annotations[node.DesiredVersionAnnotation] = v.image.String()
+	_, err = nu.client.Core().Nodes().Update(n)
+	if err != nil {
+		return false, err
+	}
+	// Second step: wait until the node-agent has updated the Node.
+	err = wait.Poll(time.Second, 10*time.Minute, func() (bool, error) {
+		v, ok, err := nu.nodes.Get(n)
+		if err != nil {
+			return false, err
+		}
+		if !ok {
+			return false, fmt.Errorf("unable to find Node %s in store", n.Name)
+		}
+		nn := v.(*v1.Node)
+		if nn.Annotations[node.DesiredVersionAnnotation] == nn.Annotations[node.CurrentVersionAnnotation] {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }

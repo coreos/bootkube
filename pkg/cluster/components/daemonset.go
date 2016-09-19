@@ -125,10 +125,10 @@ func (dsu *DaemonSetUpdater) Priority() int {
 }
 
 // UpdateToVersion will update the DaemonSet to the given version.
-func (dsu *DaemonSetUpdater) UpdateToVersion(v *Version) error {
+func (dsu *DaemonSetUpdater) UpdateToVersion(v *Version) (bool, error) {
 	ds, err := dsu.client.Extensions().DaemonSets(api.NamespaceSystem).Get(dsu.Name())
 	if err != nil {
-		return err
+		return false, err
 	}
 	// Create new DS.
 	ds.Labels["version"] = v.image.tag
@@ -142,16 +142,16 @@ func (dsu *DaemonSetUpdater) UpdateToVersion(v *Version) error {
 	}
 	ds, err = dsu.client.Extensions().DaemonSets(api.NamespaceSystem).Update(ds)
 	if err != nil {
-		return err
+		return false, err
 	}
 	pods, err := dsu.getPods()
 	if err != nil {
-		return err
+		return false, err
 	}
 	for _, p := range pods {
 		pv, err := getPodVersion(p)
 		if err != nil {
-			return fmt.Errorf("unable to get Pod %s Version: %#v", p.Name, err)
+			return false, fmt.Errorf("unable to get Pod %s Version: %#v", p.Name, err)
 		}
 		// If this Pod has already been updated, skip it.
 		if pv.Semver().EQ(v.Semver()) {
@@ -161,7 +161,7 @@ func (dsu *DaemonSetUpdater) UpdateToVersion(v *Version) error {
 		glog.Infof("Deleting pod %s", p.Name)
 		err = dsu.client.Core().Pods(api.NamespaceSystem).Delete(p.Name, nil)
 		if err != nil {
-			return err
+			return false, err
 		}
 		glog.Infof("Deleted pod %s", p.Name)
 
@@ -188,10 +188,10 @@ func (dsu *DaemonSetUpdater) UpdateToVersion(v *Version) error {
 			return false, nil
 		})
 		if err != nil {
-			return err
+			return false, err
 		}
 	}
-	return nil
+	return true, nil
 }
 
 func (dsu *DaemonSetUpdater) getPods() ([]*api.Pod, error) {

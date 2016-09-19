@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/version"
+
 	"github.com/blang/semver"
 )
 
@@ -25,19 +27,19 @@ type Version struct {
 
 func ParseVersionFromImage(image string) (*Version, error) {
 	var repo, tag string
-	version := image
+	ver := image
 	if strings.Contains(image, ":") {
 		parts := strings.SplitN(image, ":", 2)
 		if len(parts) != 2 {
 			return nil, fmt.Errorf("unable to parse version: %s", image)
 		}
 		repo, tag = parts[0], parts[1]
-		version = tag
+		ver = tag
 	}
-	if strings.Contains(version, "_") {
-		version = strings.Replace(version, "_", "+", -1)
+	if strings.Contains(ver, "_") {
+		ver = strings.Replace(ver, "_", "+", -1)
 	}
-	sv, err := semver.Parse(version)
+	sv, err := version.Parse(ver)
 	if err != nil {
 		return nil, err
 	}
