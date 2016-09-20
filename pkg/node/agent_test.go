@@ -1,7 +1,6 @@
 package node
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -11,27 +10,27 @@ import (
 
 func TestConfigHasChanged(t *testing.T) {
 	testcases := []struct {
-		onDisk   map[string]string
-		desired  map[string]string
+		current  string
+		desired  string
 		expected bool
 		desc     string
 	}{
 		{ // Nothing has changed.
-			onDisk:   map[string]string{KubeletVersionKey: "version1"},
-			desired:  map[string]string{KubeletVersionKey: "version1"},
+			current:  "version1",
+			desired:  "version1",
 			expected: false,
 			desc:     "nothing changed",
 		},
 		{ // Version has changed.
-			onDisk:   map[string]string{KubeletVersionKey: "version1"},
-			desired:  map[string]string{KubeletVersionKey: "version2"},
+			current:  "version1",
+			desired:  "version2",
 			expected: true,
 			desc:     "version changed",
 		},
 	}
 
 	for _, tc := range testcases {
-		actual := configHasChanged(tc.onDisk, tc.desired)
+		actual := configHasChanged(tc.current, tc.desired)
 		if actual != tc.expected {
 			t.Errorf("expected %v got %v for test %s", tc.expected, actual, tc.desc)
 		}
@@ -57,33 +56,27 @@ func (f *fakeDbusConn) RestartUnit(name string, action string, ch chan<- string)
 func TestHandleConfigUpdate(t *testing.T) {
 	testcases := []struct {
 		onDiskConfig         map[string]string
-		desiredConfig        map[string]string
-		expectedAnnotation   map[string]string
+		desiredVersion       string
 		expectedOnDiskConfig map[string]string
 		shouldRestartUnit    bool
 	}{
 		{ // Nothing changed
 			onDiskConfig:         map[string]string{KubeletVersionKey: "test1-version1"},
 			expectedOnDiskConfig: map[string]string{KubeletVersionKey: "test1-version1"},
-			expectedAnnotation:   map[string]string{KubeletVersionKey: "test1-version1"},
+			desiredVersion:       "test1-version1",
 			shouldRestartUnit:    false,
 		},
 		{ // Version changed
 			onDiskConfig:         map[string]string{KubeletVersionKey: "test2-version1"},
-			desiredConfig:        map[string]string{KubeletVersionKey: "test2-version2"},
+			desiredVersion:       "test2-version2",
 			expectedOnDiskConfig: map[string]string{KubeletVersionKey: "test2-version2"},
-			expectedAnnotation:   map[string]string{KubeletVersionKey: "test2-version2"},
 			shouldRestartUnit:    true,
 		},
 	}
 	for _, tc := range testcases {
 		var node v1.Node
 		node.Annotations = make(map[string]string)
-		conf, err := json.Marshal(tc.desiredConfig)
-		if err != nil {
-			t.Error(err)
-		}
-		node.Annotations[DesiredConfigAnnotation] = string(conf)
+		node.Annotations[DesiredVersionAnnotation] = tc.desiredVersion
 
 		tmpf, err := ioutil.TempFile("", "node-agent-test")
 		if err != nil {
@@ -97,20 +90,10 @@ func TestHandleConfigUpdate(t *testing.T) {
 			SysdConn: fakeSysD,
 		}
 
-		updatedNode, err := a.handleConfigUpdate(node, tc.onDiskConfig, tc.desiredConfig, tmpf.Name())
+		err = a.handleConfigUpdate(tc.onDiskConfig, tc.desiredVersion, tmpf.Name())
 		if err != nil {
 			t.Fatal(err)
 		}
-		actualAnnotation := updatedNode.Annotations[CurrentConfigAnnotation]
-		expectedAnnotationB, err := json.Marshal(tc.expectedAnnotation)
-		if err != nil {
-			t.Fatal(err)
-		}
-		expectedAnnotation := string(expectedAnnotationB)
-		if actualAnnotation != expectedAnnotation {
-			t.Fatalf("Node current annotation not correct, expected %#v, got %#v", expectedAnnotation, actualAnnotation)
-		}
-
 		actualOnDisk, err := parseKubeletEnvFile(tmpf.Name())
 		if err != nil {
 			t.Fatal(err)
@@ -124,7 +107,6 @@ func TestHandleConfigUpdate(t *testing.T) {
 				t.Fatal("expected systemd unit to be restarted but was not")
 			}
 		}
-
 	}
 }
 
