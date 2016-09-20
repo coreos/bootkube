@@ -104,7 +104,7 @@ func (dsu *DaemonSetUpdater) Version() (*Version, error) {
 	}
 	var highest *Version
 	for _, p := range pods {
-		pv, err := getPodVersion(p)
+		pv, err := getPodVersion(p, dsu.obj)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get Pod %s Version: %#v", p.Name, err)
 		}
@@ -115,6 +115,9 @@ func (dsu *DaemonSetUpdater) Version() (*Version, error) {
 		if pv.Semver().GT(highest.Semver()) {
 			highest = pv
 		}
+	}
+	if highest == nil {
+		return nil, fmt.Errorf("could not find a version for DaemonSet %s", dsu.Name())
 	}
 	return highest, nil
 }
@@ -149,7 +152,7 @@ func (dsu *DaemonSetUpdater) UpdateToVersion(v *Version) (bool, error) {
 		return false, err
 	}
 	for _, p := range pods {
-		pv, err := getPodVersion(p)
+		pv, err := getPodVersion(p, dsu.obj)
 		if err != nil {
 			return false, fmt.Errorf("unable to get Pod %s Version: %#v", p.Name, err)
 		}
@@ -225,10 +228,10 @@ func (dsu *DaemonSetUpdater) numberOfDesiredPods() int {
 	return 0
 }
 
-func getPodVersion(pod *api.Pod) (*Version, error) {
+func getPodVersion(pod *api.Pod, ds *extensions.DaemonSet) (*Version, error) {
 	var v *Version
 	for _, c := range pod.Spec.Containers {
-		if c.Name == pod.Name {
+		if c.Name == ds.Name {
 			ver, err := ParseVersionFromImage(c.Image)
 			if err != nil {
 				return nil, err
