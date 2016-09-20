@@ -3,7 +3,10 @@ package cluster
 import (
 	"testing"
 
+	"k8s.io/kubernetes/pkg/client/cache"
+
 	"github.com/coreos/bootkube/pkg/cluster/components"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
 )
 
 // type Component interface {
@@ -104,17 +107,57 @@ func TestComponentOrdering(t *testing.T) {
 	}
 }
 
+func newFakeNonNodeComponentFn(comps []Component) NonNodeComponentsGetterFn {
+	return func(_ clientset.Interface,
+		_ cache.StoreToDaemonSetLister,
+		_ cache.StoreToDeploymentLister,
+		_ components.StoreToPodLister,
+		_ cache.StoreToNodeLister) ([]Component, error) {
+		return comps, nil
+	}
+}
+
+func newFakeNodeComponentFn(comps []Component) NodeComponenetsGetterFn {
+	return func(_ clientset.Interface, _ cache.StoreToNodeLister) ([]Component, error) {
+		return comps, nil
+	}
+}
+
 func TestExitAfterComponentUpdate(t *testing.T) {
 	// Update controller should run until a component successfully updates,
 	// and then it should stop. The reasoning here is that, it's possible
 	// the updates take a long time, so we want to ensure we're always
 	// converging on the correct version, even if something happens out-of-band
 	// by a cluster admin during the upgrade.
-	comps := []Component{
-		newFakeComponent("highest", 1, "foo.io/bar/baz:v1.2.3", false, t),
-		newFakeComponent("lowest", 2, "foo.io/bar/baz:v1.1.3", false, t),
+	fake0 := newFakeComponent("comp-1", 1, "foo.io/bar/baz:v1.2.3", false, t)
+	fake1 := newFakeComponent("comp-1", 2, "foo.io/bar/baz:v1.2.3", true, t)
+	fake2 := newFakeComponent("comp-2", 3, "foo.io/bar/baz:v1.1.3", false, t)
+	nonNodeComps := []Component{
+		fake0,
+		fake1,
+		fake2,
 	}
-	uc := &UpdateController{}
+	nodeComps := []Component{
+		newFakeComponent("node", 1, "foo.io/bar/baz:v1.2.3", false, t),
+	}
+	uc := &UpdateController{
+		GetAllNonNodeManagedComponentsFn: newFakeNonNodeComponentFn(nonNodeComps),
+		GetAllManagedNodesFn:             newFakeNodeComponentFn(nodeComps),
+	}
+	newVersion, err := components.ParseVersionFromImage("v2.0.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = uc.UpdateToVersion(newVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !fake1.requestedVersion.Semver().EQ(newVersion.Semver()) {
+		t.Fatal("expected first component to have been updated")
+	}
+	if fake2.requestedVersion != nil {
+		t.Fatal("expected second component to not have been updated")
+	}
 }
 
 func TestNodesAlwaysUpdatedLast(t *testing.T) {

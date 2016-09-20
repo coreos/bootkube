@@ -34,6 +34,8 @@ const (
 
 type NonNodeComponentsGetterFn func(clientset.Interface, cache.StoreToDaemonSetLister, cache.StoreToDeploymentLister, components.StoreToPodLister, cache.StoreToNodeLister) ([]Component, error)
 
+type NodeComponenetsGetterFn func(clientset.Interface, cache.StoreToNodeLister) ([]Component, error)
+
 // UpdateController is responsible for safely updating an entire cluster.
 type UpdateController struct {
 	// Client is a generic API server client.
@@ -43,7 +45,7 @@ type UpdateController struct {
 	GetAllNonNodeManagedComponentsFn NonNodeComponentsGetterFn
 
 	// AllManagedNodesFn should return a list of every managed Node in the cluster.
-	GetAllManagedNodesFn func(clientset.Interface, cache.StoreToNodeLister) ([]Component, error)
+	GetAllManagedNodesFn NodeComponenetsGetterFn
 
 	// These stores hold all of the managed components.
 	nodes       cache.StoreToNodeLister
@@ -164,7 +166,7 @@ func (cu *UpdateController) UpdateToVersion(v *components.Version) error {
 	if err != nil {
 		return err
 	}
-	comps = sortComponentsByPriority(v, hv, comps)
+	comps = sortComponentsByPriority(hv, v, comps)
 	nodeComps, err := cu.GetAllManagedNodesFn(cu.Client, cu.nodes)
 	if err != nil {
 		return err
@@ -178,7 +180,7 @@ func (cu *UpdateController) UpdateToVersion(v *components.Version) error {
 			glog.Error(err)
 			return err
 		}
-		glog.Infof("Finished update of componenet: %s", c.Name)
+		glog.Infof("Finished update of componenet: %s", c.Name())
 		// Return once we've updated a component and then re-check the list the next
 		// time around. This ensures that we're always keeping every component at
 		// the correct version, even if they are updated out-of-band during the
@@ -263,8 +265,10 @@ func (a byDescendingPriority) Less(i, j int) bool { return a[i].Priority() > a[j
 // in the cluster, then we execute the update in descending priority.
 func sortComponentsByPriority(highestClusterVersion, newVersion *components.Version, comps []Component) []Component {
 	if newVersion.Semver().GT(highestClusterVersion.Semver()) {
+		glog.Info("sorting components by ascending priority")
 		sort.Sort(byAscendingPriority(comps))
 	} else {
+		glog.Info("sorting components by descending priority")
 		sort.Sort(byDescendingPriority(comps))
 	}
 	return comps
