@@ -4,8 +4,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/coreos/bootkube/pkg/cluster"
-	"github.com/coreos/bootkube/pkg/cluster/components"
+	"github.com/kubernetes-incubator/bootkube/pkg/cluster"
+	"github.com/kubernetes-incubator/bootkube/pkg/cluster/components"
 
 	"github.com/golang/glog"
 

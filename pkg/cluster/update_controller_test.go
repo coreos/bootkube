@@ -5,7 +5,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/client/cache"
 
-	"github.com/coreos/bootkube/pkg/cluster/components"
+	"github.com/kubernetes-incubator/bootkube/pkg/cluster/components"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
 )
 

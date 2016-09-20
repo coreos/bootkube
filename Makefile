@@ -31,11 +31,11 @@ _output/bin/%: $(GOFILES)
 
 _output/bin/%/node-agent: $(GOFILES)
 	mkdir -p $(dir $@)
-	GOOS=$* go build -o _output/bin/$*/node-agent github.com/coreos/bootkube/cmd/node-agent
+	GOOS=$* go build -o _output/bin/$*/node-agent github.com/kubernetes-incubator/bootkube/cmd/node-agent
 
 _output/bin/%/update-controller: $(GOFILES)
 	mkdir -p $(dir $@)
-	GOOS=$* go build -o _output/bin/$*/update-controller github.com/coreos/bootkube/cmd/update-controller
+	GOOS=$* go build -o _output/bin/$*/update-controller github.com/kubernetes-incubator/bootkube/cmd/update-controller
 
 _output/release/bootkube.tar.gz: _output/bin/linux/bootkube _output/bin/darwin/bootkube _output/bin/linux/checkpoint
 	mkdir -p $(dir $@)

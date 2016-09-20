@@ -5,7 +5,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/coreos/bootkube/pkg/cluster/components"
+	"github.com/kubernetes-incubator/bootkube/pkg/cluster/components"
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"

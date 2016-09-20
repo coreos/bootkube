@@ -4,7 +4,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/coreos/bootkube/pkg/node"
+	"github.com/kubernetes-incubator/bootkube/pkg/node"
 	"github.com/coreos/go-systemd/dbus"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"

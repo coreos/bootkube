@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coreos/bootkube/pkg/atomic"
+	"github.com/kubernetes-incubator/bootkube/pkg/atomic"
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"

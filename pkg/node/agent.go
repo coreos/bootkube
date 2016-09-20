@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/coreos/bootkube/pkg/atomic"
+	"github.com/kubernetes-incubator/bootkube/pkg/atomic"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
