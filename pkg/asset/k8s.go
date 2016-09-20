@@ -25,7 +25,6 @@ func newStaticAssets() Assets {
 		mustCreateAssetFromTemplate(AssetPathKubeDNSDeployment, internal.DNSDeploymentTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathKubeDNSSvc, internal.DNSSvcTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathSystemNamespace, internal.SystemNSTemplate, noData),
-		mustCreateAssetFromTemplate(AssetPathKubelet, internal.KubeletTemplate, noData),
 	}
 }
 
@@ -33,6 +32,7 @@ func newDynamicAssets(conf Config) Assets {
 	return Assets{
 		mustCreateAssetFromTemplate(AssetPathAPIServer, internal.APIServerTemplate, conf),
 		mustCreateAssetFromTemplate(AssetPathProxy, internal.ProxyTemplate, conf),
+		mustCreateAssetFromTemplate(AssetPathKubelet, internal.KubeletTemplate, conf),
 	}
 }
 

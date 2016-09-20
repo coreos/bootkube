@@ -161,4 +161,29 @@ func TestExitAfterComponentUpdate(t *testing.T) {
 }
 
 func TestNodesAlwaysUpdatedLast(t *testing.T) {
+	// A non-node component with a lower priority during an upgrade should
+	// still get updated before any node.
+	fake := newFakeComponent("comp-1", 3, "foo.io/bar/baz:v1.2.3", true, t)
+	nonNodeComps := []Component{
+		fake,
+	}
+	fakeNode := newFakeComponent("node", 1, "foo.io/bar/baz:v1.2.3", true, t)
+	nodeComps := []Component{
+		fakeNode,
+	}
+	uc := &UpdateController{
+		GetAllNonNodeManagedComponentsFn: newFakeNonNodeComponentFn(nonNodeComps),
+		GetAllManagedNodesFn:             newFakeNodeComponentFn(nodeComps),
+	}
+	newVersion, err := components.ParseVersionFromImage("v2.0.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = uc.UpdateToVersion(newVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fakeNode.requestedVersion != nil {
+		t.Fatal("node should not have been updated")
+	}
 }
