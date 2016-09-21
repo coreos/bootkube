@@ -53,7 +53,7 @@ coreos:
           --cluster_dns=10.3.0.10 \
           --cluster_domain=cluster.local \
           --exit-on-lock-contention=true \
-          --node-labels=master=true,update-controller-managed=true \
+          --node-labels="master=true,update-controller-managed=true" \
           --hostname-override=$public_ipv4
 
         Restart=always
