@@ -16,6 +16,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"errors"
+)
+
+const (
+	AssetToPrioritize = "kube-dns"
+	AssetType = "service"
 )
 
 func CreateAssets(manifestDir string, timeout time.Duration) error {
@@ -94,31 +100,31 @@ func createAssets(manifestDir string) error {
 	if err != nil {
 		return err
 	}
-
 	count := 0
-	err = r.Visit(func(info *resource.Info, err error) error {
-		if err != nil {
-			return err
-		}
-
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
+	i, err := r.Infos()
+	assets, e := prioritizeAssetCreation(i, AssetToPrioritize, AssetType)
+	if e != nil {
+		glog.Warningf("Asset ordering failed due to: %v", e)
+	}
+	for _, a := range assets {
+		obj, err := resource.NewHelper(a.Client, a.Mapping).Create(a.Namespace, true, a.Object)
 		if err != nil {
 			if apierrors.IsAlreadyExists(err) {
 				return nil
 			}
-			return cmdutil.AddSourceToErr("creating", info.Source, err)
+			return cmdutil.AddSourceToErr("creating", a.Source, err)
 		}
-		info.Refresh(obj, true)
+		a.Refresh(obj, true)
 
 		count++
 		shortOutput := false
 		if !shortOutput {
-			f.PrintObjectSpecificMessage(info.Object, util.GlogWriter{})
+			f.PrintObjectSpecificMessage(a.Object, util.GlogWriter{})
 		}
-		cmdutil.PrintSuccess(mapper, shortOutput, util.GlogWriter{}, info.Mapping.Resource, info.Name, "created")
-		UserOutput("\tcreated %23s %s\n", info.Name, strings.TrimSuffix(info.Mapping.Resource, "s"))
-		return nil
-	})
+		cmdutil.PrintSuccess(mapper, shortOutput, util.GlogWriter{}, a.Mapping.Resource, a.Name, "created")
+		UserOutput("\tcreated %23s %s\n", a.Name, strings.TrimSuffix(a.Mapping.Resource, "s"))
+
+	}
 	if err != nil {
 		return err
 	}
@@ -126,6 +132,26 @@ func createAssets(manifestDir string) error {
 		return fmt.Errorf("no objects passed to create")
 	}
 	return nil
+}
+
+// To prevent another service from winning the race for dns service IP allocation
+// we bump the dns service to the top of the list and create the DNS service asset first.
+func prioritizeAssetCreation(origSlice []*resource.Info, assetToPrioritize, assetType string) ([]*resource.Info, error) {
+	var seen bool = false
+	sortedSlice := make([]*resource.Info, 1)
+	for _, info := range origSlice {
+		if info.Name == assetToPrioritize && strings.TrimSuffix(info.Mapping.Resource, "s") == assetType {
+			sortedSlice[0] = info
+			seen = true
+		} else {
+			sortedSlice = append(sortedSlice, info)
+		}
+	}
+	if seen {
+		return sortedSlice, nil
+	}
+	// if asset def. is not found return orig. slice and fail silently
+	return origSlice, errors.New("Asset not found " + assetToPrioritize)
 }
 
 func apiTest() error {

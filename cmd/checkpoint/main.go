@@ -199,7 +199,7 @@ func parseAPIPodSpec(podList v1.PodList) v1.PodSpec {
 		}
 	}
 	cleanVolumes(&apiPod)
-	modifyInsecurePort(&apiPod)
+	//modifyInsecurePort(&apiPod)
 	return apiPod.Spec
 }
 

@@ -319,7 +319,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /readiness
-            port: 8081
+            port: 8080
             scheme: HTTP
           initialDelaySeconds: 30
           timeoutSeconds: 5

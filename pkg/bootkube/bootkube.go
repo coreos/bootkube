@@ -19,15 +19,7 @@ import (
 
 const (
 	assetTimeout = 10 * time.Minute
-	// NOTE: using 8081 as the port is a temporary hack when there is a single api-server.
-	// The self-hosted apiserver will immediately die if it cannot bind to the insecure interface.
-	// However, if it can successfully bind to insecure interface, it will continue to retry
-	// failures on the the secure interface.
-	// Staggering the insecure port allows us to launch a self-hosted api-server on the same machine
-	// as the bootkube, and the self-hosted api-server will continually retry binding to secure interface
-	// and doesn't end up in a race with bootkube for the insecure port. When bootkube dies, the self-hosted
-	// api-server is using the correct standard ports (443/8080).
-	insecureAPIAddr = "http://127.0.0.1:8081"
+	insecureAPIAddr = "http://127.0.0.1:8080"
 )
 
 var requiredPods = []string{
@@ -57,7 +49,7 @@ func NewBootkube(config Config) (*bootkube, error) {
 	fs.Parse([]string{
 		"--bind-address=0.0.0.0",
 		"--secure-port=443",
-		"--insecure-port=8081", // NOTE: temp hack for single-apiserver
+		"--insecure-port=8080",
 		"--allow-privileged=true",
 		"--tls-private-key-file=" + filepath.Join(config.AssetDir, asset.AssetPathAPIServerKey),
 		"--tls-cert-file=" + filepath.Join(config.AssetDir, asset.AssetPathAPIServerCert),
