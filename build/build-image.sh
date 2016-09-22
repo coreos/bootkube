@@ -10,7 +10,11 @@ if [ -z "${BUILD_IMAGE}" ]; then
 fi
 
 BOOTKUBE_ROOT=$(git rev-parse --show-toplevel)
-source "${BOOTKUBE_ROOT}/build/build-release.sh"
+if [[ "${BUILD_TARGET}" == "" ]]; then
+    source "${BOOTKUBE_ROOT}/build/build-release.sh"
+else
+    make _output/bin/linux/$BUILD_TARGET
+fi
 source "${BOOTKUBE_ROOT}/image/${BUILD_IMAGE}/build-image.sh"
 
 image::build
