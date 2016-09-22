@@ -4,4 +4,4 @@ metadata:
   name: cluster-config
   namespace: kube-system
 data:
-  cluster.version: quay.io/coreos/hyperkube:v1.3.5_coreos.0
+  cluster.version: quay.io/coreos/hyperkube:v1.4.0-beta.9_coreos.0

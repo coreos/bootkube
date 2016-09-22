@@ -214,7 +214,7 @@ func (le *LeaderElector) acquire() {
 		le.config.EventRecorder.Eventf(&api.Endpoints{ObjectMeta: le.config.EndpointsMeta}, api.EventTypeNormal, "%v became leader", le.config.Identity)
 		glog.Infof("sucessfully acquired lease %v/%v", le.config.EndpointsMeta.Namespace, le.config.EndpointsMeta.Name)
 		close(stop)
-	}, 0, stop)
+	}, time.Millisecond, stop)
 }
 
 // renew loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew fails.
@@ -232,7 +232,7 @@ func (le *LeaderElector) renew() {
 		le.config.EventRecorder.Eventf(&api.Endpoints{ObjectMeta: le.config.EndpointsMeta}, api.EventTypeNormal, "%v stopped leading", le.config.Identity)
 		glog.Infof("failed to renew lease %v/%v", le.config.EndpointsMeta.Namespace, le.config.EndpointsMeta.Name)
 		close(stop)
-	}, 0, stop)
+	}, time.Millisecond, stop)
 }
 
 // tryAcquireOrRenew tries to acquire a leader lease if it is not already acquired,

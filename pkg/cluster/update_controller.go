@@ -1,18 +1,19 @@
 package cluster
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"time"
 
-	"github.com/kubernetes-incubator/bootkube/pkg/cluster/components"
 	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/bootkube/pkg/cluster/components"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	"k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -29,12 +30,10 @@ const (
 	ClusterVersionKey = "cluster.version"
 	// clusterMangedAnnotation is the annotation used to denote a managed component within
 	// the cluster.
-	clusterManagedLabel = "update-controller-managed"
+	clusterManagedLabel = "update-controller-managed=true"
 )
 
-type NonNodeComponentsGetterFn func(clientset.Interface, cache.StoreToDaemonSetLister, cache.StoreToDeploymentLister, components.StoreToPodLister, cache.StoreToNodeLister) ([]Component, error)
-
-type NodeComponenetsGetterFn func(clientset.Interface, cache.StoreToNodeLister) ([]Component, error)
+type ComponentsGetterFn func(clientset.Interface, cache.StoreToDaemonSetLister, cache.StoreToDeploymentLister, components.StoreToPodLister, cache.StoreToNodeLister) ([]Component, error)
 
 // UpdateController is responsible for safely updating an entire cluster.
 type UpdateController struct {
@@ -42,10 +41,7 @@ type UpdateController struct {
 	Client clientset.Interface
 	// AllNonNodeManagedComponentsFn is a function that should return
 	// a list of every non-Node component the update controller is managing.
-	GetAllNonNodeManagedComponentsFn NonNodeComponentsGetterFn
-
-	// AllManagedNodesFn should return a list of every managed Node in the cluster.
-	GetAllManagedNodesFn NodeComponenetsGetterFn
+	GetAllManagedComponentsFn ComponentsGetterFn
 
 	// These stores hold all of the managed components.
 	nodes       cache.StoreToNodeLister
@@ -75,7 +71,7 @@ type Component interface {
 }
 
 // NewClusterUpdater returns a ClusterUpdater struct with defaults.
-func NewClusterUpdater(client clientset.Interface) (*UpdateController, error) {
+func NewClusterUpdater(client clientset.Interface, uc unversioned.Interface) (*UpdateController, error) {
 	l, err := labels.Parse(clusterManagedLabel)
 	if err != nil {
 		return nil, err
@@ -84,52 +80,52 @@ func NewClusterUpdater(client clientset.Interface) (*UpdateController, error) {
 	nodeStore, nodeController := framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(_ api.ListOptions) (runtime.Object, error) {
-				return client.Core().Nodes().List(mlo)
+				return uc.Nodes().List(mlo)
 			},
 			WatchFunc: func(_ api.ListOptions) (watch.Interface, error) {
-				return client.Core().Nodes().Watch(mlo)
+				return uc.Nodes().Watch(mlo)
 			},
 		},
-		&v1.Node{},
+		&api.Node{},
 		30*time.Minute,
 		framework.ResourceEventHandlerFuncs{},
 	)
 	daemonSetStore, daemonSetController := framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(_ api.ListOptions) (runtime.Object, error) {
-				return client.Extensions().DaemonSets(api.NamespaceSystem).List(mlo)
+				return uc.Extensions().DaemonSets(api.NamespaceSystem).List(mlo)
 			},
 			WatchFunc: func(_ api.ListOptions) (watch.Interface, error) {
-				return client.Extensions().DaemonSets(api.NamespaceSystem).Watch(mlo)
+				return uc.Extensions().DaemonSets(api.NamespaceSystem).Watch(mlo)
 			},
 		},
-		&v1beta1.DaemonSet{},
+		&extensions.DaemonSet{},
 		30*time.Minute,
 		framework.ResourceEventHandlerFuncs{},
 	)
 	deploymentStore, deploymentController := framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(_ api.ListOptions) (runtime.Object, error) {
-				return client.Extensions().Deployments(api.NamespaceSystem).List(mlo)
+				return uc.Extensions().Deployments(api.NamespaceSystem).List(mlo)
 			},
 			WatchFunc: func(_ api.ListOptions) (watch.Interface, error) {
-				return client.Extensions().Deployments(api.NamespaceSystem).Watch(mlo)
+				return uc.Extensions().Deployments(api.NamespaceSystem).Watch(mlo)
 			},
 		},
-		&v1beta1.Deployment{},
+		&extensions.Deployment{},
 		30*time.Minute,
 		framework.ResourceEventHandlerFuncs{},
 	)
 	podStore, podController := framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(lo api.ListOptions) (runtime.Object, error) {
-				return client.Core().Pods(api.NamespaceSystem).List(lo)
+				return uc.Pods(api.NamespaceSystem).List(lo)
 			},
 			WatchFunc: func(lo api.ListOptions) (watch.Interface, error) {
-				return client.Core().Pods(api.NamespaceSystem).Watch(lo)
+				return uc.Pods(api.NamespaceSystem).Watch(lo)
 			},
 		},
-		&v1.Pod{},
+		&api.Pod{},
 		30*time.Minute,
 		framework.ResourceEventHandlerFuncs{},
 	)
@@ -141,18 +137,17 @@ func NewClusterUpdater(client clientset.Interface) (*UpdateController, error) {
 
 	return &UpdateController{
 		Client: client,
-		GetAllNonNodeManagedComponentsFn: DefaultGetAllManagedNonNodeComponentsFn,
-		GetAllManagedNodesFn:             DefaultGetManagedNodeComponentsFn,
-		nodes:                            cache.StoreToNodeLister{nodeStore},
-		deployments:                      cache.StoreToDeploymentLister{deploymentStore},
-		daemonSets:                       cache.StoreToDaemonSetLister{daemonSetStore},
-		pods:                             components.StoreToPodLister{podStore},
+		GetAllManagedComponentsFn: DefaultGetAllManagedComponentsFn,
+		nodes:       cache.StoreToNodeLister{nodeStore},
+		deployments: cache.StoreToDeploymentLister{deploymentStore},
+		daemonSets:  cache.StoreToDaemonSetLister{daemonSetStore},
+		pods:        components.StoreToPodLister{podStore},
 	}, nil
 }
 
 // UpdateToVersion will update the cluster to the given version.
 func (cu *UpdateController) UpdateToVersion(v *components.Version) error {
-	comps, err := cu.GetAllNonNodeManagedComponentsFn(
+	comps, err := cu.GetAllManagedComponentsFn(
 		cu.Client,
 		cu.daemonSets,
 		cu.deployments,
@@ -167,11 +162,6 @@ func (cu *UpdateController) UpdateToVersion(v *components.Version) error {
 		return err
 	}
 	comps = sortComponentsByPriority(hv, v, comps)
-	nodeComps, err := cu.GetAllManagedNodesFn(cu.Client, cu.nodes)
-	if err != nil {
-		return err
-	}
-	comps = append(comps, nodeComps...)
 	for _, c := range comps {
 		glog.Infof("Begin update of component: %s", c.Name())
 		updated, err := c.UpdateToVersion(v)
@@ -186,13 +176,15 @@ func (cu *UpdateController) UpdateToVersion(v *components.Version) error {
 		// the correct version, even if they are updated out-of-band during the
 		// course of an upgrade.
 		if updated {
+			glog.Infof("Finished update of componenet: %s", c.Name())
 			return nil
 		}
+		glog.Info("Component %s already updated, moving on", c.Name())
 	}
 	return nil
 }
 
-func DefaultGetAllManagedNonNodeComponentsFn(client clientset.Interface,
+func DefaultGetAllManagedComponentsFn(client clientset.Interface,
 	daemonsets cache.StoreToDaemonSetLister,
 	deployments cache.StoreToDeploymentLister,
 	pods components.StoreToPodLister,
@@ -223,15 +215,11 @@ func DefaultGetAllManagedNonNodeComponentsFn(client clientset.Interface,
 		}
 		comps = append(comps, du)
 	}
-	return comps, nil
-}
-
-func DefaultGetManagedNodeComponentsFn(client clientset.Interface, nodes cache.StoreToNodeLister) ([]Component, error) {
+	// Add Nodes
 	nl, err := nodes.List()
 	if err != nil {
 		return nil, err
 	}
-	var comps []Component
 	for _, n := range nl.Items {
 		nu, err := components.NewNodeUpdater(client, &n, nodes)
 		if err != nil {
@@ -264,7 +252,7 @@ func (a byDescendingPriority) Less(i, j int) bool { return a[i].Priority() > a[j
 // If the version is lower than the highest versioned component
 // in the cluster, then we execute the update in descending priority.
 func sortComponentsByPriority(highestClusterVersion, newVersion *components.Version, comps []Component) []Component {
-	if newVersion.Semver().GT(highestClusterVersion.Semver()) {
+	if newVersion.Semver().GTE(highestClusterVersion.Semver()) {
 		glog.Info("sorting components by ascending priority")
 		sort.Sort(byAscendingPriority(comps))
 	} else {
@@ -288,6 +276,9 @@ func highestClusterVersion(comps []Component) (*components.Version, error) {
 		if cv.Semver().GT(highestVersion.Semver()) {
 			highestVersion = cv
 		}
+	}
+	if highestVersion == nil {
+		return nil, errors.New("unable to get highest cluster version")
 	}
 	return highestVersion, nil
 }

@@ -14,6 +14,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
@@ -37,7 +38,7 @@ func main() {
 
 func run(c clientset.Interface, uc client.Interface) {
 	glog.Info("update controller running")
-	cu, err := cluster.NewClusterUpdater(c)
+	cu, err := cluster.NewClusterUpdater(c, uc)
 	if err != nil {
 		glog.Error(err)
 		return
@@ -93,19 +94,29 @@ func run(c clientset.Interface, uc client.Interface) {
 		},
 	)
 
+	b := record.NewBroadcaster()
+	r := b.NewRecorder(api.EventSource{
+		Component: "cluster-updater",
+	})
 	stopChan := make(chan struct{})
 	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
 		EndpointsMeta: api.ObjectMeta{
 			Namespace: "kube-system",
 			Name:      "kube-update-controller",
 		},
-		Client:   uc,
-		Identity: os.Getenv("POD_NAME"),
+		Client:        uc,
+		Identity:      os.Getenv("POD_NAME"),
+		LeaseDuration: 15 * time.Second,
+		RenewDeadline: 10 * time.Second,
+		RetryPeriod:   2 * time.Second,
+		EventRecorder: r,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(stop <-chan struct{}) {
+				glog.Info("started leading: running update controller")
 				go configMapController.Run(stopChan)
 			},
 			OnStoppedLeading: func() {
+				glog.Info("stopped leading: pausing update controller")
 				stopChan <- struct{}{}
 			},
 		},

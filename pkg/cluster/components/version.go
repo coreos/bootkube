@@ -9,7 +9,7 @@ import (
 	"github.com/blang/semver"
 )
 
-const updatePriorityAnnotation = "alpha.coreos.com/update-controller/priority"
+const updatePriorityAnnotation = "update-controller.alpha.coreos.com/priority"
 
 func noAnnotationError(component, name string) error {
 	return fmt.Errorf("no priority annotation for %s %s", component, name)

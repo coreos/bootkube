@@ -35,10 +35,10 @@ func (nu *NodeUpdater) Name() string {
 	return nu.node.Name
 }
 
-// Node priority is not used, Nodes are always
-// updated last.
+// Priority for Nodes should be such that they
+// get updated last, and rolled back first.
 func (nu *NodeUpdater) Priority() int {
-	return 0
+	return 100
 }
 
 // Version returns the highest version of any
@@ -53,7 +53,7 @@ func (nu *NodeUpdater) Version() (*Version, error) {
 	}
 	n, ok := ni.(*api.Node)
 	if !ok {
-		return nil, fmt.Errorf("unexpected type returned from Node store, expected *v1.Node, got %t", ni)
+		return nil, fmt.Errorf("unexpected type returned from Node store, expected *v1.Node, got %T", ni)
 	}
 	versionString, ok := n.Annotations[node.CurrentVersionAnnotation]
 	if !ok {
@@ -64,16 +64,9 @@ func (nu *NodeUpdater) Version() (*Version, error) {
 
 // UpdateToVersion will update the Node to the given version.
 func (nu *NodeUpdater) UpdateToVersion(v *Version) (bool, error) {
-	ni, exists, err := nu.nodes.Get(nu.node)
+	n, err := nu.client.Core().Nodes().Get(nu.Name())
 	if err != nil {
 		return false, err
-	}
-	if !exists {
-		return false, fmt.Errorf("Node %s does not exist in local store", nu.node.Name)
-	}
-	n, ok := ni.(*v1.Node)
-	if !ok {
-		return false, fmt.Errorf("got incorrect type from node store, expected *v1.Node, got %t", n)
 	}
 	// First step: update the annotation on the Node object. This will
 	// trigger the node-agent running on that node to update the Node.

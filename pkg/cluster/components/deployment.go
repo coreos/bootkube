@@ -92,9 +92,6 @@ func (du *DeploymentUpdater) UpdateToVersion(v *Version) (bool, error) {
 			break
 		}
 	}
-	dep.Labels["version"] = v.image.tag
-	dep.Spec.Template.Labels["version"] = v.image.tag
-
 	oldGeneration := dep.Status.ObservedGeneration
 	// Update the deployment, which will trigger an update.
 	_, err = du.client.Extensions().Deployments(api.NamespaceSystem).Update(dep)

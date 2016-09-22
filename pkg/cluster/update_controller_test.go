@@ -107,18 +107,12 @@ func TestComponentOrdering(t *testing.T) {
 	}
 }
 
-func newFakeNonNodeComponentFn(comps []Component) NonNodeComponentsGetterFn {
+func newFakeComponentFn(comps []Component) ComponentsGetterFn {
 	return func(_ clientset.Interface,
 		_ cache.StoreToDaemonSetLister,
 		_ cache.StoreToDeploymentLister,
 		_ components.StoreToPodLister,
 		_ cache.StoreToNodeLister) ([]Component, error) {
-		return comps, nil
-	}
-}
-
-func newFakeNodeComponentFn(comps []Component) NodeComponenetsGetterFn {
-	return func(_ clientset.Interface, _ cache.StoreToNodeLister) ([]Component, error) {
 		return comps, nil
 	}
 }
@@ -136,13 +130,10 @@ func TestExitAfterComponentUpdate(t *testing.T) {
 		fake0,
 		fake1,
 		fake2,
-	}
-	nodeComps := []Component{
-		newFakeComponent("node", 1, "foo.io/bar/baz:v1.2.3", false, t),
+		newFakeComponent("node", 100, "foo.io/bar/baz:v1.2.3", false, t),
 	}
 	uc := &UpdateController{
-		GetAllNonNodeManagedComponentsFn: newFakeNonNodeComponentFn(nonNodeComps),
-		GetAllManagedNodesFn:             newFakeNodeComponentFn(nodeComps),
+		GetAllManagedComponentsFn: newFakeComponentFn(nonNodeComps),
 	}
 	newVersion, err := components.ParseVersionFromImage("v2.0.0")
 	if err != nil {
@@ -157,33 +148,5 @@ func TestExitAfterComponentUpdate(t *testing.T) {
 	}
 	if fake2.requestedVersion != nil {
 		t.Fatal("expected second component to not have been updated")
-	}
-}
-
-func TestNodesAlwaysUpdatedLast(t *testing.T) {
-	// A non-node component with a lower priority during an upgrade should
-	// still get updated before any node.
-	fake := newFakeComponent("comp-1", 3, "foo.io/bar/baz:v1.2.3", true, t)
-	nonNodeComps := []Component{
-		fake,
-	}
-	fakeNode := newFakeComponent("node", 1, "foo.io/bar/baz:v1.2.3", true, t)
-	nodeComps := []Component{
-		fakeNode,
-	}
-	uc := &UpdateController{
-		GetAllNonNodeManagedComponentsFn: newFakeNonNodeComponentFn(nonNodeComps),
-		GetAllManagedNodesFn:             newFakeNodeComponentFn(nodeComps),
-	}
-	newVersion, err := components.ParseVersionFromImage("v2.0.0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = uc.UpdateToVersion(newVersion)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if fakeNode.requestedVersion != nil {
-		t.Fatal("node should not have been updated")
 	}
 }

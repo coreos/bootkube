@@ -104,9 +104,9 @@ func (dsu *DaemonSetUpdater) Version() (*Version, error) {
 	}
 	var highest *Version
 	for _, p := range pods {
-		pv, err := getPodVersion(p, dsu.obj)
+		pv, err := getPodVersion(p, dsu.Name())
 		if err != nil {
-			return nil, fmt.Errorf("unable to get Pod %s Version: %#v", p.Name, err)
+			return nil, fmt.Errorf("unable to get Pod %s Version: %v", p.Name, err)
 		}
 		if highest == nil {
 			highest = pv
@@ -134,8 +134,6 @@ func (dsu *DaemonSetUpdater) UpdateToVersion(v *Version) (bool, error) {
 		return false, err
 	}
 	// Create new DS.
-	ds.Labels["version"] = v.image.tag
-	ds.Spec.Template.Labels["version"] = v.image.tag
 	for i, c := range ds.Spec.Template.Spec.Containers {
 		if c.Name == dsu.Name() {
 			glog.Infof("updating image for container: %s", c.Name)
@@ -145,14 +143,15 @@ func (dsu *DaemonSetUpdater) UpdateToVersion(v *Version) (bool, error) {
 	}
 	ds, err = dsu.client.Extensions().DaemonSets(api.NamespaceSystem).Update(ds)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("unable to update DaemonSet %s: %v\n\n%#v", dsu.Name(), err, ds)
 	}
 	pods, err := dsu.getPods()
 	if err != nil {
 		return false, err
 	}
+	updated := false
 	for _, p := range pods {
-		pv, err := getPodVersion(p, dsu.obj)
+		pv, err := getPodVersion(p, dsu.Name())
 		if err != nil {
 			return false, fmt.Errorf("unable to get Pod %s Version: %#v", p.Name, err)
 		}
@@ -160,6 +159,7 @@ func (dsu *DaemonSetUpdater) UpdateToVersion(v *Version) (bool, error) {
 		if pv.Semver().EQ(v.Semver()) {
 			continue
 		}
+		updated = true
 		// Delete old DS Pod.
 		glog.Infof("Deleting pod %s", p.Name)
 		err = dsu.client.Core().Pods(api.NamespaceSystem).Delete(p.Name, nil)
@@ -194,7 +194,7 @@ func (dsu *DaemonSetUpdater) UpdateToVersion(v *Version) (bool, error) {
 			return false, err
 		}
 	}
-	return true, nil
+	return updated, nil
 }
 
 func (dsu *DaemonSetUpdater) getPods() ([]*api.Pod, error) {
@@ -228,24 +228,11 @@ func (dsu *DaemonSetUpdater) numberOfDesiredPods() int {
 	return 0
 }
 
-func getPodVersion(pod *api.Pod, ds *extensions.DaemonSet) (*Version, error) {
-	var v *Version
+func getPodVersion(pod *api.Pod, dsName string) (*Version, error) {
 	for _, c := range pod.Spec.Containers {
-		if c.Name == ds.Name {
-			ver, err := ParseVersionFromImage(c.Image)
-			if err != nil {
-				return nil, err
-			}
-			if v == nil {
-				v = ver
-			} else if v.Semver().GT(ver.Semver()) {
-				v = ver
-			}
-			break
+		if c.Name == dsName {
+			return ParseVersionFromImage(c.Image)
 		}
 	}
-	if v == nil {
-		return nil, fmt.Errorf("unable to get current version for Pod %s", pod.Name)
-	}
-	return v, nil
+	return nil, fmt.Errorf("unable to get current version for Pod %s", pod.Name)
 }
