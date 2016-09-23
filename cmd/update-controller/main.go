@@ -12,7 +12,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -28,17 +27,16 @@ func main() {
 	if err != nil {
 		glog.Fatal(err)
 	}
-	c := clientset.NewForConfigOrDie(config)
 	uc, err := client.New(config)
 	if err != nil {
 		glog.Fatal(err)
 	}
-	run(c, uc)
+	run(uc)
 }
 
-func run(c clientset.Interface, uc client.Interface) {
+func run(uc client.Interface) {
 	glog.Info("update controller running")
-	cu, err := cluster.NewClusterUpdater(c, uc)
+	cu, err := cluster.NewClusterUpdater(uc)
 	if err != nil {
 		glog.Error(err)
 		return
@@ -80,13 +78,13 @@ func run(c clientset.Interface, uc client.Interface) {
 	_, configMapController := framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(lo api.ListOptions) (runtime.Object, error) {
-				return c.Core().ConfigMaps(api.NamespaceSystem).List(opts)
+				return uc.ConfigMaps(api.NamespaceSystem).List(opts)
 			},
 			WatchFunc: func(lo api.ListOptions) (watch.Interface, error) {
-				return c.Core().ConfigMaps(api.NamespaceSystem).Watch(opts)
+				return uc.ConfigMaps(api.NamespaceSystem).Watch(opts)
 			},
 		},
-		&v1.ConfigMap{},
+		&api.ConfigMap{},
 		30*time.Second,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    addCallback,

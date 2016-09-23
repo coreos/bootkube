@@ -8,7 +8,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	"k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -16,14 +16,14 @@ import (
 // annotations which are then handled by the node-agent.
 type NodeUpdater struct {
 	// client is an API Server client.
-	client clientset.Interface
+	client unversioned.Interface
 	// nodeStore is cache of node backed by an informer.
 	nodes cache.StoreToNodeLister
 	// node is the node this updater is responsible for.
 	node *api.Node
 }
 
-func NewNodeUpdater(client clientset.Interface, node *api.Node, nodes cache.StoreToNodeLister) (*NodeUpdater, error) {
+func NewNodeUpdater(client unversioned.Interface, node *api.Node, nodes cache.StoreToNodeLister) (*NodeUpdater, error) {
 	return &NodeUpdater{
 		client: client,
 		nodes:  nodes,
@@ -64,7 +64,7 @@ func (nu *NodeUpdater) Version() (*Version, error) {
 
 // UpdateToVersion will update the Node to the given version.
 func (nu *NodeUpdater) UpdateToVersion(v *Version) (bool, error) {
-	n, err := nu.client.Core().Nodes().Get(nu.Name())
+	n, err := nu.client.Nodes().Get(nu.Name())
 	if err != nil {
 		return false, err
 	}
@@ -77,7 +77,7 @@ func (nu *NodeUpdater) UpdateToVersion(v *Version) (bool, error) {
 		return false, nil
 	}
 	n.Annotations[node.DesiredVersionAnnotation] = v.image.String()
-	_, err = nu.client.Core().Nodes().Update(n)
+	_, err = nu.client.Nodes().Update(n)
 	if err != nil {
 		return false, err
 	}

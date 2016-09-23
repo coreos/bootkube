@@ -10,7 +10,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	unversionedclient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/deployment"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -22,7 +22,7 @@ type DaemonSetUpdater struct {
 	// name of the DaemonSet object.
 	name string
 	// client is an API Server client.
-	client clientset.Interface
+	client unversionedclient.Interface
 	// pods is backed by an informer, contains list of Pods
 	// that belong to the DaemonSet.
 	pods StoreToPodLister
@@ -62,7 +62,7 @@ func (s *StoreToPodLister) Exists(pod *api.Pod) (bool, error) {
 	return exists, nil
 }
 
-func NewDaemonSetUpdater(client clientset.Interface, ds *extensions.DaemonSet, daemonsets cache.StoreToDaemonSetLister, pods StoreToPodLister) (*DaemonSetUpdater, error) {
+func NewDaemonSetUpdater(client unversionedclient.Interface, ds *extensions.DaemonSet, daemonsets cache.StoreToDaemonSetLister, pods StoreToPodLister) (*DaemonSetUpdater, error) {
 	selector, err := unversioned.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		return nil, err
@@ -162,7 +162,7 @@ func (dsu *DaemonSetUpdater) UpdateToVersion(v *Version) (bool, error) {
 		updated = true
 		// Delete old DS Pod.
 		glog.Infof("Deleting pod %s", p.Name)
-		err = dsu.client.Core().Pods(api.NamespaceSystem).Delete(p.Name, nil)
+		err = dsu.client.Pods(api.NamespaceSystem).Delete(p.Name, nil)
 		if err != nil {
 			return false, err
 		}

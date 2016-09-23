@@ -12,7 +12,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
 	"k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
@@ -33,15 +32,12 @@ const (
 	clusterManagedLabel = "update-controller-managed=true"
 )
 
-type ComponentsGetterFn func(clientset.Interface, unversioned.Interface, cache.StoreToDaemonSetLister, cache.StoreToDeploymentLister, components.StoreToPodLister, cache.StoreToNodeLister) ([]Component, error)
+type ComponentsGetterFn func(unversioned.Interface, cache.StoreToDaemonSetLister, cache.StoreToDeploymentLister, components.StoreToPodLister, cache.StoreToNodeLister) ([]Component, error)
 
 // UpdateController is responsible for safely updating an entire cluster.
 type UpdateController struct {
-	// Client is a generic API server client.
-	Client clientset.Interface
-	// UnversionedClient is another client, useful for events and
-	// not having to do conversions in certain places.
-	UnversionedClient unversioned.Interface
+	// Client is an API Server client.
+	Client unversioned.Interface
 	// AllNonNodeManagedComponentsFn is a function that should return
 	// a list of every non-Node component the update controller is managing.
 	GetAllManagedComponentsFn ComponentsGetterFn
@@ -74,7 +70,7 @@ type Component interface {
 }
 
 // NewClusterUpdater returns a ClusterUpdater struct with defaults.
-func NewClusterUpdater(client clientset.Interface, uc unversioned.Interface) (*UpdateController, error) {
+func NewClusterUpdater(uc unversioned.Interface) (*UpdateController, error) {
 	l, err := labels.Parse(clusterManagedLabel)
 	if err != nil {
 		return nil, err
@@ -139,8 +135,7 @@ func NewClusterUpdater(client clientset.Interface, uc unversioned.Interface) (*U
 	go podController.Run(wait.NeverStop)
 
 	return &UpdateController{
-		Client:                    client,
-		UnversionedClient:         uc,
+		Client: uc,
 		GetAllManagedComponentsFn: DefaultGetAllManagedComponentsFn,
 		nodes:       cache.StoreToNodeLister{nodeStore},
 		deployments: cache.StoreToDeploymentLister{deploymentStore},
@@ -153,7 +148,6 @@ func NewClusterUpdater(client clientset.Interface, uc unversioned.Interface) (*U
 func (cu *UpdateController) UpdateToVersion(v *components.Version) error {
 	comps, err := cu.GetAllManagedComponentsFn(
 		cu.Client,
-		cu.UnversionedClient,
 		cu.daemonSets,
 		cu.deployments,
 		cu.pods,
@@ -189,8 +183,7 @@ func (cu *UpdateController) UpdateToVersion(v *components.Version) error {
 	return nil
 }
 
-func DefaultGetAllManagedComponentsFn(client clientset.Interface,
-	uc unversioned.Interface,
+func DefaultGetAllManagedComponentsFn(uc unversioned.Interface,
 	daemonsets cache.StoreToDaemonSetLister,
 	deployments cache.StoreToDeploymentLister,
 	pods components.StoreToPodLister,
@@ -203,7 +196,7 @@ func DefaultGetAllManagedComponentsFn(client clientset.Interface,
 		return nil, err
 	}
 	for _, ds := range dsl.Items {
-		dsu, err := components.NewDaemonSetUpdater(client, &ds, daemonsets, pods)
+		dsu, err := components.NewDaemonSetUpdater(uc, &ds, daemonsets, pods)
 		if err != nil {
 			return nil, err
 		}
@@ -215,7 +208,7 @@ func DefaultGetAllManagedComponentsFn(client clientset.Interface,
 		return nil, err
 	}
 	for _, dp := range dpls {
-		du, err := components.NewDeploymentUpdater(client, uc, &dp)
+		du, err := components.NewDeploymentUpdater(uc, &dp)
 		if err != nil {
 			return nil, err
 		}
@@ -227,7 +220,7 @@ func DefaultGetAllManagedComponentsFn(client clientset.Interface,
 		return nil, err
 	}
 	for _, n := range nl.Items {
-		nu, err := components.NewNodeUpdater(client, &n, nodes)
+		nu, err := components.NewNodeUpdater(uc, &n, nodes)
 		if err != nil {
 			return nil, err
 		}
