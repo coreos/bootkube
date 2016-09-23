@@ -98,8 +98,7 @@ func run(c clientset.Interface, uc client.Interface) {
 	r := b.NewRecorder(api.EventSource{
 		Component: "cluster-updater",
 	})
-	stopChan := make(chan struct{})
-	lec := leaderelection.LeaderElectionConfig{
+	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
 		EndpointsMeta: api.ObjectMeta{
 			Namespace: "kube-system",
 			Name:      "kube-update-controller",
@@ -113,18 +112,13 @@ func run(c clientset.Interface, uc client.Interface) {
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(stop <-chan struct{}) {
 				glog.Info("started leading: running update controller")
-				go configMapController.Run(stopChan)
+				go configMapController.Run(stop)
 			},
 			OnStoppedLeading: func() {
-				glog.Info("stopped leading: pausing update controller")
-				stopChan <- struct{}{}
+				glog.Fatal("stopped leading: pausing update controller")
 			},
 		},
-	}
-
-	for {
-		leaderelection.RunOrDie(lec)
-	}
+	})
 }
 
 func parseNewVersion(config *v1.ConfigMap) (*components.Version, error) {
