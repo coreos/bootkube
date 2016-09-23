@@ -7,8 +7,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	"k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/deployment"
 )
 
@@ -17,12 +17,14 @@ type DeploymentUpdater struct {
 	// name of the Deployment object.
 	name string
 	// client is an API Server client.
-	client clientset.Interface
+	client            clientset.Interface
+	unversionedclient unversioned.Interface
+
 	// priority is the priority to update this Deployment.
 	priority int
 }
 
-func NewDeploymentUpdater(client clientset.Interface, dep *extensions.Deployment) (*DeploymentUpdater, error) {
+func NewDeploymentUpdater(client clientset.Interface, unversionedclient unversioned.Interface, dep *extensions.Deployment) (*DeploymentUpdater, error) {
 	if dep.Annotations == nil {
 		return nil, noAnnotationError("Deployment", dep.Name)
 	}
@@ -35,9 +37,10 @@ func NewDeploymentUpdater(client clientset.Interface, dep *extensions.Deployment
 		return nil, err
 	}
 	return &DeploymentUpdater{
-		name:     dep.Name,
-		client:   client,
-		priority: priority,
+		name:              dep.Name,
+		client:            client,
+		unversionedclient: unversionedclient,
+		priority:          priority,
 	}, nil
 }
 
@@ -100,13 +103,7 @@ func (du *DeploymentUpdater) UpdateToVersion(v *Version) (bool, error) {
 	}
 
 	err = deployment.WaitForObservedDeployment(func() (*extensions.Deployment, error) {
-		dp, err := du.client.Extensions().Deployments(api.NamespaceSystem).Get(du.Name())
-		if err != nil {
-			return nil, err
-		}
-		var out extensions.Deployment
-		v1beta1.Convert_v1beta1_Deployment_To_extensions_Deployment(dp, &out, nil)
-		return &out, nil
+		return du.unversionedclient.Extensions().Deployments(api.NamespaceSystem).Get(du.Name())
 	}, oldGeneration+1, time.Second, 10*time.Minute)
 	if err != nil {
 		return false, err

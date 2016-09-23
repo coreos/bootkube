@@ -99,7 +99,7 @@ func run(c clientset.Interface, uc client.Interface) {
 		Component: "cluster-updater",
 	})
 	stopChan := make(chan struct{})
-	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+	lec := leaderelection.LeaderElectionConfig{
 		EndpointsMeta: api.ObjectMeta{
 			Namespace: "kube-system",
 			Name:      "kube-update-controller",
@@ -120,7 +120,11 @@ func run(c clientset.Interface, uc client.Interface) {
 				stopChan <- struct{}{}
 			},
 		},
-	})
+	}
+
+	for {
+		leaderelection.RunOrDie(lec)
+	}
 }
 
 func parseNewVersion(config *v1.ConfigMap) (*components.Version, error) {

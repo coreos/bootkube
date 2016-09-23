@@ -33,12 +33,15 @@ const (
 	clusterManagedLabel = "update-controller-managed=true"
 )
 
-type ComponentsGetterFn func(clientset.Interface, cache.StoreToDaemonSetLister, cache.StoreToDeploymentLister, components.StoreToPodLister, cache.StoreToNodeLister) ([]Component, error)
+type ComponentsGetterFn func(clientset.Interface, unversioned.Interface, cache.StoreToDaemonSetLister, cache.StoreToDeploymentLister, components.StoreToPodLister, cache.StoreToNodeLister) ([]Component, error)
 
 // UpdateController is responsible for safely updating an entire cluster.
 type UpdateController struct {
 	// Client is a generic API server client.
 	Client clientset.Interface
+	// UnversionedClient is another client, useful for events and
+	// not having to do conversions in certain places.
+	UnversionedClient unversioned.Interface
 	// AllNonNodeManagedComponentsFn is a function that should return
 	// a list of every non-Node component the update controller is managing.
 	GetAllManagedComponentsFn ComponentsGetterFn
@@ -136,7 +139,8 @@ func NewClusterUpdater(client clientset.Interface, uc unversioned.Interface) (*U
 	go podController.Run(wait.NeverStop)
 
 	return &UpdateController{
-		Client: client,
+		Client:                    client,
+		UnversionedClient:         uc,
 		GetAllManagedComponentsFn: DefaultGetAllManagedComponentsFn,
 		nodes:       cache.StoreToNodeLister{nodeStore},
 		deployments: cache.StoreToDeploymentLister{deploymentStore},
@@ -149,6 +153,7 @@ func NewClusterUpdater(client clientset.Interface, uc unversioned.Interface) (*U
 func (cu *UpdateController) UpdateToVersion(v *components.Version) error {
 	comps, err := cu.GetAllManagedComponentsFn(
 		cu.Client,
+		cu.UnversionedClient,
 		cu.daemonSets,
 		cu.deployments,
 		cu.pods,
@@ -185,6 +190,7 @@ func (cu *UpdateController) UpdateToVersion(v *components.Version) error {
 }
 
 func DefaultGetAllManagedComponentsFn(client clientset.Interface,
+	uc unversioned.Interface,
 	daemonsets cache.StoreToDaemonSetLister,
 	deployments cache.StoreToDeploymentLister,
 	pods components.StoreToPodLister,
@@ -209,7 +215,7 @@ func DefaultGetAllManagedComponentsFn(client clientset.Interface,
 		return nil, err
 	}
 	for _, dp := range dpls {
-		du, err := components.NewDeploymentUpdater(client, &dp)
+		du, err := components.NewDeploymentUpdater(client, uc, &dp)
 		if err != nil {
 			return nil, err
 		}

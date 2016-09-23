@@ -170,7 +170,7 @@ func (dsu *DaemonSetUpdater) UpdateToVersion(v *Version) (bool, error) {
 
 		// Wait for all pods to be available before moving on.
 		err = wait.Poll(time.Second, 2*time.Minute, func() (bool, error) {
-			glog.Infof("checking new pod availability for DS: %s", dsu.Name)
+			glog.Infof("checking new pod availability for DS: %s", dsu.Name())
 
 			// Make sure the pod we deleted above is removed from the cache.
 			exists, err := dsu.pods.Exists(p)
@@ -184,6 +184,7 @@ func (dsu *DaemonSetUpdater) UpdateToVersion(v *Version) (bool, error) {
 			}
 
 			if dsu.numberOfDesiredPods() == len(pl) && dsu.allPodsAvailable() {
+				glog.Info("Pod ready, moving on")
 				return true, nil
 			}
 
