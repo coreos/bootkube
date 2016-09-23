@@ -12,6 +12,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -31,12 +32,13 @@ func main() {
 	if err != nil {
 		glog.Fatal(err)
 	}
-	run(uc)
+	internalclient := internalclientset.NewForConfigOrDie(config)
+	run(uc, internalclient)
 }
 
-func run(uc client.Interface) {
+func run(uc client.Interface, internalclient internalclientset.Interface) {
 	glog.Info("update controller running")
-	cu, err := cluster.NewClusterUpdater(uc)
+	cu, err := cluster.NewClusterUpdater(uc, internalclient)
 	if err != nil {
 		glog.Error(err)
 		return

@@ -7,8 +7,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/deployment"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // DeploymentUpdater is responsible for updating a Deployment.
@@ -16,13 +18,14 @@ type DeploymentUpdater struct {
 	// name of the Deployment object.
 	name string
 	// client is an API Server client.
-	client unversioned.Interface
+	client         unversioned.Interface
+	internalclient internalclientset.Interface
 
 	// priority is the priority to update this Deployment.
 	priority int
 }
 
-func NewDeploymentUpdater(client unversioned.Interface, dep *extensions.Deployment) (*DeploymentUpdater, error) {
+func NewDeploymentUpdater(client unversioned.Interface, internalclient internalclientset.Interface, dep *extensions.Deployment) (*DeploymentUpdater, error) {
 	if dep.Annotations == nil {
 		return nil, noAnnotationError("Deployment", dep.Name)
 	}
@@ -35,9 +38,10 @@ func NewDeploymentUpdater(client unversioned.Interface, dep *extensions.Deployme
 		return nil, err
 	}
 	return &DeploymentUpdater{
-		name:     dep.Name,
-		client:   client,
-		priority: priority,
+		name:           dep.Name,
+		client:         client,
+		internalclient: internalclient,
+		priority:       priority,
 	}, nil
 }
 
@@ -92,16 +96,29 @@ func (du *DeploymentUpdater) UpdateToVersion(v *Version) (bool, error) {
 			break
 		}
 	}
-	oldGeneration := dep.Status.ObservedGeneration
 	// Update the deployment, which will trigger an update.
-	_, err = du.client.Extensions().Deployments(api.NamespaceSystem).Update(dep)
+	updatedDep, err := du.client.Extensions().Deployments(api.NamespaceSystem).Update(dep)
 	if err != nil {
 		return false, err
 	}
-
-	err = deployment.WaitForObservedDeployment(func() (*extensions.Deployment, error) {
-		return du.client.Extensions().Deployments(api.NamespaceSystem).Get(du.Name())
-	}, oldGeneration+1, time.Second, 10*time.Minute)
+	var newRS *extensions.ReplicaSet
+	err = wait.Poll(time.Second, 2*time.Minute, func() (bool, error) {
+		newRS, err = deployment.GetNewReplicaSet(updatedDep, du.internalclient)
+		if err != nil {
+			return false, err
+		}
+		return newRS != nil, nil
+	})
+	if err != nil {
+		return false, err
+	}
+	err = wait.Poll(time.Second, 5*time.Minute, func() (bool, error) {
+		count, err := deployment.GetAvailablePodsForReplicaSets(du.internalclient, updatedDep, []*extensions.ReplicaSet{newRS}, 5)
+		if err != nil {
+			return false, err
+		}
+		return count == newRS.Spec.Replicas, nil
+	})
 	if err != nil {
 		return false, err
 	}
