@@ -10,7 +10,6 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
@@ -43,7 +42,7 @@ func run(uc client.Interface, internalclient internalclientset.Interface) {
 		glog.Error(err)
 		return
 	}
-	handleConfigChange := func(newConfigMap *v1.ConfigMap) {
+	handleConfigChange := func(newConfigMap *api.ConfigMap) {
 		newVersion, err := parseNewVersion(newConfigMap)
 		if err != nil {
 			glog.Error(err)
@@ -55,7 +54,7 @@ func run(uc client.Interface, internalclient internalclientset.Interface) {
 	}
 	updateCallback := func(_, newObj interface{}) {
 		glog.Info("begin update callback")
-		newConfigMap, ok := newObj.(*v1.ConfigMap)
+		newConfigMap, ok := newObj.(*api.ConfigMap)
 		if !ok {
 			glog.Infof("Wrong type for update callback, expected *v1.ConfigMap, got: %T", newObj)
 			return
@@ -64,7 +63,7 @@ func run(uc client.Interface, internalclient internalclientset.Interface) {
 	}
 	addCallback := func(obj interface{}) {
 		glog.Info("begin add callback")
-		newConfigMap, ok := obj.(*v1.ConfigMap)
+		newConfigMap, ok := obj.(*api.ConfigMap)
 		if !ok {
 			glog.Infof("Wrong type for add callback, expected *v1.ConfigMap, got: %T", obj)
 			return
@@ -121,7 +120,7 @@ func run(uc client.Interface, internalclient internalclientset.Interface) {
 	})
 }
 
-func parseNewVersion(config *v1.ConfigMap) (*components.Version, error) {
+func parseNewVersion(config *api.ConfigMap) (*components.Version, error) {
 	version := config.Data[cluster.ClusterVersionKey]
 	return components.ParseVersionFromImage(version)
 }
