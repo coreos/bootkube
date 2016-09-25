@@ -1,0 +1,32 @@
+[Unit]
+Requires=docker.service etcd2.service flanneld.service
+After=docker.service etcd2.service flanneld.service
+
+[Service]
+Environment=KUBELET_ACI=quay.io/coreos/hyperkube
+Environment=KUBELET_VERSION=v1.3.6_coreos.0
+Environment="RKT_OPTS=--volume etc-resolv,kind=host,source=/etc/resolv.conf --mount volume=etc-resolv,target=/etc/resolv.conf"
+EnvironmentFile=/etc/environment
+EnvironmentFile=-{{COREOS_ENV_FILE}}
+
+ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests
+ExecStartPre=/bin/mkdir -p /srv/kubernetes/manifests
+ExecStartPre=/bin/mkdir -p /etc/kubernetes/checkpoint-secrets
+ExecStart=/usr/lib/coreos/kubelet-wrapper \
+  --api-servers=https://${COREOS_PRIVATE_IPV4}:443 \
+  --kubeconfig=/etc/kubernetes/kubeconfig \
+  --lock-file=/var/run/lock/kubelet.lock \
+  --exit-on-lock-contention \
+  --allow-privileged \
+  --hostname-override=${COREOS_PRIVATE_IPV4} \
+  --node-labels=master=true \
+  --minimum-container-ttl-duration=3m0s \
+  --cluster_dns=10.3.0.10 \
+  --cluster_domain=cluster.local \
+  --config=/etc/kubernetes/manifests
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
