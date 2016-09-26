@@ -73,10 +73,10 @@ func (nu *NodeUpdater) UpdateToVersion(v *Version) (bool, error) {
 	if n.Annotations == nil {
 		n.Annotations = make(map[string]string)
 	}
-	if n.Annotations[node.CurrentVersionAnnotation] == v.image.String() {
+	if n.Annotations[node.CurrentVersionAnnotation] == v.image.Tag() {
 		return false, nil
 	}
-	n.Annotations[node.DesiredVersionAnnotation] = v.image.String()
+	n.Annotations[node.DesiredVersionAnnotation] = v.image.Tag()
 	_, err = nu.client.Nodes().Update(n)
 	if err != nil {
 		return false, err
