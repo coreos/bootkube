@@ -48,6 +48,7 @@ type Config struct {
 	AltNames        *tlsutil.AltNames
 	SelfHostKubelet bool
 	StorageBackend  string
+	CloudProvider   string
 }
 
 // NewDefaultAssets returns a list of default assets, optionally

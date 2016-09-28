@@ -35,6 +35,7 @@ var (
 		altNames          string
 		selfHostKubelet   bool
 		storageBackend    string
+		cloudProvider     string
 	}
 )
 
@@ -48,6 +49,7 @@ func init() {
 	cmdRender.Flags().StringVar(&renderOpts.apiServers, "api-servers", "https://127.0.0.1:443", "List of API server URLs including host:port, commma seprated")
 	cmdRender.Flags().StringVar(&renderOpts.altNames, "api-server-alt-names", "", "List of SANs to use in api-server certificate. Example: 'IP=127.0.0.1,IP=127.0.0.2,DNS=localhost'. If empty, SANs will be extracted from the --api-servers flag.")
 	cmdRender.Flags().BoolVar(&renderOpts.selfHostKubelet, "self-host-kubelet", false, "Create a self-hosted kubelet daemonset.")
+	cmdRender.Flags().StringVar(&renderOpts.cloudProvider, "cloud-provider", "", "The provider for cloud services.  Empty string for no provider")
 }
 
 func runCmdRender(cmd *cobra.Command, args []string) error {
@@ -117,6 +119,7 @@ func flagsToAssetConfig() (c *asset.Config, err error) {
 		AltNames:        altNames,
 		SelfHostKubelet: renderOpts.selfHostKubelet,
 		StorageBackend:  renderOpts.storageBackend,
+		CloudProvider:   renderOpts.cloudProvider,
 	}, nil
 }
 

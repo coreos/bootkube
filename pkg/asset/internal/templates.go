@@ -142,6 +142,7 @@ spec:
         - --tls-private-key-file=/etc/kubernetes/secrets/apiserver.key
         - --service-account-key-file=/etc/kubernetes/secrets/service-account.pub
         - --client-ca-file=/etc/kubernetes/secrets/ca.crt
+        - --cloud-provider={{ .CloudProvider  }}
         env:
           - name: MY_POD_IP
             valueFrom:
@@ -214,6 +215,8 @@ spec:
         - --root-ca-file=/etc/kubernetes/secrets/ca.crt
         - --service-account-private-key-file=/etc/kubernetes/secrets/service-account.key
         - --leader-elect=true
+        - --cloud-provider={{ .CloudProvider  }}
+        - --configure-cloud-routes=false
         volumeMounts:
         - name: secrets
           mountPath: /etc/kubernetes/secrets
@@ -228,6 +231,7 @@ spec:
       - name: ssl-host
         hostPath:
           path: /usr/share/ca-certificates
+      dnsPolicy: Default # Don't use cluster DNS.
 `)
 	SchedulerTemplate = []byte(`apiVersion: extensions/v1beta1
 kind: Deployment
