@@ -33,7 +33,6 @@ const (
 	AssetPathKubeDNSDeployment       = "manifests/kube-dns-deployment.yaml"
 	AssetPathKubeDNSSvc              = "manifests/kube-dns-svc.yaml"
 	AssetPathSystemNamespace         = "manifests/kube-system-ns.yaml"
-	AssetPathUpdateController        = "manifests/update-controller.yaml"
 )
 
 // AssetConfig holds all configuration needed when generating
