@@ -5,25 +5,45 @@ import (
 	"os"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api"
+
+	"github.com/kubernetes-incubator/bootkube/pkg/cluster/components/version"
 )
 
 func TestConfigHasChanged(t *testing.T) {
+	v1, err := version.ParseFromImageString("foo.io/bar/baz:v1.0.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	v2, err := version.ParseFromImageString("foo.io/bar/baz:v1.2.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	v3, err := version.ParseFromImageString("foo.io/bur/baz:v1.0.0")
+	if err != nil {
+		t.Fatal(err)
+	}
 	testcases := []struct {
-		current  string
-		desired  string
+		current  map[string]string
+		desired  *version.Version
 		expected bool
 		desc     string
 	}{
 		{ // Nothing has changed.
-			current:  "version1",
-			desired:  "version1",
+			current:  map[string]string{KubeletImageKey: "foo.io/bar/baz", KubeletVersionKey: "v1.0.0"},
+			desired:  v1,
 			expected: false,
 			desc:     "nothing changed",
 		},
-		{ // Version has changed.
-			current:  "version1",
-			desired:  "version2",
+		{ // Version tag has changed.
+			current:  map[string]string{KubeletImageKey: "foo.io/bar/baz", KubeletVersionKey: "v1.0.0"},
+			desired:  v2,
+			expected: true,
+			desc:     "version changed",
+		},
+		{ // Version repo has changed.
+			current:  map[string]string{KubeletImageKey: "foo.io/bar/baz", KubeletVersionKey: "v1.0.0"},
+			desired:  v3,
 			expected: true,
 			desc:     "version changed",
 		},
@@ -54,29 +74,47 @@ func (f *fakeDbusConn) RestartUnit(name string, action string, ch chan<- string)
 }
 
 func TestHandleConfigUpdate(t *testing.T) {
+	v1, err := version.ParseFromImageString("foo.io/bar/baz:v1.0.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	v2, err := version.ParseFromImageString("foo.io/bar/baz:v1.2.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	v3, err := version.ParseFromImageString("foo.io/bur/baz:v1.0.0")
+	if err != nil {
+		t.Fatal(err)
+	}
 	testcases := []struct {
 		onDiskConfig         map[string]string
-		desiredVersion       string
+		desiredVersion       *version.Version
 		expectedOnDiskConfig map[string]string
 		shouldRestartUnit    bool
 	}{
 		{ // Nothing changed
-			onDiskConfig:         map[string]string{KubeletVersionKey: "test1-version1"},
-			expectedOnDiskConfig: map[string]string{KubeletVersionKey: "test1-version1"},
-			desiredVersion:       "test1-version1",
+			onDiskConfig:         map[string]string{KubeletImageKey: "foo.io/bar/baz", KubeletVersionKey: "v1.0.0"},
+			expectedOnDiskConfig: map[string]string{KubeletImageKey: "foo.io/bar/baz", KubeletVersionKey: "v1.0.0"},
+			desiredVersion:       v1,
 			shouldRestartUnit:    false,
 		},
-		{ // Version changed
-			onDiskConfig:         map[string]string{KubeletVersionKey: "test2-version1"},
-			desiredVersion:       "test2-version2",
-			expectedOnDiskConfig: map[string]string{KubeletVersionKey: "test2-version2"},
+		{ // Version tag changed
+			onDiskConfig:         map[string]string{KubeletImageKey: "foo.io/bar/baz", KubeletVersionKey: "v1.0.0"},
+			desiredVersion:       v2,
+			expectedOnDiskConfig: map[string]string{KubeletImageKey: "foo.io/bar/baz", KubeletVersionKey: "v1.2.0"},
+			shouldRestartUnit:    true,
+		},
+		{ // Version repo changed
+			onDiskConfig:         map[string]string{KubeletImageKey: "foo.io/bar/baz", KubeletVersionKey: "v1.0.0"},
+			desiredVersion:       v3,
+			expectedOnDiskConfig: map[string]string{KubeletImageKey: "foo.io/bur/baz", KubeletVersionKey: "v1.0.0"},
 			shouldRestartUnit:    true,
 		},
 	}
 	for _, tc := range testcases {
-		var node v1.Node
+		var node api.Node
 		node.Annotations = make(map[string]string)
-		node.Annotations[DesiredVersionAnnotation] = tc.desiredVersion
+		node.Annotations[DesiredVersionAnnotation] = tc.desiredVersion.ImageString()
 
 		tmpf, err := ioutil.TempFile("", "node-agent-test")
 		if err != nil {

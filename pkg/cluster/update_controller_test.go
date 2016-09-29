@@ -8,20 +8,14 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned"
 
 	"github.com/kubernetes-incubator/bootkube/pkg/cluster/components"
+	"github.com/kubernetes-incubator/bootkube/pkg/cluster/components/version"
 )
-
-// type Component interface {
-// 	Name() string
-// 	UpdateToVersion(*components.Version) error
-// 	Priority() int
-// 	Version() (*components.Version, error)
-// }
 
 type fakeComponent struct {
 	name             string
 	priority         int
-	requestedVersion *components.Version
-	currentVersion   *components.Version
+	requestedVersion *version.Version
+	currentVersion   *version.Version
 	shouldUpdate     bool
 }
 
@@ -29,7 +23,7 @@ func (fk *fakeComponent) Name() string {
 	return fk.name
 }
 
-func (fk *fakeComponent) UpdateToVersion(v *components.Version) (bool, error) {
+func (fk *fakeComponent) UpdateToVersion(v *version.Version) (bool, error) {
 	fk.requestedVersion = v
 	return fk.shouldUpdate, nil
 }
@@ -38,12 +32,12 @@ func (fk *fakeComponent) Priority() int {
 	return fk.priority
 }
 
-func (fk *fakeComponent) Version() (*components.Version, error) {
+func (fk *fakeComponent) Version() (*version.Version, error) {
 	return fk.currentVersion, nil
 }
 
 func newFakeComponent(name string, priority int, versionString string, shouldUpdate bool, t *testing.T) *fakeComponent {
-	ver, err := components.ParseVersionFromImage(versionString)
+	ver, err := version.ParseFromImageString(versionString)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +85,7 @@ func TestComponentOrdering(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Log(tc.desc)
-		desiredVer, err := components.ParseVersionFromImage(tc.desiredVersionString)
+		desiredVer, err := version.ParseFromImageString(tc.desiredVersionString)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -137,11 +131,11 @@ func TestExitAfterComponentUpdate(t *testing.T) {
 	uc := &UpdateController{
 		GetAllManagedComponentsFn: newFakeComponentFn(nonNodeComps),
 	}
-	newVersion, err := components.ParseVersionFromImage("v2.0.0")
+	newVersion, err := version.ParseFromImageString("v2.0.0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = uc.UpdateToVersion(newVersion)
+	_, err = uc.UpdateToVersion(newVersion)
 	if err != nil {
 		t.Fatal(err)
 	}
