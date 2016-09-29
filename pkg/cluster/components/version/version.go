@@ -1,4 +1,4 @@
-package components
+package version
 
 import (
 	"fmt"
@@ -9,9 +9,9 @@ import (
 	"github.com/blang/semver"
 )
 
-const updatePriorityAnnotation = "update-controller.alpha.coreos.com/priority"
+const UpdatePriorityAnnotation = "update-controller.alpha.coreos.com/priority"
 
-func noAnnotationError(component, name string) error {
+func NoAnnotationError(component, name string) error {
 	return fmt.Errorf("no priority annotation for %s %s", component, name)
 }
 
@@ -25,7 +25,7 @@ type Version struct {
 	image *ContainerImage
 }
 
-func ParseVersionFromImage(image string) (*Version, error) {
+func ParseFromImageString(image string) (*Version, error) {
 	var repo, tag string
 	ver := image
 	if strings.Contains(image, ":") {
@@ -49,6 +49,21 @@ func ParseVersionFromImage(image string) (*Version, error) {
 // Semver returns a Semver object for version comparisons.
 func (v *Version) Semver() semver.Version {
 	return v.semver
+}
+
+// Repo returns the Container Image repo.
+func (v *Version) Repo() string {
+	return v.image.repo
+}
+
+// Tag returns the Container Image tag.
+func (v *Version) Tag() string {
+	return v.image.tag
+}
+
+// ImageString returns the container image string.
+func (v *Version) ImageString() string {
+	return v.image.String()
 }
 
 // ContainerImage describes a container image. It holds

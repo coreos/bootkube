@@ -7,8 +7,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kubernetes-incubator/bootkube/pkg/atomic"
 	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/bootkube/pkg/atomic"
+	"github.com/kubernetes-incubator/bootkube/pkg/cluster/components/version"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
 )
@@ -41,6 +42,8 @@ const (
 	CurrentVersionAnnotation = "node-agent.alpha.coreos.com/current-kubelet-version"
 	// KubeletVersionKey is the key used to lookup the kubelet version.
 	KubeletVersionKey = "KUBELET_VERSION"
+	// KubeletImageKey is the key used to lookup the kubelet image.
+	KubeletImageKey = "KUBELET_ACI"
 
 	defaultKubeletEnvPath = "/etc/kubernetes/kubelet.env"
 	kubeletService        = "kubelet.service"
@@ -66,13 +69,12 @@ func (a *Agent) NodeUpdateCallback(_, newObj interface{}) {
 		glog.Errorf("error parsing on-host kubelet env file: %v", err)
 		return
 	}
-	currentVersion := onDiskConfig[KubeletVersionKey]
 	desiredVersion, err := getDesiredVersion(node)
 	if err != nil {
 		glog.Error(err)
 	}
 	// Check desired config against the on disk config.
-	if configHasChanged(currentVersion, desiredVersion) {
+	if configHasChanged(onDiskConfig, desiredVersion) {
 		err = a.handleConfigUpdate(onDiskConfig, desiredVersion, defaultKubeletEnvPath)
 		if err != nil {
 			glog.Error(err)
@@ -84,9 +86,9 @@ func (a *Agent) NodeUpdateCallback(_, newObj interface{}) {
 	glog.Info("node update callback finished")
 }
 
-func (a *Agent) handleConfigUpdate(onDiskConfig map[string]string, desiredConfig string, kubeletEnvPath string) error {
+func (a *Agent) handleConfigUpdate(onDiskConfig map[string]string, desiredVersion *version.Version, kubeletEnvPath string) error {
 	// Update on disk config.
-	err := updateKubeletEnvFile(kubeletEnvPath, desiredConfig, onDiskConfig)
+	err := updateKubeletEnvFile(kubeletEnvPath, desiredVersion, onDiskConfig)
 	if err != nil {
 		return err
 	}
@@ -124,27 +126,33 @@ func (a *Agent) restartKubeletService() error {
 	return nil
 }
 
-func getDesiredVersion(node *v1.Node) (string, error) {
+func getDesiredVersion(node *v1.Node) (*version.Version, error) {
 	dv, ok := node.Annotations[DesiredVersionAnnotation]
 	if !ok {
 		err := fmt.Errorf("no %s annotation found for node %s, ignoring", DesiredVersionAnnotation, node.Name)
-		return "", err
+		return nil, err
 	}
-	return dv, nil
+	return version.ParseFromImageString(dv)
 }
 
-func configHasChanged(currentVersion, desiredVersion string) bool {
-	return desiredVersion != "" &&
-		currentVersion != desiredVersion
+func configHasChanged(onDiskConfig map[string]string, desiredVersion *version.Version) bool {
+	if desiredVersion == nil {
+		return false
+	}
+	if onDiskConfig[KubeletImageKey] != desiredVersion.Repo() {
+		return true
+	}
+	return onDiskConfig[KubeletVersionKey] != desiredVersion.Tag()
 }
 
-func updateKubeletEnvFile(kubeletEnvPath string, version string, onDiskConfig map[string]string) error {
+func updateKubeletEnvFile(kubeletEnvPath string, version *version.Version, onDiskConfig map[string]string) error {
 	var buf bytes.Buffer
 	updatedConfig := make(map[string]string)
 	for k, v := range onDiskConfig {
 		updatedConfig[k] = v
 	}
-	updatedConfig[KubeletVersionKey] = version
+	updatedConfig[KubeletImageKey] = version.Repo()
+	updatedConfig[KubeletVersionKey] = version.Tag()
 	for k, v := range updatedConfig {
 		buf.WriteString(fmt.Sprintf("%s=%s\n", k, v))
 	}

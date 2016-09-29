@@ -119,7 +119,7 @@ metadata:
     k8s-app: kube-apiserver
     update-controller-managed: "true"
   annotations:
-    update-controller.alpha.coreos.com/priority: "1"
+    update-controller.alpha.coreos.com/priority: "25"
 spec:
   template:
     metadata:
@@ -186,7 +186,7 @@ metadata:
     k8s-app: kube-controller-manager
     update-controller-managed: "true"
   annotations:
-    update-controller.alpha.coreos.com/priority: "3"
+    update-controller.alpha.coreos.com/priority: "75"
 spec:
   template:
     metadata:
@@ -226,7 +226,7 @@ metadata:
     k8s-app: kube-scheduler
     update-controller-managed: "true"
   annotations:
-    update-controller.alpha.coreos.com/priority: "2"
+    update-controller.alpha.coreos.com/priority: "50"
 spec:
   template:
     metadata:
@@ -250,7 +250,7 @@ metadata:
     k8s-app: kube-proxy
     update-controller-managed: "true"
   annotations:
-    update-controller.alpha.coreos.com/priority: "4"
+    update-controller.alpha.coreos.com/priority: "100"
 spec:
   template:
     metadata:

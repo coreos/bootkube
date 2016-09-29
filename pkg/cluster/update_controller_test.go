@@ -4,9 +4,10 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/unversioned"
 
 	"github.com/kubernetes-incubator/bootkube/pkg/cluster/components"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
 )
 
 // type Component interface {
@@ -108,7 +109,8 @@ func TestComponentOrdering(t *testing.T) {
 }
 
 func newFakeComponentFn(comps []Component) ComponentsGetterFn {
-	return func(_ clientset.Interface,
+	return func(_ unversioned.Interface,
+		_ internalclientset.Interface,
 		_ cache.StoreToDaemonSetLister,
 		_ cache.StoreToDeploymentLister,
 		_ components.StoreToPodLister,

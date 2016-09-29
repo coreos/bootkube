@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+
 	"github.com/kubernetes-incubator/bootkube/pkg/cluster/components"
+	"github.com/kubernetes-incubator/bootkube/pkg/cluster/components/version"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -30,7 +32,9 @@ const (
 	ClusterVersionKey = "cluster.version"
 	// clusterMangedAnnotation is the annotation used to denote a managed component within
 	// the cluster.
-	clusterManagedLabel = "update-controller-managed=true"
+	clusterManagedLabel = "update-controller-managed"
+
+	informerResyncPeriod = 2 * time.Minute
 )
 
 type ComponentsGetterFn func(unversioned.Interface, internalclientset.Interface, cache.StoreToDaemonSetLister, cache.StoreToDeploymentLister, components.StoreToPodLister, cache.StoreToNodeLister) ([]Component, error)
@@ -45,6 +49,8 @@ type UpdateController struct {
 	// AllNonNodeManagedComponentsFn is a function that should return
 	// a list of every non-Node component the update controller is managing.
 	GetAllManagedComponentsFn ComponentsGetterFn
+
+	configmaps cache.Store
 
 	// These stores hold all of the managed components.
 	nodes       cache.StoreToNodeLister
@@ -66,15 +72,15 @@ type Component interface {
 	Name() string
 	// UpdateToVersion is the function used to update this component to the
 	// provided version.
-	UpdateToVersion(*components.Version) (bool, error)
+	UpdateToVersion(*version.Version) (bool, error)
 	// Priority is the priority level for this component.
 	Priority() int
 	// Version of the component.
-	Version() (*components.Version, error)
+	Version() (*version.Version, error)
 }
 
-// NewClusterUpdater returns a ClusterUpdater struct with defaults.
-func NewClusterUpdater(uc unversioned.Interface, internalclient internalclientset.Interface) (*UpdateController, error) {
+// NewUpdateController returns a UpdateController with defaults.
+func NewUpdateController(uc unversioned.Interface, internalclient internalclientset.Interface, configMapStore cache.Store) (*UpdateController, error) {
 	l, err := labels.Parse(clusterManagedLabel)
 	if err != nil {
 		return nil, err
@@ -90,7 +96,7 @@ func NewClusterUpdater(uc unversioned.Interface, internalclient internalclientse
 			},
 		},
 		&api.Node{},
-		30*time.Minute,
+		informerResyncPeriod,
 		framework.ResourceEventHandlerFuncs{},
 	)
 	daemonSetStore, daemonSetController := framework.NewInformer(
@@ -103,7 +109,7 @@ func NewClusterUpdater(uc unversioned.Interface, internalclient internalclientse
 			},
 		},
 		&extensions.DaemonSet{},
-		30*time.Minute,
+		informerResyncPeriod,
 		framework.ResourceEventHandlerFuncs{},
 	)
 	deploymentStore, deploymentController := framework.NewInformer(
@@ -116,7 +122,7 @@ func NewClusterUpdater(uc unversioned.Interface, internalclient internalclientse
 			},
 		},
 		&extensions.Deployment{},
-		30*time.Minute,
+		informerResyncPeriod,
 		framework.ResourceEventHandlerFuncs{},
 	)
 	podStore, podController := framework.NewInformer(
@@ -129,7 +135,7 @@ func NewClusterUpdater(uc unversioned.Interface, internalclient internalclientse
 			},
 		},
 		&api.Pod{},
-		30*time.Minute,
+		informerResyncPeriod,
 		framework.ResourceEventHandlerFuncs{},
 	)
 
@@ -142,51 +148,96 @@ func NewClusterUpdater(uc unversioned.Interface, internalclient internalclientse
 		Client:                    uc,
 		InternalClient:            internalclient,
 		GetAllManagedComponentsFn: DefaultGetAllManagedComponentsFn,
-		nodes:       cache.StoreToNodeLister{nodeStore},
-		deployments: cache.StoreToDeploymentLister{deploymentStore},
-		daemonSets:  cache.StoreToDaemonSetLister{daemonSetStore},
-		pods:        components.StoreToPodLister{podStore},
+		configmaps:                configMapStore,
+		nodes:                     cache.StoreToNodeLister{nodeStore},
+		deployments:               cache.StoreToDeploymentLister{deploymentStore},
+		daemonSets:                cache.StoreToDaemonSetLister{daemonSetStore},
+		pods:                      components.StoreToPodLister{podStore},
 	}, nil
 }
 
+func (uc *UpdateController) Run(stop <-chan struct{}) {
+	glog.Info("update-controller running")
+	for {
+		sleepDuration := time.Millisecond
+		select {
+		case <-stop:
+			glog.Info("update-controller stopping...")
+			return
+		default:
+			obj, exists, err := uc.configmaps.GetByKey(fmt.Sprintf("%s/%s", api.NamespaceSystem, ClusterConfigMapName))
+			if err != nil {
+				glog.Error(err)
+				sleepDuration = time.Second
+				break
+			}
+			if !exists {
+				sleepDuration = time.Second
+				break
+			}
+			cm, ok := obj.(*api.ConfigMap)
+			if !ok {
+				glog.Fatalf("Got unexpected type from ConfigMap store, expected *api.ConfigMap, got %T", obj)
+				sleepDuration = time.Second
+			}
+			newVersion, err := parseNewVersion(cm)
+			if err != nil {
+				glog.Error(err)
+				break
+			}
+			updated, err := uc.UpdateToVersion(newVersion)
+			if err != nil {
+				glog.Error(err)
+			}
+			if !updated {
+				// There was nothing to be done, sleep for a bit and check again.
+				sleepDuration = 30 * time.Second
+			}
+			time.Sleep(sleepDuration)
+		}
+	}
+}
+
 // UpdateToVersion will update the cluster to the given version.
-func (cu *UpdateController) UpdateToVersion(v *components.Version) error {
-	comps, err := cu.GetAllManagedComponentsFn(
-		cu.Client,
-		cu.InternalClient,
-		cu.daemonSets,
-		cu.deployments,
-		cu.pods,
-		cu.nodes,
+func (uc *UpdateController) UpdateToVersion(v *version.Version) (bool, error) {
+	comps, err := uc.GetAllManagedComponentsFn(
+		uc.Client,
+		uc.InternalClient,
+		uc.daemonSets,
+		uc.deployments,
+		uc.pods,
+		uc.nodes,
 	)
 	if err != nil {
-		return err
+		return false, err
 	}
+	// Get the highest cluster version, which allows us to determine
+	// whether we are updating or rolling back.
 	hv, err := highestClusterVersion(comps)
 	if err != nil {
-		return err
+		return false, err
 	}
+	// Get a sorted list of components we should update. Each component
+	// is sorted by priority corresponding to the desired version.
+	// For more info on the sorting logic, see the documentation on `sortComponentsByPriority`.
 	comps = sortComponentsByPriority(hv, v, comps)
 	for _, c := range comps {
 		glog.Infof("Begin update of component: %s", c.Name())
 		updated, err := c.UpdateToVersion(v)
 		if err != nil {
-			err = fmt.Errorf("Failed update of component: %s due to: %v", c.Name(), err)
-			glog.Error(err)
-			return err
+			return false, fmt.Errorf("Failed update of component: %s due to: %v", c.Name(), err)
 		}
-		glog.Infof("Finished update of componenet: %s", c.Name())
 		// Return once we've updated a component and then re-check the list the next
 		// time around. This ensures that we're always keeping every component at
 		// the correct version, even if they are updated out-of-band during the
 		// course of an upgrade.
 		if updated {
 			glog.Infof("Finished update of componenet: %s", c.Name())
-			return nil
+			return true, nil
 		}
-		glog.Info("Component %s already updated, moving on", c.Name())
+		glog.Infof("Component %s already updated, moving on", c.Name())
 	}
-	return nil
+	return false, nil
 }
 
 func DefaultGetAllManagedComponentsFn(uc unversioned.Interface,
@@ -248,16 +299,22 @@ func (a byDescendingPriority) Len() int           { return len(a) }
 func (a byDescendingPriority) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byDescendingPriority) Less(i, j int) bool { return a[i].Priority() > a[j].Priority() }
 
-// We need to sort in asc/desc order based on the version skew.
+// Sort in asc/desc order based on the version skew.
 //
 // For example:
 //
-// If the version is higher than the highest versioned component
+// If the desired version is higher than the highest versioned component
 // in the cluster, then we execute the update in ascending priority.
 //
-// If the version is lower than the highest versioned component
+// If the desired version is lower than the highest versioned component
 // in the cluster, then we execute the update in descending priority.
-func sortComponentsByPriority(highestClusterVersion, newVersion *components.Version, comps []Component) []Component {
+//
+// We sort this way because of certain requirements when updating a cluster.
+// For example, we should always update the API Server first during a normal update
+// so it should have the highest priority. During a rollback however, we should
+// update that component last. Sorting based on the desired version, and the highest
+// cluster version allows us to determine the correct order for updating components.
+func sortComponentsByPriority(highestClusterVersion, newVersion *version.Version, comps []Component) []Component {
 	if newVersion.Semver().GTE(highestClusterVersion.Semver()) {
 		glog.Info("sorting components by ascending priority")
 		sort.Sort(byAscendingPriority(comps))
@@ -268,8 +325,11 @@ func sortComponentsByPriority(highestClusterVersion, newVersion *components.Vers
 	return comps
 }
 
-func highestClusterVersion(comps []Component) (*components.Version, error) {
-	var highestVersion *components.Version
+// highestClusterVersion returns the highest version of any component running in the
+// cluster. We consider the highest version running to be the current cluster version
+// and use that information to determine component ordering during updates.
+func highestClusterVersion(comps []Component) (*version.Version, error) {
+	var highestVersion *version.Version
 	for _, comp := range comps {
 		cv, err := comp.Version()
 		if err != nil {
@@ -287,4 +347,8 @@ func highestClusterVersion(comps []Component) (*components.Version, error) {
 		return nil, errors.New("unable to get highest cluster version")
 	}
 	return highestVersion, nil
+}
+
+func parseNewVersion(config *api.ConfigMap) (*version.Version, error) {
+	return version.ParseFromImageString(config.Data[ClusterVersionKey])
 }

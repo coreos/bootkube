@@ -4,12 +4,17 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kubernetes-incubator/bootkube/pkg/cluster/components/version"
 	"github.com/kubernetes-incubator/bootkube/pkg/node"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/wait"
+)
+
+const (
+	nodePriority      = 1000
+	nodeUpdateTimeout = 2 * time.Minute
 )
 
 // NodeUpdater is responsible for updating nodes via
@@ -38,12 +43,12 @@ func (nu *NodeUpdater) Name() string {
 // Priority for Nodes should be such that they
 // get updated last, and rolled back first.
 func (nu *NodeUpdater) Priority() int {
-	return 100
+	return nodePriority
 }
 
 // Version returns the highest version of any
 // Node in the store.
-func (nu *NodeUpdater) Version() (*Version, error) {
+func (nu *NodeUpdater) Version() (*version.Version, error) {
 	ni, exists, err := nu.nodes.Get(nu.node)
 	if err != nil {
 		return nil, err
@@ -59,11 +64,11 @@ func (nu *NodeUpdater) Version() (*Version, error) {
 	if !ok {
 		return nil, fmt.Errorf("no version annotation for Node %s", n.Name)
 	}
-	return ParseVersionFromImage(versionString)
+	return version.ParseFromImageString(versionString)
 }
 
 // UpdateToVersion will update the Node to the given version.
-func (nu *NodeUpdater) UpdateToVersion(v *Version) (bool, error) {
+func (nu *NodeUpdater) UpdateToVersion(v *version.Version) (bool, error) {
 	n, err := nu.client.Nodes().Get(nu.Name())
 	if err != nil {
 		return false, err
@@ -73,16 +78,16 @@ func (nu *NodeUpdater) UpdateToVersion(v *Version) (bool, error) {
 	if n.Annotations == nil {
 		n.Annotations = make(map[string]string)
 	}
-	if n.Annotations[node.CurrentVersionAnnotation] == v.image.Tag() {
+	if n.Annotations[node.CurrentVersionAnnotation] == v.ImageString() {
 		return false, nil
 	}
-	n.Annotations[node.DesiredVersionAnnotation] = v.image.Tag()
+	n.Annotations[node.DesiredVersionAnnotation] = v.ImageString()
 	_, err = nu.client.Nodes().Update(n)
 	if err != nil {
 		return false, err
 	}
 	// Second step: wait until the node-agent has updated the Node.
-	err = wait.Poll(time.Second, 10*time.Minute, func() (bool, error) {
+	err = wait.Poll(time.Second, nodeUpdateTimeout, func() (bool, error) {
 		v, ok, err := nu.nodes.Get(n)
 		if err != nil {
 			return false, err
@@ -90,7 +95,7 @@ func (nu *NodeUpdater) UpdateToVersion(v *Version) (bool, error) {
 		if !ok {
 			return false, fmt.Errorf("unable to find Node %s in store", n.Name)
 		}
-		nn := v.(*v1.Node)
+		nn := v.(*api.Node)
 		if nn.Annotations[node.DesiredVersionAnnotation] == nn.Annotations[node.CurrentVersionAnnotation] {
 			return true, nil
 		}

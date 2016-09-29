@@ -8,6 +8,7 @@ readonly VERSION=${VERSION:-$(${BOOTKUBE_ROOT}/build/git-version.sh)}
 
 function image::build() {
     local TEMP_DIR=$(mktemp -d -t node-agent.XXXX)
+    echo "Copying files into ${TEMP_DIR}"
 
     cp $BOOTKUBE_ROOT/_output/bin/linux/node-agent ${TEMP_DIR}
     cp $BOOTKUBE_ROOT/image/node-agent/Dockerfile ${TEMP_DIR}

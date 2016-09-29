@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/kubernetes-incubator/bootkube/pkg/cluster"
-	"github.com/kubernetes-incubator/bootkube/pkg/cluster/components"
 
 	"github.com/golang/glog"
 
@@ -19,6 +18,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -35,63 +35,32 @@ func main() {
 	run(uc, internalclient)
 }
 
-func run(uc client.Interface, internalclient internalclientset.Interface) {
+func run(client client.Interface, internalclient internalclientset.Interface) {
 	glog.Info("update controller running")
-	cu, err := cluster.NewClusterUpdater(uc, internalclient)
-	if err != nil {
-		glog.Error(err)
-		return
-	}
-	handleConfigChange := func(newConfigMap *api.ConfigMap) {
-		newVersion, err := parseNewVersion(newConfigMap)
-		if err != nil {
-			glog.Error(err)
-			return
-		}
-		if err := cu.UpdateToVersion(newVersion); err != nil {
-			glog.Error(err)
-		}
-	}
-	updateCallback := func(_, newObj interface{}) {
-		glog.Info("begin update callback")
-		newConfigMap, ok := newObj.(*api.ConfigMap)
-		if !ok {
-			glog.Infof("Wrong type for update callback, expected *v1.ConfigMap, got: %T", newObj)
-			return
-		}
-		handleConfigChange(newConfigMap)
-	}
-	addCallback := func(obj interface{}) {
-		glog.Info("begin add callback")
-		newConfigMap, ok := obj.(*api.ConfigMap)
-		if !ok {
-			glog.Infof("Wrong type for add callback, expected *v1.ConfigMap, got: %T", obj)
-			return
-		}
-		handleConfigChange(newConfigMap)
-	}
 	opts := api.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector("metadata.name", cluster.ClusterConfigMapName),
 	}
-	// TODO Once we switch to Third Party Resources, we should skip the informer,
-	// and from there move to a simple polling solution that checks all
-	// version 3rd party resource objects.
-	_, configMapController := framework.NewInformer(
+	// TODO switch to 3rd Party Resource.
+	configMapStore, configMapController := framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(lo api.ListOptions) (runtime.Object, error) {
-				return uc.ConfigMaps(api.NamespaceSystem).List(opts)
+				return client.ConfigMaps(api.NamespaceSystem).List(opts)
 			},
 			WatchFunc: func(lo api.ListOptions) (watch.Interface, error) {
-				return uc.ConfigMaps(api.NamespaceSystem).Watch(opts)
+				return client.ConfigMaps(api.NamespaceSystem).Watch(opts)
 			},
 		},
 		&api.ConfigMap{},
 		30*time.Second,
-		framework.ResourceEventHandlerFuncs{
-			AddFunc:    addCallback,
-			UpdateFunc: updateCallback,
-		},
+		framework.ResourceEventHandlerFuncs{},
 	)
+	go configMapController.Run(wait.NeverStop)
+
+	uc, err := cluster.NewUpdateController(client, internalclient, configMapStore)
+	if err != nil {
+		glog.Error(err)
+		return
+	}
 
 	b := record.NewBroadcaster()
 	r := b.NewRecorder(api.EventSource{
@@ -102,7 +71,7 @@ func run(uc client.Interface, internalclient internalclientset.Interface) {
 			Namespace: "kube-system",
 			Name:      "kube-update-controller",
 		},
-		Client:        uc,
+		Client:        client,
 		Identity:      os.Getenv("POD_NAME"),
 		LeaseDuration: 15 * time.Second,
 		RenewDeadline: 10 * time.Second,
@@ -111,16 +80,11 @@ func run(uc client.Interface, internalclient internalclientset.Interface) {
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(stop <-chan struct{}) {
 				glog.Info("started leading: running update controller")
-				go configMapController.Run(stop)
+				go uc.Run(stop)
 			},
 			OnStoppedLeading: func() {
 				glog.Fatal("stopped leading: pausing update controller")
 			},
 		},
 	})
-}
-
-func parseNewVersion(config *api.ConfigMap) (*components.Version, error) {
-	version := config.Data[cluster.ClusterVersionKey]
-	return components.ParseVersionFromImage(version)
 }

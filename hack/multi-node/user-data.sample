@@ -38,7 +38,6 @@ coreos:
         [Service]
         EnvironmentFile=/etc/environment
         EnvironmentFile=/etc/kubernetes/kubelet.env
-        Environment=KUBELET_ACI=quay.io/coreos/hyperkube
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests
         ExecStartPre=/bin/mkdir -p /srv/kubernetes/manifests
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/checkpoint-secrets
@@ -70,6 +69,7 @@ write_files:
 
       if [[ ! -f /etc/kubernetes/kubelet.env ]]; then
           /bin/echo "KUBELET_VERSION=v1.3.6_coreos.0" > /etc/kubernetes/kubelet.env
+          /bin/echo "KUBELET_ACI=quay.io/coreos/hyperkube" >> /etc/kubernetes/kubelet.env
       fi
   - path: "/etc/kubernetes/kubeconfig"
     permissions: "0644"

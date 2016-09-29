@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/bootkube/pkg/cluster/components/version"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -16,6 +17,10 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
+const (
+	daemonsetPodUpdateTimeout = 2 * time.Minute
+)
+
 // DaemonSetUpdater can provide rolling updates on
 // the given DaemonSet.
 type DaemonSetUpdater struct {
@@ -23,8 +28,9 @@ type DaemonSetUpdater struct {
 	name string
 	// client is an API Server client.
 	client unversionedclient.Interface
-	// pods is backed by an informer, contains list of Pods
-	// that belong to the DaemonSet.
+	// pods is backed by an informer, contains list of all Pods
+	// in the kube-system namespace. Can be queried using the
+	// DaemonSet selector to get pods for this DaemonSet.
 	pods StoreToPodLister
 	// daemonsets is a cache of DaemonSets backed by an informer.
 	daemonsets cache.StoreToDaemonSetLister
@@ -32,8 +38,6 @@ type DaemonSetUpdater struct {
 	selector labels.Selector
 	// priority is the update priority for this DaemonSet.
 	priority int
-	// obj is the DaemonSet Object.
-	obj *extensions.DaemonSet
 }
 
 // StoreToPodLister is a mirror of the cache.StoreToPodLister.
@@ -68,11 +72,11 @@ func NewDaemonSetUpdater(client unversionedclient.Interface, ds *extensions.Daem
 		return nil, err
 	}
 	if ds.Annotations == nil {
-		return nil, noAnnotationError("DaemonSet", ds.Name)
+		return nil, version.NoAnnotationError("DaemonSet", ds.Name)
 	}
-	ps, ok := ds.Annotations[updatePriorityAnnotation]
+	ps, ok := ds.Annotations[version.UpdatePriorityAnnotation]
 	if !ok {
-		return nil, noAnnotationError("DaemonSet", ds.Name)
+		return nil, version.NoAnnotationError("DaemonSet", ds.Name)
 	}
 	priority, err := strconv.Atoi(ps)
 	if err != nil {
@@ -85,7 +89,6 @@ func NewDaemonSetUpdater(client unversionedclient.Interface, ds *extensions.Daem
 		daemonsets: daemonsets,
 		selector:   selector,
 		priority:   priority,
-		obj:        ds,
 	}, nil
 }
 
@@ -97,29 +100,24 @@ func (dsu *DaemonSetUpdater) Name() string {
 
 // Version returns the highest version of any Pod managed
 // by this DaemonSet.
-func (dsu *DaemonSetUpdater) Version() (*Version, error) {
-	pods, err := dsu.getPods()
+func (dsu *DaemonSetUpdater) Version() (*version.Version, error) {
+	dsi, exists, err := dsu.daemonsets.GetByKey(fmt.Sprintf("%s/%s", api.NamespaceSystem, dsu.Name()))
 	if err != nil {
 		return nil, err
 	}
-	var highest *Version
-	for _, p := range pods {
-		pv, err := getPodVersion(p, dsu.Name())
-		if err != nil {
-			return nil, fmt.Errorf("unable to get Pod %s Version: %v", p.Name, err)
-		}
-		if highest == nil {
-			highest = pv
-			continue
-		}
-		if pv.Semver().GT(highest.Semver()) {
-			highest = pv
+	if !exists {
+		return nil, fmt.Errorf("could not find a version for DaemonSet %s: does not exist in local store", dsu.Name())
+	}
+	ds, ok := dsi.(*extensions.DaemonSet)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type returned from DaemonSet store, expected *extensions.DaemonSet, got %T", ds)
+	}
+	for _, c := range ds.Spec.Template.Spec.Containers {
+		if c.Name == dsu.Name() {
+			return version.ParseFromImageString(c.Image)
 		}
 	}
-	if highest == nil {
-		return nil, fmt.Errorf("could not find a version for DaemonSet %s", dsu.Name())
-	}
-	return highest, nil
+	return nil, fmt.Errorf("could not find a version for DaemonSet %s: could not find matching container", dsu.Name())
 }
 
 // Priority is the priority of updating this component.
@@ -128,7 +126,7 @@ func (dsu *DaemonSetUpdater) Priority() int {
 }
 
 // UpdateToVersion will update the DaemonSet to the given version.
-func (dsu *DaemonSetUpdater) UpdateToVersion(v *Version) (bool, error) {
+func (dsu *DaemonSetUpdater) UpdateToVersion(v *version.Version) (bool, error) {
 	ds, err := dsu.client.Extensions().DaemonSets(api.NamespaceSystem).Get(dsu.Name())
 	if err != nil {
 		return false, err
@@ -137,19 +135,22 @@ func (dsu *DaemonSetUpdater) UpdateToVersion(v *Version) (bool, error) {
 	for i, c := range ds.Spec.Template.Spec.Containers {
 		if c.Name == dsu.Name() {
 			glog.Infof("updating image for container: %s", c.Name)
-			ds.Spec.Template.Spec.Containers[i].Image = v.image.String()
+			if ds.Spec.Template.Spec.Containers[i].Image != v.ImageString() {
+				ds.Spec.Template.Spec.Containers[i].Image = v.ImageString()
+				_, err = dsu.client.Extensions().DaemonSets(api.NamespaceSystem).Update(ds)
+				if err != nil {
+					return false, fmt.Errorf("unable to update DaemonSet %s: %v\n\n%#v", dsu.Name(), err, ds)
+				}
+			}
 			break
 		}
-	}
-	ds, err = dsu.client.Extensions().DaemonSets(api.NamespaceSystem).Update(ds)
-	if err != nil {
-		return false, fmt.Errorf("unable to update DaemonSet %s: %v\n\n%#v", dsu.Name(), err, ds)
 	}
 	pods, err := dsu.getPods()
 	if err != nil {
 		return false, err
 	}
 	updated := false
+	glog.Infof("updating %d Pods for DaemonSet %s", len(pods), dsu.Name())
 	for _, p := range pods {
 		pv, err := getPodVersion(p, dsu.Name())
 		if err != nil {
@@ -169,7 +170,7 @@ func (dsu *DaemonSetUpdater) UpdateToVersion(v *Version) (bool, error) {
 		glog.Infof("Deleted pod %s", p.Name)
 
 		// Wait for all pods to be available before moving on.
-		err = wait.Poll(time.Second, 2*time.Minute, func() (bool, error) {
+		err = wait.Poll(time.Second, daemonsetPodUpdateTimeout, func() (bool, error) {
 			glog.Infof("checking new pod availability for DS: %s", dsu.Name())
 
 			// Make sure the pod we deleted above is removed from the cache.
@@ -184,11 +185,11 @@ func (dsu *DaemonSetUpdater) UpdateToVersion(v *Version) (bool, error) {
 			}
 
 			if dsu.numberOfDesiredPods() == len(pl) && dsu.allPodsAvailable() {
-				glog.Info("Pod ready, moving on")
+				glog.Infof("%d desired pods and %d running, moving on", dsu.numberOfDesiredPods(), len(pl))
 				return true, nil
 			}
 
-			glog.Info("Pod not ready, will check again")
+			glog.Infof("%d desired pods and %d running, will check again", dsu.numberOfDesiredPods(), len(pl))
 			return false, nil
 		})
 		if err != nil {
@@ -229,10 +230,10 @@ func (dsu *DaemonSetUpdater) numberOfDesiredPods() int {
 	return 0
 }
 
-func getPodVersion(pod *api.Pod, dsName string) (*Version, error) {
+func getPodVersion(pod *api.Pod, dsName string) (*version.Version, error) {
 	for _, c := range pod.Spec.Containers {
 		if c.Name == dsName {
-			return ParseVersionFromImage(c.Image)
+			return version.ParseFromImageString(c.Image)
 		}
 	}
 	return nil, fmt.Errorf("unable to get current version for Pod %s", pod.Name)

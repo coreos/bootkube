@@ -7,7 +7,7 @@ import (
 )
 
 // WriteAndCopy will write the provided data to disk in a temp
-// file, and then atomically copy that to the provided path.
+// file, and then atomically rename that to the provided path.
 func WriteAndCopy(data []byte, path string) error {
 	// First write a "temp" file.
 	tmpfile := filepath.Join(filepath.Dir(path), "."+filepath.Base(path))
