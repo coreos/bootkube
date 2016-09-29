@@ -102,7 +102,7 @@ func (a *Agent) updateNode(node *v1.Node) error {
 	if err != nil {
 		return fmt.Errorf("error parsing on-host kubelet env file: %v", err)
 	}
-	node.Annotations[CurrentVersionAnnotation] = onDiskConfig[KubeletVersionKey]
+	node.Annotations[CurrentVersionAnnotation] = fmt.Sprintf("%s:%s", onDiskConfig[KubeletImageKey], onDiskConfig[KubeletVersionKey])
 	_, err = a.Client.Core().Nodes().Update(node)
 	return err
 }
