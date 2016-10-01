@@ -32,7 +32,7 @@ $ kubectl \
   annotate \
   --overwrite \
   node <your node> \
-  node-agent.alpha.coreos.com/desired-version="v1.3.2_coreos.0"
+  node-agent.alpha.coreos.com/desired-version="quay.io/coreos/hyperkube:v1.3.2_coreos.0"
 ```
 
 1. Inspect the status of the on-host update by checking the following
