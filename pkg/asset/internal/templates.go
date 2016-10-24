@@ -38,11 +38,6 @@ spec:
       - name: kubelet
         image: quay.io/coreos/hyperkube:v1.4.3_coreos.0
         command:
-        - /nsenter
-        - --target=1
-        - --mount
-        - --wd=.
-        - --
         - ./hyperkube
         - kubelet
         - --pod-manifest-path=/etc/kubernetes/manifests
@@ -53,6 +48,7 @@ spec:
         - --kubeconfig=/etc/kubernetes/kubeconfig
         - --require-kubeconfig
         - --lock-file=/var/run/lock/kubelet.lock
+        - --containerized
         env:
           - name: MY_POD_IP
             valueFrom:
@@ -80,6 +76,8 @@ spec:
           mountPath: /var/lib/kubelet
         - name: var-lib-rkt
           mountPath: /var/lib/rkt
+        - name: rootfs
+          mountPath: /rootfs
       hostNetwork: true
       hostPID: true
       volumes:
@@ -107,6 +105,9 @@ spec:
       - name: var-lib-rkt
         hostPath:
           path: /var/lib/rkt
+      - name: rootfs
+        hostPath:
+          path: /
 `)
 	APIServerTemplate = []byte(`apiVersion: "extensions/v1beta1"
 kind: DaemonSet
