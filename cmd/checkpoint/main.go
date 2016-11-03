@@ -75,6 +75,7 @@ func run() {
 			// clean it up a bit, and then save it to the ignore path for
 			// later use.
 			tempAPIServerManifest.Spec = parseAPIPodSpec(podList)
+			stripServiceAccounts(&tempAPIServerManifest)
 			convertSecretsToVolumeMounts(client, &tempAPIServerManifest)
 			writeManifest(tempAPIServerManifest)
 			glog.Infof("finished creating temp-apiserver manifest at %s\n", checkpointManifest)
@@ -91,6 +92,12 @@ func run() {
 			}
 		}
 		time.Sleep(60 * time.Second)
+	}
+}
+
+func stripServiceAccounts(pod *v1.Pod) {
+	if len(pod.Spec.ServiceAccountName) != 0 {
+		pod.Spec.ServiceAccountName = ""
 	}
 }
 
