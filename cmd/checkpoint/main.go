@@ -75,7 +75,6 @@ func run() {
 			// clean it up a bit, and then save it to the ignore path for
 			// later use.
 			tempAPIServerManifest.Spec = parseAPIPodSpec(podList)
-			stripServiceAccounts(&tempAPIServerManifest)
 			convertSecretsToVolumeMounts(client, &tempAPIServerManifest)
 			writeManifest(tempAPIServerManifest)
 			glog.Infof("finished creating temp-apiserver manifest at %s\n", checkpointManifest)
@@ -91,14 +90,14 @@ func run() {
 				}
 			}
 		}
-		time.Sleep(60 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
 }
 
-func stripServiceAccounts(pod *v1.Pod) {
-	if len(pod.Spec.ServiceAccountName) != 0 {
-		pod.Spec.ServiceAccountName = ""
-	}
+func stripNonessentialInfo(p *v1.Pod) {
+	p.Spec.ServiceAccountName = ""
+	p.Spec.DeprecatedServiceAccount = ""
+	p.Status.Reset()
 }
 
 func getPodsFromKubeletAPI() []byte {
@@ -190,6 +189,7 @@ func parseAPIPodSpec(podList v1.PodList) v1.PodSpec {
 		}
 	}
 	cleanVolumes(&apiPod)
+	stripNonessentialInfo(&apiPod)
 	return apiPod.Spec
 }
 
