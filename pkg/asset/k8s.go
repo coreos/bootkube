@@ -20,7 +20,6 @@ const (
 func newStaticAssets(selfHostKubelet bool) Assets {
 	var noData interface{}
 	assets := Assets{
-		mustCreateAssetFromTemplate(AssetPathControllerManager, internal.ControllerManagerTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathScheduler, internal.SchedulerTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathProxy, internal.ProxyTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathKubeDNSDeployment, internal.DNSDeploymentTemplate, noData),
@@ -37,6 +36,7 @@ func newStaticAssets(selfHostKubelet bool) Assets {
 func newDynamicAssets(conf Config) Assets {
 	return Assets{
 		mustCreateAssetFromTemplate(AssetPathAPIServer, internal.APIServerTemplate, conf),
+		mustCreateAssetFromTemplate(AssetPathControllerManager, internal.ControllerManagerTemplate, conf),
 	}
 }
 
