@@ -17,27 +17,26 @@ const (
 	secretCMName        = "kube-controller-manager"
 )
 
-func newStaticAssets(selfHostKubelet bool) Assets {
+func newStaticAssets() Assets {
 	var noData interface{}
-	assets := Assets{
-		mustCreateAssetFromTemplate(AssetPathControllerManager, internal.ControllerManagerTemplate, noData),
+	return Assets{
 		mustCreateAssetFromTemplate(AssetPathScheduler, internal.SchedulerTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathProxy, internal.ProxyTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathKubeDNSDeployment, internal.DNSDeploymentTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathKubeDNSSvc, internal.DNSSvcTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathCheckpointer, internal.CheckpointerTemplate, noData),
 	}
-	if selfHostKubelet {
-		assets = append(assets, mustCreateAssetFromTemplate(AssetPathKubelet, internal.KubeletTemplate, noData))
-	}
-
-	return assets
 }
 
 func newDynamicAssets(conf Config) Assets {
-	return Assets{
+	assets := Assets{
 		mustCreateAssetFromTemplate(AssetPathAPIServer, internal.APIServerTemplate, conf),
+		mustCreateAssetFromTemplate(AssetPathControllerManager, internal.ControllerManagerTemplate, conf),
 	}
+	if conf.SelfHostKubelet {
+		assets = append(assets, mustCreateAssetFromTemplate(AssetPathKubelet, internal.KubeletTemplate, conf))
+	}
+	return assets
 }
 
 func newKubeConfigAsset(assets Assets, conf Config) (Asset, error) {
