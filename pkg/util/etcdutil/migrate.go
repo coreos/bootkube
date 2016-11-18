@@ -22,15 +22,15 @@ const (
 )
 
 func Migrate() error {
-	restcli, err := restclient.RESTClientFor(&restclient.Config{
+	kubecli, err := clientset.NewForConfig(&restclient.Config{
 		Host: apiserverAddr,
 	})
 	if err != nil {
 		return fmt.Errorf("fail to create kube client: %v", err)
 	}
-	kubecli := clientset.New(restcli)
+	httpcli := kubecli.CoreClient.RESTClient.Client
 
-	err = waitEtcdTPRReady(restcli.Client, 5*time.Second, 60*time.Second, apiserverAddr, api.NamespaceSystem)
+	err = waitEtcdTPRReady(httpcli, 5*time.Second, 60*time.Second, apiserverAddr, api.NamespaceSystem)
 	if err != nil {
 		return err
 	}
@@ -41,7 +41,7 @@ func Migrate() error {
 	}
 	glog.Infof("boot-etcd pod IP is: %s", ip)
 
-	if err := createMigratedEtcdCluster(restcli.Client, apiserverAddr, ip); err != nil {
+	if err := createMigratedEtcdCluster(httpcli, apiserverAddr, ip); err != nil {
 		glog.Errorf("fail to create migrated etcd cluster: %v", err)
 		return err
 	}
