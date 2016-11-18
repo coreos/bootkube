@@ -113,11 +113,8 @@ func createMigratedEtcdCluster(httpcli *http.Client, host, podIP string) error {
   "spec": {
     "size": 1,
     "version": "v3.1.0-alpha.1",
-    "seed": {
-      "MemberClientEndpoints": [
-        "http://%s:2379"
-      ],
-      "RemoveDelay": 30
+    "selfHosted": {
+		"bootMemberClientEndpoint": "http://%s:12379"
     }
   }
 }`, podIP))

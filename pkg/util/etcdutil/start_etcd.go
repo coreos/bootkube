@@ -47,11 +47,11 @@ spec:
     - -c
     - /usr/local/bin/etcd
       --name boot-etcd
-      --listen-client-urls=http://0.0.0.0:2379
-      --listen-peer-urls=http://0.0.0.0:2380
-      --advertise-client-urls=http://$(MY_POD_IP):2379
-      --initial-advertise-peer-urls http://$(MY_POD_IP):2380
-      --initial-cluster boot-etcd=http://$(MY_POD_IP):2380
+      --listen-client-urls=http://0.0.0.0:12379
+      --listen-peer-urls=http://0.0.0.0:12380
+      --advertise-client-urls=http://$(MY_POD_IP):12379
+      --initial-advertise-peer-urls http://$(MY_POD_IP):12380
+      --initial-cluster boot-etcd=http://$(MY_POD_IP):12380
       --initial-cluster-token bootkube
       --initial-cluster-state new
       --data-dir=/var/etcd/data
