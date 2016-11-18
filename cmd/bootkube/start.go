@@ -45,7 +45,7 @@ func runCmdStart(cmd *cobra.Command, args []string) error {
 
 	// TODO: this should likely move into bootkube.Run() eventually.
 	if startOpts.selfHostedEtcd {
-		if err := etcdutil.StartEtcd(); err != nil {
+		if err := etcdutil.StartEtcd(startOpts.etcdServer); err != nil {
 			return fmt.Errorf("fail to start etcd: %v", err)
 		}
 	}

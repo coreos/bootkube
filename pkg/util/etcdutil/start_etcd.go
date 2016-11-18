@@ -9,20 +9,20 @@ import (
 	"github.com/golang/glog"
 )
 
-func StartEtcd() error {
+func StartEtcd(endpoint string) error {
 	if err := ioutil.WriteFile("/etc/kubernetes/manifests/boot-etcd.yaml", []byte(etcdPodYaml), 0600); err != nil {
 		return fmt.Errorf("fail to write file '/etc/kubernetes/manifests/boot-etcd.yaml': %v", err)
 	}
 	glog.Info("etcd server has been defined to run by kubelet. Please wait...")
-	return waitEtcdUp()
+	return waitEtcdUp(endpoint)
 }
 
-func waitEtcdUp() error {
+func waitEtcdUp(endpoint string) error {
 	httpcli := &http.Client{
 		Timeout: 10 * time.Second,
 	}
 	for {
-		_, err := httpcli.Get("http://127.0.0.1:2379/version")
+		_, err := httpcli.Get(endpoint + "/version")
 		if err != nil {
 			glog.Infof("couldn't talk to etcd server (retrying 10s later): %v\n", err)
 			time.Sleep(10 * time.Second)
