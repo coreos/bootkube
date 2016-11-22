@@ -47,6 +47,7 @@ type Config struct {
 	CAPrivKey       *rsa.PrivateKey
 	AltNames        *tlsutil.AltNames
 	SelfHostKubelet bool
+	SelfHostedEtcd  bool
 	StorageBackend  string
 	CloudProvider   string
 }
@@ -55,7 +56,7 @@ type Config struct {
 // configured via a user provided AssetConfig. Default assets include
 // TLS assets (certs, keys and secrets), and k8s component manifests.
 func NewDefaultAssets(conf Config) (Assets, error) {
-	as := newStaticAssets(conf.SelfHostKubelet)
+	as := newStaticAssets(conf.SelfHostKubelet, conf.SelfHostedEtcd)
 	as = append(as, newDynamicAssets(conf)...)
 
 	// TLS assets
