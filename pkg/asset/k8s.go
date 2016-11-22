@@ -17,7 +17,7 @@ const (
 	secretCMName        = "kube-controller-manager"
 )
 
-func newStaticAssets(selfHostKubelet bool) Assets {
+func newStaticAssets(selfHostKubelet, selfHostedEtcd bool) Assets {
 	var noData interface{}
 	assets := Assets{
 		mustCreateAssetFromTemplate(AssetPathScheduler, internal.SchedulerTemplate, noData),
@@ -25,11 +25,15 @@ func newStaticAssets(selfHostKubelet bool) Assets {
 		mustCreateAssetFromTemplate(AssetPathKubeDNSDeployment, internal.DNSDeploymentTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathKubeDNSSvc, internal.DNSSvcTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathCheckpointer, internal.CheckpointerTemplate, noData),
-		mustCreateAssetFromTemplate(AssetPathEtcdOperator, internal.EtcdOperatorTemplate, noData),
-		mustCreateAssetFromTemplate(AssetPathEtcdSvc, internal.EtcdSvcTemplate, noData),
 	}
 	if selfHostKubelet {
 		assets = append(assets, mustCreateAssetFromTemplate(AssetPathKubelet, internal.KubeletTemplate, noData))
+	}
+	if selfHostedEtcd {
+		assets = append(assets,
+			mustCreateAssetFromTemplate(AssetPathEtcdOperator, internal.EtcdOperatorTemplate, noData),
+			mustCreateAssetFromTemplate(AssetPathEtcdSvc, internal.EtcdSvcTemplate, noData),
+		)
 	}
 
 	return assets
