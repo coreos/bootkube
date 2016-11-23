@@ -277,6 +277,13 @@ spec:
         - proxy
         - --kubeconfig=/etc/kubernetes/kubeconfig
         - --proxy-mode=iptables
+        - --hostname-override=$(POD_IP)
+        - --cluster-cidr=10.2.0.0/16
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         securityContext:
           privileged: true
         volumeMounts:
