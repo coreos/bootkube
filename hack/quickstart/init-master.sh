@@ -41,6 +41,10 @@ function init_master_node() {
     configure_etcd
     systemctl enable etcd-member; sudo systemctl start etcd-member
 
+    # Some systems may not have one or the other variable set
+    COREOS_PUBLIC_IPV4=${COREOS_PUBLIC_IPV4:-${COREOS_PRIVATE_IPV4:-127.0.0.1}}
+    COREOS_PRIVATE_IPV4=${COREOS_PRIVATE_IPV4:-${COREOS_PUBLIC_IPV4}}
+
     # Render cluster assets
     /usr/bin/rkt run \
         --volume home,kind=host,source=/home/core \
