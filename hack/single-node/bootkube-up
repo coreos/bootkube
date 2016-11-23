@@ -16,16 +16,14 @@ fi
 
 # Start the VM
 vagrant up
-
-ssh_ident="$(vagrant ssh-config | awk '/IdentityFile/ {print $2}' | tr -d '"')"
-ssh_port="$(vagrant ssh-config | awk '/Port [0-9]+/ {print $2}')"
+vagrant ssh-config > ssh_config
 
 # Copy locally rendered assets to the server
-scp -q -o stricthostkeychecking=no -i ${ssh_ident} -P ${ssh_port} -r cluster core@127.0.0.1:/home/core/cluster
-scp -q -o stricthostkeychecking=no -i ${ssh_ident} -P ${ssh_port} ../../_output/bin/linux/bootkube core@127.0.0.1:/home/core
+scp -q -F ssh_config -r cluster core@default:/home/core/cluster
+scp -q -F ssh_config ../../_output/bin/linux/bootkube core@default:/home/core
 
 # Run bootkube
-ssh -q -o stricthostkeychecking=no -i ${ssh_ident} -p ${ssh_port} core@127.0.0.1 "sudo /home/core/bootkube start --asset-dir=/home/core/cluster 2>> /home/core/bootkube.log"
+ssh -q -F ssh_config core@default "sudo /home/core/bootkube start --asset-dir=/home/core/cluster 2>> /home/core/bootkube.log"
 
 echo
 echo "Bootstrap complete. Access your kubernetes cluster using:"
