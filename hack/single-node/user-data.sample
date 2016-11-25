@@ -13,6 +13,10 @@ coreos:
         content: |
           [Service]
           ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{ "Network": "10.2.0.0/16" }'
+          Environment=HTTP_PROXY=${http_proxy}
+          Environment=HTTPS_PROXY=${https_proxy}
+          Environment=http_proxy=${http_proxy}
+          Environment=https_proxy=${https_proxy}
     - name: docker.service
       drop-ins:
       - name: 50-flannel.conf
@@ -20,6 +24,11 @@ coreos:
           [Unit]
           Requires=flanneld.service
           After=flanneld.service
+          [Service]
+          Environment=HTTP_PROXY=${http_proxy}
+          Environment=HTTPS_PROXY=${https_proxy}
+          Environment=http_proxy=${http_proxy}
+          Environment=https_proxy=${https_proxy}
     - name: kubelet.service
       enable: true
       command: start
@@ -28,6 +37,10 @@ coreos:
         EnvironmentFile=/etc/environment
         Environment=KUBELET_ACI=quay.io/coreos/hyperkube
         Environment=KUBELET_VERSION=v1.4.6_coreos.0
+        Environment=HTTP_PROXY=${http_proxy}
+        Environment=HTTPS_PROXY=${https_proxy}
+        Environment=http_proxy=${http_proxy}
+        Environment=https_proxy=${https_proxy}
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests
         ExecStartPre=/bin/mkdir -p /srv/kubernetes/manifests
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/checkpoint-secrets
