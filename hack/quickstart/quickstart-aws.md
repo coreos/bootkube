@@ -1,27 +1,35 @@
 ## AWS Quickstart
 
+### Choose a cluster prefix
+
+This can be changed to identify separate clusters.
+
+```
+export CLUSTER_PREFIX=quickstart
+```
+
 ### Configure Security Groups
 
 Make note of the `GroupId` output of this command, as it will be referenced later in this guide as `<K8S_SG_ID>`.
 
 ```
-$ aws ec2 create-security-group --region us-west-2 --group-name k8s-sg --description "Security group for k8s cluster"
+$ aws ec2 create-security-group --region us-west-2 --group-name ${CLUSTER_PREFIX}-sg --description "Security group for ${CLUSTER_PREFIX} cluster"
 GroupID: "sg-abcdefg"
 ```
 
 Next, create the security group rules.
 
 ```
-$ aws ec2 authorize-security-group-ingress --region us-west-2 --group-name k8s-sg --protocol tcp --port 22 --cidr 0.0.0.0/0
-$ aws ec2 authorize-security-group-ingress --region us-west-2 --group-name k8s-sg --protocol tcp --port 443 --cidr 0.0.0.0/0
-$ aws ec2 authorize-security-group-ingress --region us-west-2 --group-name k8s-sg --protocol tcp --port 0-65535 --source-group k8s-sg
+$ aws ec2 authorize-security-group-ingress --region us-west-2 --group-name ${CLUSTER_PREFIX}-sg --protocol tcp --port 22 --cidr 0.0.0.0/0
+$ aws ec2 authorize-security-group-ingress --region us-west-2 --group-name ${CLUSTER_PREFIX}-sg --protocol tcp --port 443 --cidr 0.0.0.0/0
+$ aws ec2 authorize-security-group-ingress --region us-west-2 --group-name ${CLUSTER_PREFIX}-sg --protocol tcp --port 0-65535 --source-group k8s-sg
 ```
 
 ### Create a key-pair
 
 ```
-$ aws ec2 create-key-pair --key-name k8s-key --query 'KeyMaterial' --output text > k8s-key.pem
-$ chmod 400 k8s-key.pem
+$ aws ec2 create-key-pair --key-name ${CLUSTER_PREFIX}-key --query 'KeyMaterial' --output text > ${CLUSTER_PREFIX}-key.pem
+$ chmod 400 ${CLUSTER_PREFIX}-key.pem
 ```
 
 ### Launch Nodes
@@ -31,7 +39,7 @@ To find the latest CoreOS alpha/beta/stable images, please see the [CoreOS AWS D
 In the command below, replace `<K8S_SG_ID>` with the security-group-id noted earlier.
 
 ```
-$ aws ec2 run-instances --region us-west-2 --image-id ami-184a8f78 --security-group-ids <K8S_SG_ID> --count 1 --instance-type m3.medium --key-name k8s-key --query 'Instances[0].InstanceId'
+$ aws ec2 run-instances --region us-west-2 --image-id ami-184a8f78 --security-group-ids <K8S_SG_ID> --count 1 --instance-type m3.medium --key-name ${CLUSTER_PREFIX}-key --query 'Instances[0].InstanceId'
 "i-abcdefgh"
 ```
 
