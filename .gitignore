@@ -3,3 +3,4 @@ vendor-v[0-9].[0-9].[0-9]/
 
 hack/*/.vagrant/
 hack/*/cluster/
+hack/*/ssh_config
