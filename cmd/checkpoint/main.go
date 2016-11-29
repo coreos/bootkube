@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -29,6 +30,9 @@ const (
 
 	tempAPIServer = "temp-apiserver"
 	kubeAPIServer = "kube-apiserver"
+
+	tempEtcd   = "temp-self-hosted-etcd"
+	etcdPrefix = "self-hosted-etcd"
 )
 
 var (
@@ -46,12 +50,32 @@ var tempAPIServerManifest = v1.Pod{
 	},
 }
 
+var tempEtcdManifest = v1.Pod{
+	TypeMeta: unversioned.TypeMeta{
+		APIVersion: "v1",
+		Kind:       "Pod",
+	},
+	ObjectMeta: v1.ObjectMeta{
+		Name:      tempEtcd,
+		Namespace: api.NamespaceSystem,
+	},
+}
+
 var tempPodSpecMap = map[string]v1.Pod{
 	tempAPIServer: tempAPIServerManifest,
+	tempEtcd:      tempEtcdManifest,
 }
 
 func main() {
 	glog.Info("begin pods checkpointing...")
+	etcd := flag.Bool("experimental-self-hosted-etcd", false, "Checkpoint self hosted etcd.")
+	flag.Parse()
+
+	if *etcd {
+		glog.Infof("self hosted etcd checkpoint enabled")
+		go run(etcdPrefix, tempEtcd, api.NamespaceSystem)
+	}
+
 	run(kubeAPIServer, tempAPIServer, api.NamespaceSystem)
 }
 

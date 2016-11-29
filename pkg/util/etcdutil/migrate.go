@@ -107,7 +107,7 @@ func createMigratedEtcdCluster(httpcli *http.Client, host, podIP string) error {
   "apiVersion": "coreos.com/v1",
   "kind": "EtcdCluster",
   "metadata": {
-    "name": "etcd-cluster",
+    "name": "self-hosted-etcd",
     "namespace": "kube-system"
   },
   "spec": {
