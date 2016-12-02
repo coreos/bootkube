@@ -27,35 +27,40 @@ const (
 	kubeconfigPath    = "/etc/kubernetes/kubeconfig"
 	secretsPath       = "/etc/kubernetes/checkpoint-secrets"
 
-	tempAPIServer = "temp-apiserver"
-	kubeAPIServer = "kube-apiserver"
+	checkpointAPIServer = "checkpoint-apiserver"
+	kubeAPIServer       = "kube-apiserver"
+
+	checkpointAnnotation = "alpha.coreos.com/checkpoint"
 )
 
 var (
 	secureAPIAddr = fmt.Sprintf("https://%s:%s", os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT_HTTPS"))
 )
 
-var tempAPIServerManifest = v1.Pod{
+var checkpointAPIServerManifest = v1.Pod{
 	TypeMeta: unversioned.TypeMeta{
 		APIVersion: "v1",
 		Kind:       "Pod",
 	},
 	ObjectMeta: v1.ObjectMeta{
-		Name:      "temp-apiserver",
+		Name:      kubeAPIServer,
 		Namespace: api.NamespaceSystem,
+		Annotations: map[string]string{
+			checkpointAnnotation: checkpointAPIServer,
+		},
 	},
 }
 
-var tempPodSpecMap = map[string]v1.Pod{
-	tempAPIServer: tempAPIServerManifest,
+var checkpointPodSpecMap = map[string]v1.Pod{
+	checkpointAPIServer: checkpointAPIServerManifest,
 }
 
 func main() {
 	glog.Info("begin pods checkpointing...")
-	run(kubeAPIServer, tempAPIServer, api.NamespaceSystem)
+	run(kubeAPIServer, checkpointAPIServer, api.NamespaceSystem)
 }
 
-func run(actualPodName, tempPodName, namespace string) {
+func run(actualPodAnnotation, checkpointPodAnnotation, namespace string) {
 	client := newAPIClient()
 	for {
 		var podList v1.PodList
@@ -63,35 +68,35 @@ func run(actualPodName, tempPodName, namespace string) {
 			glog.Fatal(err)
 		}
 		switch {
-		case bothRunning(podList, actualPodName, tempPodName, namespace):
-			glog.Infof("both temp %v and actual %v pods running, removing temp pod", actualPodName, tempPodName)
-			// Both the temp and actual pods are running.
-			// Remove the temp manifest from the config dir so that the
+		case bothRunning(podList, actualPodAnnotation, checkpointPodAnnotation, namespace):
+			glog.Infof("both checkpoint %v and actual %v pods running, removing checkpoint pod", actualPodAnnotation, checkpointPodAnnotation)
+			// Both the checkpoint and actual pods are running.
+			// Remove the checkpoint manifest from the config dir so that the
 			// kubelet will stop it.
-			if err := os.Remove(activeManifest(tempPodName)); err != nil {
+			if err := os.Remove(activeManifest(checkpointPodAnnotation)); err != nil {
 				glog.Error(err)
 			}
-		case isPodRunning(podList, client, actualPodName, namespace):
-			glog.Infof("actual pod %v found, creating temp pod manifest", actualPodName)
+		case isPodRunning(podList, client, actualPodAnnotation, namespace):
+			glog.Infof("actual pod %v found, creating checkpoint pod manifest", actualPodAnnotation)
 			// The actual is running. Let's snapshot the pod,
 			// clean it up a bit, and then save it to the ignore path for
 			// later use.
-			tempSpec, ok := tempPodSpecMap[tempPodName]
+			checkpointSpec, ok := checkpointPodSpecMap[checkpointPodAnnotation]
 			if !ok {
-				glog.Fatalf("cannot find pod spec for %v", tempPodName)
+				glog.Fatalf("cannot find pod spec for %v", checkpointPodAnnotation)
 			}
-			tempSpec.Spec = parseAPIPodSpec(podList, actualPodName, namespace)
-			convertSecretsToVolumeMounts(client, &tempSpec)
-			writeManifest(tempSpec, tempPodName)
-			glog.Infof("finished creating temp pod %v manifest at %s\n", tempPodName, checkpointManifest(tempPodName))
+			checkpointSpec.Spec = parseAPIPodSpec(podList, actualPodAnnotation, namespace)
+			convertSecretsToVolumeMounts(client, &checkpointSpec)
+			writeManifest(checkpointSpec, checkpointPodAnnotation)
+			glog.Infof("finished creating checkpoint pod %v manifest at %s\n", checkpointPodAnnotation, checkpointManifest(checkpointPodAnnotation))
 
 		default:
-			glog.Info("no actual pod running, installing temp pod static manifest")
-			b, err := ioutil.ReadFile(checkpointManifest(tempPodName))
+			glog.Info("no actual pod running, installing checkpoint pod static manifest")
+			b, err := ioutil.ReadFile(checkpointManifest(checkpointPodAnnotation))
 			if err != nil {
 				glog.Error(err)
 			} else {
-				if err := ioutil.WriteFile(activeManifest(tempPodName), b, 0644); err != nil {
+				if err := ioutil.WriteFile(activeManifest(checkpointPodAnnotation), b, 0644); err != nil {
 					glog.Error(err)
 				}
 			}
@@ -122,11 +127,11 @@ func getPodsFromKubeletAPI() []byte {
 }
 
 func bothRunning(pods v1.PodList, an, tn, ns string) bool {
-	var actualPodSeen, tempPodSeen bool
+	var actualPodSeen, checkpointPodSeen bool
 	for _, p := range pods.Items {
 		actualPodSeen = actualPodSeen || isPod(p, an, ns)
-		tempPodSeen = tempPodSeen || isPod(p, tn, ns)
-		if actualPodSeen && tempPodSeen {
+		checkpointPodSeen = checkpointPodSeen || isPod(p, tn, ns)
+		if actualPodSeen && checkpointPodSeen {
 			return true
 		}
 	}
@@ -149,7 +154,7 @@ func isPodRunning(pods v1.PodList, client clientset.Interface, n, ns string) boo
 }
 
 func isPod(pod v1.Pod, n, ns string) bool {
-	return strings.Contains(pod.Name, n) && pod.Namespace == ns
+	return pod.Annotations[checkpointAnnotation] == n && pod.Namespace == ns
 }
 
 // cleanVolumes will sanitize the list of volumes and volume mounts
