@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+GLOG_v=${GLOG_v:-1}
+
 un="$(uname)"
 local_os="linux"
 if [ ${un} == 'Darwin' ]; then
@@ -23,7 +25,7 @@ scp -q -F ssh_config -r cluster core@default:/home/core/cluster
 scp -q -F ssh_config ../../_output/bin/linux/bootkube core@default:/home/core
 
 # Run bootkube
-ssh -q -F ssh_config core@default "sudo /home/core/bootkube start --asset-dir=/home/core/cluster 2>> /home/core/bootkube.log"
+ssh -q -F ssh_config core@default "sudo GLOG_v=${GLOG_v} /home/core/bootkube start --asset-dir=/home/core/cluster 2>> /home/core/bootkube.log"
 
 echo
 echo "Bootstrap complete. Access your kubernetes cluster using:"
