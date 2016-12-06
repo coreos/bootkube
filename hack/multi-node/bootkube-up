@@ -15,6 +15,13 @@ if [ ! -d "cluster" ]; then
   cp cluster/user-data{,-worker}
   cp cluster/user-data{,-controller}
   sed -i.bak -e '/--node-labels=master=true/d' cluster/user-data-worker
+  for i in http_proxy https_proxy HTTP_PROXY HTTPS_PROXY; do
+    if [ -n "${!i:-}" ]; then
+        sed -i 's;${'"${i}"'};'"${!i}"';' cluster/user-data{,-worker,-controller}
+    else
+        sed -i '/${'"${i}"'/d' cluster/user-data{,-worker,-controller}
+    fi
+  done
 fi
 
 # Start the VM
