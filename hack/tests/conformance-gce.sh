@@ -105,6 +105,6 @@ else
         "--mount volume=keyfile,target=/build/keyfile " \
     )
 
-    sudo rkt run --insecure-options=image ${RKT_OPTS} docker://golang:1.6.3 --exec /bin/bash -- -c \
+    sudo rkt run --insecure-options=image ${RKT_OPTS} docker://golang:1.7.4 --exec /bin/bash -- -c \
         "IN_CONTAINER=true BOOTKUBE_REPO=${BOOTKUBE_REPO} BOOTKUBE_VERSION=${BOOTKUBE_VERSION} COREOS_IMAGE=${COREOS_IMAGE} /build/bootkube/hack/tests/$(basename $0)"
 fi

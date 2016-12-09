@@ -38,13 +38,13 @@ type Config struct {
 type bootkube struct {
 	selfHostedEtcd bool
 	assetDir       string
-	apiServer      *apiserver.APIServer
+	apiServer      *apiserver.ServerRunOptions
 	controller     *controller.CMServer
 	scheduler      *scheduler.SchedulerServer
 }
 
 func NewBootkube(config Config) (*bootkube, error) {
-	apiServer := apiserver.NewAPIServer()
+	apiServer := apiserver.NewServerRunOptions()
 	fs := pflag.NewFlagSet("apiserver", pflag.ExitOnError)
 	apiServer.AddFlags(fs)
 	fs.Parse(makeAPIServerFlags(config))
