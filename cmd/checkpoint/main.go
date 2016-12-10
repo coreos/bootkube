@@ -78,6 +78,7 @@ func run(checkpoints map[string]v1.Pod) {
 			switch {
 			case podpair.parent != nil && podpair.child == nil:
 				glog.Infof("only actual pod %v found, creating checkpoint pod manifest", upn)
+
 				// The actual is running. Let's snapshot the pod,
 				// clean it up a bit, and then save it to the ignore path for
 				// later use.
@@ -305,6 +306,19 @@ func getPodsWithCheckpointAnnotation(pods v1.PodList) map[string]*checkpointPodP
 
 	for i := range pods.Items {
 		p := pods.Items[i]
+
+		// FIXME: trim off the pod name suffix to workaround with checkpointing the same
+		// pod with different suffix multiple times on the same node.
+		// A more reliable solution is to contact with the real API server to do GC.
+		// See https://github.com/kubernetes-incubator/bootkube/pull/220#issuecomment-265616615
+		// for more details.
+		if strings.HasPrefix(p.GetName(), "kube-apiserver") {
+			p.ObjectMeta.Name = "kube-apiserver"
+		}
+		if strings.HasPrefix(p.GetName(), "kube-etcd") {
+			p.ObjectMeta.Name = "kube-etcd"
+		}
+
 		if n, ok := p.Annotations[checkpointAnnotation]; ok && n == "true" {
 			upn := uniquePodName(p)
 			if pa[upn] == nil {
