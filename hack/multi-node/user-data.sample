@@ -26,7 +26,7 @@ coreos:
         [Service]
         EnvironmentFile=/etc/environment
         Environment=KUBELET_ACI=quay.io/coreos/hyperkube
-        Environment=KUBELET_VERSION=v1.4.6_coreos.0
+        Environment=KUBELET_VERSION=v1.4.7_coreos.0
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests
         ExecStartPre=/bin/mkdir -p /srv/kubernetes/manifests
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/checkpoint-secrets
