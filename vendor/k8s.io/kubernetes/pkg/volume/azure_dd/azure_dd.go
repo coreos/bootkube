@@ -115,11 +115,20 @@ func (plugin *azureDataDiskPlugin) newMounterInternal(spec *volume.Spec, podUID 
 	if err != nil {
 		return nil, err
 	}
-
-	fsType := *azure.FSType
+	fsType := "ext4"
+	if azure.FSType != nil {
+		fsType = *azure.FSType
+	}
+	cachingMode := api.AzureDataDiskCachingNone
+	if azure.CachingMode != nil {
+		cachingMode = *azure.CachingMode
+	}
+	readOnly := false
+	if azure.ReadOnly != nil {
+		readOnly = *azure.ReadOnly
+	}
 	diskName := azure.DiskName
 	diskUri := azure.DataDiskURI
-	cachingMode := *azure.CachingMode
 	return &azureDiskMounter{
 		azureDisk: &azureDisk{
 			podUID:      podUID,
@@ -131,7 +140,7 @@ func (plugin *azureDataDiskPlugin) newMounterInternal(spec *volume.Spec, podUID 
 			plugin:      plugin,
 		},
 		fsType:      fsType,
-		readOnly:    *azure.ReadOnly,
+		readOnly:    readOnly,
 		diskMounter: &mount.SafeFormatAndMount{Interface: plugin.host.GetMounter(), Runner: exec.New()}}, nil
 }
 
@@ -204,6 +213,13 @@ func (b *azureDiskMounter) GetAttributes() volume.Attributes {
 	}
 }
 
+// Checks prior to mount operations to verify that the required components (binaries, etc.)
+// to mount the volume are available on the underlying node.
+// If not, it returns an error
+func (b *azureDiskMounter) CanMount() error {
+	return nil
+}
+
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *azureDiskMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
@@ -273,7 +289,7 @@ func (b *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 }
 
 func makeGlobalPDPath(host volume.VolumeHost, volume string) string {
-	return path.Join(host.GetPluginDir(azureDataDiskPluginName), "mounts", volume)
+	return path.Join(host.GetPluginDir(azureDataDiskPluginName), mount.MountsInGlobalPDPath, volume)
 }
 
 func (azure *azureDisk) GetPath() string {

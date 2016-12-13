@@ -23,6 +23,8 @@ import (
 	"strconv"
 	dstrings "strings"
 
+	"runtime"
+
 	"github.com/golang/glog"
 	gcli "github.com/heketi/heketi/client/api/go-client"
 	gapi "github.com/heketi/heketi/pkg/glusterfs/api"
@@ -54,8 +56,9 @@ var _ volume.Provisioner = &glusterfsVolumeProvisioner{}
 var _ volume.Deleter = &glusterfsVolumeDeleter{}
 
 const (
-	glusterfsPluginName = "kubernetes.io/glusterfs"
-	volprefix           = "vol_"
+	glusterfsPluginName         = "kubernetes.io/glusterfs"
+	volprefix                   = "vol_"
+	gciGlusterMountBinariesPath = "/sbin/mount.glusterfs"
 )
 
 func (plugin *glusterfsPlugin) Init(host volume.VolumeHost) error {
@@ -194,6 +197,20 @@ func (b *glusterfsMounter) GetAttributes() volume.Attributes {
 		Managed:         false,
 		SupportsSELinux: false,
 	}
+}
+
+// Checks prior to mount operations to verify that the required components (binaries, etc.)
+// to mount the volume are available on the underlying node.
+// If not, it returns an error
+func (b *glusterfsMounter) CanMount() error {
+	exe := exec.New()
+	switch runtime.GOOS {
+	case "linux":
+		if _, err := exe.Command("/bin/ls", gciGlusterMountBinariesPath).CombinedOutput(); err != nil {
+			return fmt.Errorf("Required binary %s is missing", gciGlusterMountBinariesPath)
+		}
+	}
+	return nil
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.

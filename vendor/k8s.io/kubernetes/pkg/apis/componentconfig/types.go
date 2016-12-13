@@ -305,6 +305,8 @@ type KubeletConfiguration struct {
 	// rktPath is the path of rkt binary. Leave empty to use the first rkt in
 	// $PATH.
 	RktPath string `json:"rktPath,omitempty"`
+	// experimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
+	ExperimentalMounterPath string `json:"experimentalMounterPath,omitempty"`
 	// rktApiEndpoint is the endpoint of the rkt API service to communicate with.
 	RktAPIEndpoint string `json:"rktAPIEndpoint,omitempty"`
 	// rktStage1Image is the image to use as stage1. Local paths and
@@ -433,6 +435,10 @@ type KubeletConfiguration struct {
 	IPTablesDropBit int32 `json:"iptablesDropBit"`
 	// Whitelist of unsafe sysctls or sysctl patterns (ending in *).
 	AllowedUnsafeSysctls []string `json:"experimentalAllowedUnsafeSysctls,omitempty"`
+	// This flag, if set, enables a check prior to mount operations to verify that the required components
+	// (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled
+	// and fails the mount operation fails.
+	ExperimentalCheckNodeCapabilitiesBeforeMount bool `json:"ExperimentalCheckNodeCapabilitiesBeforeMount,omitempty"`
 }
 
 type KubeSchedulerConfiguration struct {

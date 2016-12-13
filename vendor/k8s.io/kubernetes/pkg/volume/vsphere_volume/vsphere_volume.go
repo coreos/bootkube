@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -119,11 +120,19 @@ func (plugin *vsphereVolumePlugin) newUnmounterInternal(volName string, podUID t
 }
 
 func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	mounter := plugin.host.GetMounter()
+	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
+	volumePath, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
+	if err != nil {
+		return nil, err
+	}
+	volumePath = strings.Replace(volumePath, "\\040", " ", -1)
+	glog.V(5).Infof("vSphere volume path is %q", volumePath)
 	vsphereVolume := &api.Volume{
 		Name: volumeName,
 		VolumeSource: api.VolumeSource{
 			VsphereVolume: &api.VsphereVirtualDiskVolumeSource{
-				VolumePath: volumeName,
+				VolumePath: volumePath,
 			},
 		},
 	}
@@ -175,6 +184,13 @@ func (b *vsphereVolumeMounter) GetAttributes() volume.Attributes {
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *vsphereVolumeMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
+}
+
+// Checks prior to mount operations to verify that the required components (binaries, etc.)
+// to mount the volume are available on the underlying node.
+// If not, it returns an error
+func (b *vsphereVolumeMounter) CanMount() error {
+	return nil
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
@@ -269,7 +285,7 @@ func (v *vsphereVolumeUnmounter) TearDownAt(dir string) error {
 }
 
 func makeGlobalPDPath(host volume.VolumeHost, devName string) string {
-	return path.Join(host.GetPluginDir(vsphereVolumePluginName), "mounts", devName)
+	return path.Join(host.GetPluginDir(vsphereVolumePluginName), mount.MountsInGlobalPDPath, devName)
 }
 
 func (vv *vsphereVolume) GetPath() string {

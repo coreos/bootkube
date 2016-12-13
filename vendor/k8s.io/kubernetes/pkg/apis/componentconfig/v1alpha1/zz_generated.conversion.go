@@ -255,6 +255,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.RemoteImageEndpoint = in.RemoteImageEndpoint
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 	out.RktPath = in.RktPath
+	out.ExperimentalMounterPath = in.ExperimentalMounterPath
 	out.RktAPIEndpoint = in.RktAPIEndpoint
 	out.RktStage1Image = in.RktStage1Image
 	if err := api.Convert_Pointer_string_To_string(&in.LockFilePath, &out.LockFilePath, s); err != nil {
@@ -339,6 +340,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 		return err
 	}
 	out.AllowedUnsafeSysctls = in.AllowedUnsafeSysctls
+	out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
 	return nil
 }
 
@@ -435,6 +437,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.RemoteImageEndpoint = in.RemoteImageEndpoint
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 	out.RktPath = in.RktPath
+	out.ExperimentalMounterPath = in.ExperimentalMounterPath
 	out.RktAPIEndpoint = in.RktAPIEndpoint
 	out.RktStage1Image = in.RktStage1Image
 	if err := api.Convert_string_To_Pointer_string(&in.LockFilePath, &out.LockFilePath, s); err != nil {
@@ -519,6 +522,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 		return err
 	}
 	out.AllowedUnsafeSysctls = in.AllowedUnsafeSysctls
+	out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
 	return nil
 }
 
