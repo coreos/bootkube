@@ -28,6 +28,12 @@ import (
 	"k8s.io/kubernetes/pkg/util/exec"
 )
 
+const (
+	// Default mount command if mounter path is not specified
+	defaultMountCommand  = "mount"
+	MountsInGlobalPDPath = "mounts"
+)
+
 type Interface interface {
 	// Mount mounts source to target as fstype with given options.
 	Mount(source string, target string, fstype string, options []string) error
@@ -89,8 +95,17 @@ func (mounter *SafeFormatAndMount) FormatAndMount(source string, target string, 
 }
 
 // New returns a mount.Interface for the current system.
-func New() Interface {
-	return &Mounter{}
+// It provides options to override the default mounter behavior.
+// mounterPath allows using an alternative to `/bin/mount` for mounting.
+func New(mounterPath string) Interface {
+	// If mounter-path flag is not set, use default mount path
+	if mounterPath == "" {
+		mounterPath = defaultMountCommand
+	}
+
+	return &Mounter{
+		mounterPath: mounterPath,
+	}
 }
 
 // GetMountRefs finds all other references to the device referenced
@@ -115,13 +130,21 @@ func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
 		}
 	}
 
+	// TODO: this is a workaround for the unmount device issue caused by gci mounter.
+	// In GCI cluster, if gci mounter is used for mounting, the container started by mounter
+	// script will cause additional mounts created in the container. Since these mounts are
+	// irrelavant to the original mounts, they should be not considered when checking the
+	// mount references. Current solution is to filter out those mount paths that contain
+	// the string of original mount path.
+	// Plan to work on better approach to solve this issue.
+
 	// Find all references to the device.
 	var refs []string
 	if deviceName == "" {
 		glog.Warningf("could not determine device for path: %q", mountPath)
 	} else {
 		for i := range mps {
-			if mps[i].Device == deviceName && mps[i].Path != slTarget {
+			if mps[i].Device == deviceName && !strings.Contains(mps[i].Path, slTarget) {
 				refs = append(refs, mps[i].Path)
 			}
 		}
@@ -175,9 +198,15 @@ func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (str
 		glog.V(4).Infof("Directory %s is not mounted", mountPath)
 		return "", fmt.Errorf("directory %s is not mounted", mountPath)
 	}
+	basemountPath := path.Join(pluginDir, MountsInGlobalPDPath)
 	for _, ref := range refs {
-		if strings.HasPrefix(ref, pluginDir) {
-			return path.Base(ref), nil
+		if strings.HasPrefix(ref, basemountPath) {
+			volumeID, err := filepath.Rel(basemountPath, ref)
+			if err != nil {
+				glog.Errorf("Failed to get volume id from mount %s - %v", mountPath, err)
+				return "", err
+			}
+			return volumeID, nil
 		}
 	}
 

@@ -612,11 +612,13 @@ func WaitForPodsSuccess(c *client.Client, ns string, successPodLabels map[string
 	return nil
 }
 
+var ReadyReplicaVersion = version.MustParse("v1.4.0")
+
 // WaitForPodsRunningReady waits up to timeout to ensure that all pods in
 // namespace ns are either running and ready, or failed but controlled by a
-// replication controller. Also, it ensures that at least minPods are running
-// and ready. It has separate behavior from other 'wait for' pods functions in
-// that it requires the list of pods on every iteration. This is useful, for
+// controller. Also, it ensures that at least minPods are running and
+// ready. It has separate behavior from other 'wait for' pods functions in
+// that it requests the list of pods on every iteration. This is useful, for
 // example, in cluster startup, because the number of pods increases while
 // waiting.
 // If ignoreLabels is not empty, pods matching this selector are ignored and
@@ -626,6 +628,14 @@ func WaitForPodsSuccess(c *client.Client, ns string, successPodLabels map[string
 // and some in Success. This is to allow the client to decide if "Success"
 // means "Ready" or not.
 func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout time.Duration, ignoreLabels map[string]string) error {
+
+	// This can be removed when we no longer have 1.3 servers running with upgrade tests.
+	hasReadyReplicas, err := ServerVersionGTE(ReadyReplicaVersion, c.Discovery())
+	if err != nil {
+		Logf("Error getting the server version: %v", err)
+		return err
+	}
+
 	ignoreSelector := labels.SelectorFromSet(ignoreLabels)
 	start := time.Now()
 	Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
@@ -641,17 +651,32 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 	}()
 
 	if wait.PollImmediate(Poll, timeout, func() (bool, error) {
-		// We get the new list of pods and replication controllers in every
-		// iteration because more pods come online during startup and we want to
-		// ensure they are also checked.
+		// We get the new list of pods, replication controllers, and
+		// replica sets in every iteration because more pods come
+		// online during startup and we want to ensure they are also
+		// checked.
+		replicas, replicaOk := int32(0), int32(0)
 		rcList, err := c.ReplicationControllers(ns).List(api.ListOptions{})
 		if err != nil {
 			Logf("Error getting replication controllers in namespace '%s': %v", ns, err)
 			return false, nil
 		}
-		replicas := int32(0)
-		for _, rc := range rcList.Items {
-			replicas += rc.Spec.Replicas
+
+		if hasReadyReplicas {
+			for _, rc := range rcList.Items {
+				replicas += rc.Spec.Replicas
+				replicaOk += rc.Status.ReadyReplicas
+			}
+
+			rsList, err := c.Extensions().ReplicaSets(ns).List(api.ListOptions{})
+			if err != nil {
+				Logf("Error getting replication sets in namespace %q: %v", ns, err)
+				return false, nil
+			}
+			for _, rs := range rsList.Items {
+				replicas += rs.Spec.Replicas
+				replicaOk += rs.Status.ReadyReplicas
+			}
 		}
 
 		podList, err := c.Pods(ns).List(api.ListOptions{})
@@ -659,7 +684,7 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 			Logf("Error getting pods in namespace '%s': %v", ns, err)
 			return false, nil
 		}
-		nOk, replicaOk := int32(0), int32(0)
+		nOk := int32(0)
 		badPods = []api.Pod{}
 		desiredPods = len(podList.Items)
 		for _, pod := range podList.Items {
@@ -669,24 +694,23 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 			}
 			if res, err := PodRunningReady(&pod); res && err == nil {
 				nOk++
-				if hasReplicationControllersForPod(rcList, pod) {
-					replicaOk++
-				}
 			} else {
 				if pod.Status.Phase != api.PodFailed {
 					Logf("The status of Pod %s is %s, waiting for it to be either Running or Failed", pod.ObjectMeta.Name, pod.Status.Phase)
 					badPods = append(badPods, pod)
-				} else if !hasReplicationControllersForPod(rcList, pod) {
-					Logf("Pod %s is Failed, but it's not controlled by a ReplicationController", pod.ObjectMeta.Name)
+				} else if _, ok := pod.Annotations[api.CreatedByAnnotation]; !ok {
+					Logf("Pod %s is Failed, but it's not controlled by a controller", pod.ObjectMeta.Name)
 					badPods = append(badPods, pod)
 				}
-				//ignore failed pods that are controlled by a replication controller
+				//ignore failed pods that are controlled by some controller
 			}
 		}
 
 		Logf("%d / %d pods in namespace '%s' are running and ready (%d seconds elapsed)",
 			nOk, len(podList.Items), ns, int(time.Since(start).Seconds()))
-		Logf("expected %d pod replicas in namespace '%s', %d are Running and Ready.", replicas, ns, replicaOk)
+		if hasReadyReplicas {
+			Logf("expected %d pod replicas in namespace '%s', %d are Running and Ready.", replicas, ns, replicaOk)
+		}
 
 		if replicaOk == replicas && nOk >= minPods && len(badPods) == 0 {
 			return true, nil
