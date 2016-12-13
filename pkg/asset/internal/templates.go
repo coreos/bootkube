@@ -169,12 +169,12 @@ metadata:
   name: checkpoint-installer
   namespace: kube-system
   labels:
-    k8s-app: kube-api-checkpointer
+    k8s-app: pod-checkpointer
 spec:
   template:
     metadata:
       labels:
-        k8s-app: kube-api-checkpointer
+        k8s-app: pod-checkpointer
     spec:
       nodeSelector:
         master: "true"
