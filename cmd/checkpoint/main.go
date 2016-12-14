@@ -34,8 +34,8 @@ const (
 )
 
 var podAPIServerMeta = unversioned.TypeMeta{
-	APIVersion: "v1",
-	Kind:       "Pod",
+	APIVersion: "nope",
+	Kind:       "nope",
 }
 
 var (
