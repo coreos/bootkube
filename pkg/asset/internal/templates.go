@@ -261,12 +261,12 @@ metadata:
   name: kube-proxy
   namespace: kube-system
   labels:
-    k8s_app: kube-proxy
+    k8s-app: kube-proxy
 spec:
   template:
     metadata:
       labels:
-        k8s_app: kube-proxy
+        k8s-app: kube-proxy
     spec:
       hostNetwork: true
       containers:
