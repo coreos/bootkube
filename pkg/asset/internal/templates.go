@@ -118,6 +118,8 @@ spec:
     metadata:
       labels:
         k8s-app: kube-apiserver
+      annotations:
+        checkpointer.alpha.coreos.com/checkpoint: "true"
     spec:
       nodeSelector:
         master: "true"
