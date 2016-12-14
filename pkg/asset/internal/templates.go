@@ -181,7 +181,7 @@ spec:
       hostNetwork: true
       containers:
       - name: checkpoint-installer
-        image: quay.io/coreos/pod-checkpointer:808d9e50c8beaa82672cb7dbd57a782d7d6c0262
+        image: quay.io/coreos/pod-checkpointer-dev:db0d7316d3352d184b38a3c56c49820e12136313
         command:
         - /checkpoint-installer.sh
         volumeMounts:
