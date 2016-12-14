@@ -51,6 +51,7 @@ spec:
         - --kubeconfig=/etc/kubernetes/kubeconfig
         - --require-kubeconfig
         - --lock-file=/var/run/lock/kubelet.lock
+        - --cloud-provider={{.CloudProvider}}
         env:
           - name: MY_POD_IP
             valueFrom:
