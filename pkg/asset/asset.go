@@ -41,15 +41,23 @@ const (
 // AssetConfig holds all configuration needed when generating
 // the default set of assets.
 type Config struct {
-	EtcdServers     []*url.URL
-	APIServers      []*url.URL
-	CACert          *x509.Certificate
-	CAPrivKey       *rsa.PrivateKey
-	AltNames        *tlsutil.AltNames
-	SelfHostKubelet bool
-	SelfHostedEtcd  bool
-	StorageBackend  string
-	CloudProvider   string
+	EtcdServers       []*url.URL
+	APIServers        []*url.URL
+	CACert            *x509.Certificate
+	CAPrivKey         *rsa.PrivateKey
+	AltNames          *tlsutil.AltNames
+	SelfHostKubelet   bool
+	SelfHostedEtcd    bool
+	StorageBackend    string
+	CloudProvider     string
+	TemplateOverrides map[string]Template
+}
+
+// Template holds a textual template as well as data that can be used during
+// generation.
+type Template struct {
+	Template []byte
+	Data     interface{}
 }
 
 // NewDefaultAssets returns a list of default assets, optionally

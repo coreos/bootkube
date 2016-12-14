@@ -3,6 +3,7 @@ package asset
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"path/filepath"
 	"text/template"
 
@@ -41,8 +42,8 @@ func newStaticAssets(selfHostKubelet, selfHostedEtcd bool) Assets {
 
 func newDynamicAssets(conf Config) Assets {
 	return Assets{
-		mustCreateAssetFromTemplate(AssetPathControllerManager, internal.ControllerManagerTemplate, conf),
-		mustCreateAssetFromTemplate(AssetPathAPIServer, internal.APIServerTemplate, conf),
+		mustCreateAssetFromOverridableTemplate(AssetPathControllerManager, internal.ControllerManagerTemplate, conf, conf.TemplateOverrides),
+		mustCreateAssetFromOverridableTemplate(AssetPathAPIServer, internal.APIServerTemplate, conf, conf.TemplateOverrides),
 	}
 }
 
@@ -135,6 +136,21 @@ func secretFromAssets(name, namespace string, assetNames []string, assets Assets
 		},
 		Data: data,
 	})
+}
+
+func mustCreateAssetFromOverridableTemplate(name string, template []byte, data interface{}, overrides map[string]Template) Asset {
+	if templateOverride, ok := overrides[name]; ok {
+		var mergedData map[string]interface{}
+
+		jData, _ := json.Marshal(data)
+		json.Unmarshal(jData, &mergedData)
+		jOverrideData, _ := json.Marshal(templateOverride.Data)
+		json.Unmarshal(jOverrideData, &mergedData)
+
+		return mustCreateAssetFromTemplate(name, templateOverride.Template, mergedData)
+	}
+
+	return mustCreateAssetFromTemplate(name, template, data)
 }
 
 func mustCreateAssetFromTemplate(name string, template []byte, data interface{}) Asset {
