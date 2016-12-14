@@ -42,7 +42,7 @@ conformance-%: clean all
 #TODO(aaron): the k8s.io/client-go upstream package is a symlink with relative path. Making note because we change symlink path.
 # This will naively try and create a vendor dir from a k8s release
 # USE: make vendor VENDOR_VERSION=vX.Y.Z
-VENDOR_VERSION = v1.4.7+coreos.0
+VENDOR_VERSION = v1.5.1+coreos.0
 vendor:
 	@echo "Creating k8s vendor for: $(VENDOR_VERSION)"
 	@rm -rf vendor

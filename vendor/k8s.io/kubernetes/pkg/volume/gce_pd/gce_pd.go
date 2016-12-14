@@ -166,9 +166,6 @@ func (plugin *gcePersistentDiskPlugin) newDeleterInternal(spec *volume.Spec, man
 }
 
 func (plugin *gcePersistentDiskPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	if len(options.AccessModes) == 0 {
-		options.AccessModes = plugin.GetAccessModes()
-	}
 	return plugin.newProvisionerInternal(options, &GCEDiskUtil{})
 }
 
@@ -400,7 +397,7 @@ func (c *gcePersistentDiskProvisioner) Provision() (*api.PersistentVolume, error
 		},
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   c.options.AccessModes,
+			AccessModes:                   c.options.PVC.Spec.AccessModes,
 			Capacity: api.ResourceList{
 				api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 			},
@@ -412,6 +409,9 @@ func (c *gcePersistentDiskProvisioner) Provision() (*api.PersistentVolume, error
 				},
 			},
 		},
+	}
+	if len(c.options.PVC.Spec.AccessModes) == 0 {
+		pv.Spec.AccessModes = c.plugin.GetAccessModes()
 	}
 
 	if len(labels) != 0 {

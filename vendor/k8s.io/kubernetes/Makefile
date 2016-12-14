@@ -95,9 +95,17 @@ ginkgo:
 #   make verify
 #   make verify BRANCH=branch_x
 .PHONY: verify
-verify:
+verify: verify_generated_files
 	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh -v
 	hack/make-rules/vet.sh
+
+# Runs all the generated updates.
+#
+# Example:
+# make update
+.PHONY: update
+update:
+	hack/update-all.sh
 
 # Build and run tests.
 #
@@ -119,11 +127,15 @@ check test: generated_files
 
 # Build and run integration tests.
 #
+# Args:
+#   WHAT: Directory names to test.  All *_test.go files under these
+#     directories will be run.  If not specified, "everything" will be tested.
+#
 # Example:
 #   make test-integration
 .PHONY: test-integration
 test-integration: generated_files
-	hack/make-rules/test-integration.sh
+	hack/make-rules/test-integration.sh $(WHAT)
 
 # Build and run end-to-end tests.
 #
@@ -164,11 +176,12 @@ test-e2e: ginkgo generated_files
 #  INSTANCE_METADATA: For REMOTE=true and running on GCE only.
 #  GUBERNATOR: For REMOTE=true only. Produce link to Gubernator to view logs.
 #	 Defaults to false.
+#  PARALLELISM: The number of gingko nodes to run.  Defaults to 8.
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container
 #   make test-e2e-node REMOTE=true DELETE_INSTANCES=true
-#   make test-e2e-node TEST_ARGS="--cgroups-per-qos=true"
+#   make test-e2e-node TEST_ARGS="--experimental-cgroups-per-qos=true"
 # Build and run tests.
 .PHONY: test-e2e-node
 test-e2e-node: ginkgo generated_files
@@ -180,6 +193,7 @@ test-e2e-node: ginkgo generated_files
 #   make test-cmd
 .PHONY: test-cmd
 test-cmd: generated_files
+	hack/make-rules/test-kubeadm-cmd.sh
 	hack/make-rules/test-cmd.sh
 
 # Remove all build artifacts.
@@ -190,7 +204,7 @@ test-cmd: generated_files
 # TODO(thockin): call clean_generated when we stop committing generated code.
 .PHONY: clean
 clean: clean_meta
-	build/make-clean.sh
+	build-tools/make-clean.sh
 	rm -rf $(OUT_DIR)
 	rm -rf Godeps/_workspace # Just until we are sure it is gone
 
@@ -202,13 +216,14 @@ clean: clean_meta
 clean_meta:
 	rm -rf $(META_DIR)
 
-# Remove all auto-generated artifacts.
+# Remove all auto-generated artifacts. Generated artifacts in staging folder should not be removed as they are not
+# generated using generated_files.
 #
 # Example:
 #   make clean_generated
 .PHONY: clean_generated
 clean_generated:
-	find . -type f -name $(GENERATED_FILE_PREFIX)\* | xargs rm -f
+	find . -type f -name $(GENERATED_FILE_PREFIX)\* | grep -v "[.]/staging/.*" | xargs rm -f
 
 # Run 'go vet'.
 #
@@ -230,7 +245,7 @@ vet:
 #   make release
 .PHONY: release
 release:
-	build/release.sh
+	build-tools/release.sh
 
 # Build a release, but skip tests
 #
@@ -238,7 +253,7 @@ release:
 #   make release-skip-tests
 .PHONY: release-skip-tests quick-release
 release-skip-tests quick-release:
-	KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build/release.sh
+	KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build-tools/release.sh
 
 # Cross-compile for all platforms
 #
@@ -278,4 +293,12 @@ $(notdir $(abspath $(wildcard federation/cmd/*/))): generated_files
 #   make generated_files
 .PHONY: generated_files
 generated_files:
-	$(MAKE) -f Makefile.$@ $@ CALLED_FROM_MAIN_MAKEFILE=1
+	$(MAKE) -f Makefile.generated_files $@ CALLED_FROM_MAIN_MAKEFILE=1
+
+# Verify auto-generated files needed for the build.
+#
+# Example:
+#   make verify_generated_files
+.PHONY: verify_generated_files
+verify_generated_files:
+	$(MAKE) -f Makefile.generated_files $@ CALLED_FROM_MAIN_MAKEFILE=1

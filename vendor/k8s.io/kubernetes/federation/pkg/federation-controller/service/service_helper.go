@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/pkg/api/errors"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
@@ -77,16 +77,16 @@ ForLoop:
 }
 
 // Whenever there is change on service, the federation service should be updated
-func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache *clusterCache, serviceCache *serviceCache, fedClient federation_release_1_4.Interface, sc *ServiceController) error {
+func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache *clusterCache, serviceCache *serviceCache, fedClient fedclientset.Interface, sc *ServiceController) error {
 	// obj holds the latest service info from apiserver, return if there is no federation cache for the service
 	cachedService, ok := serviceCache.get(key)
 	if !ok {
 		// if serviceCache does not exists, that means the service is not created by federation, we should skip it
 		return nil
 	}
-	serviceInterface, exists, err := clusterCache.serviceStore.GetByKey(key)
+	serviceInterface, exists, err := clusterCache.serviceStore.Indexer.GetByKey(key)
 	if err != nil {
-		glog.Infof("Did not successfully get %v from store: %v, will retry later", key, err)
+		glog.Errorf("Did not successfully get %v from store: %v, will retry later", key, err)
 		clusterCache.serviceQueue.Add(key)
 		return err
 	}
@@ -223,6 +223,7 @@ func (cc *clusterClientCache) processServiceUpdate(cachedService *cachedService,
 			for _, fed := range cachedFedServiceStatus.Ingress {
 				if new.IP == fed.IP && new.Hostname == fed.Hostname {
 					found = true
+					break
 				}
 			}
 			if !found {
@@ -257,7 +258,7 @@ func (cc *clusterClientCache) processServiceUpdate(cachedService *cachedService,
 	return needUpdate
 }
 
-func (cc *clusterClientCache) persistFedServiceUpdate(cachedService *cachedService, fedClient federation_release_1_4.Interface) error {
+func (cc *clusterClientCache) persistFedServiceUpdate(cachedService *cachedService, fedClient fedclientset.Interface) error {
 	service := cachedService.lastState
 	glog.V(5).Infof("Persist federation service status %s/%s", service.Namespace, service.Name)
 	var err error

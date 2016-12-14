@@ -51,6 +51,7 @@ type CinderProvider interface {
 	GetAttachmentDiskPath(instanceID string, diskName string) (string, error)
 	DiskIsAttached(diskName, instanceID string) (bool, error)
 	DisksAreAttached(diskNames []string, instanceID string) (map[string]bool, error)
+	ShouldTrustDevicePath() bool
 	Instances() (cloudprovider.Instances, bool)
 }
 
@@ -162,9 +163,6 @@ func (plugin *cinderPlugin) newDeleterInternal(spec *volume.Spec, manager cdMana
 }
 
 func (plugin *cinderPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	if len(options.AccessModes) == 0 {
-		options.AccessModes = plugin.GetAccessModes()
-	}
 	return plugin.newProvisionerInternal(options, &CinderDiskUtil{})
 }
 
@@ -482,7 +480,7 @@ func (c *cinderVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 		},
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   c.options.AccessModes,
+			AccessModes:                   c.options.PVC.Spec.AccessModes,
 			Capacity: api.ResourceList{
 				api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 			},
@@ -495,6 +493,10 @@ func (c *cinderVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 			},
 		},
 	}
+	if len(c.options.PVC.Spec.AccessModes) == 0 {
+		pv.Spec.AccessModes = c.plugin.GetAccessModes()
+	}
+
 	return pv, nil
 }
 

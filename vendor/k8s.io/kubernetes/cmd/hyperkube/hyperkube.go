@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// CAUTION: If you update code in this file, you may need to also update code
-//          in contrib/mesos/cmd/km/hyperkube.go
 package main
 
 import (
@@ -149,7 +147,7 @@ func (hk *HyperKube) Run(args []string) error {
 			baseCommand = baseCommand + " " + serverName
 			args = args[1:]
 		} else {
-			err = errors.New("No server specified")
+			err = errors.New("no server specified")
 			hk.Printf("Error: %v\n\n", err)
 			hk.Usage()
 			return err

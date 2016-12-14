@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
+	k8stypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/wait"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -87,7 +88,7 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 	podName := "pod-uid"
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := k8stypes.NodeName("node-name")
 	dsw.AddNode(nodeName)
 	volumeExists := dsw.VolumeExists(volumeName, nodeName)
 	if volumeExists {
@@ -133,7 +134,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 	podName := "pod-uid"
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := k8stypes.NodeName("node-name")
 	dsw.AddNode(nodeName)
 	volumeExists := dsw.VolumeExists(volumeName, nodeName)
 	if volumeExists {
@@ -200,7 +201,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	podName := "pod-uid"
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := k8stypes.NodeName("node-name")
 	dsw.AddNode(nodeName)
 	volumeExists := dsw.VolumeExists(volumeName, nodeName)
 	if volumeExists {
@@ -267,7 +268,7 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 	podName := "pod-uid"
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := k8stypes.NodeName("node-name")
 	dsw.AddNode(nodeName)
 	volumeExists := dsw.VolumeExists(volumeName, nodeName)
 	if volumeExists {

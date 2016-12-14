@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
-	release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -37,7 +37,7 @@ import (
 )
 
 type clusterCache struct {
-	clientset *release_1_4.Clientset
+	clientset *kubeclientset.Clientset
 	cluster   *v1beta1.Cluster
 	// A store of services, populated by the serviceController
 	serviceStore cache.StoreToServiceLister
@@ -93,10 +93,12 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterNa
 		cachedClusterClient.endpointStore.Store, cachedClusterClient.endpointController = cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-					return clientset.Core().Endpoints(v1.NamespaceAll).List(options)
+					versionedOptions := util.VersionizeV1ListOptions(options)
+					return clientset.Core().Endpoints(v1.NamespaceAll).List(versionedOptions)
 				},
 				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					return clientset.Core().Endpoints(v1.NamespaceAll).Watch(options)
+					versionedOptions := util.VersionizeV1ListOptions(options)
+					return clientset.Core().Endpoints(v1.NamespaceAll).Watch(versionedOptions)
 				},
 			},
 			&v1.Endpoints{},
@@ -114,13 +116,15 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterNa
 			},
 		)
 
-		cachedClusterClient.serviceStore.Store, cachedClusterClient.serviceController = cache.NewInformer(
+		cachedClusterClient.serviceStore.Indexer, cachedClusterClient.serviceController = cache.NewIndexerInformer(
 			&cache.ListWatch{
 				ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-					return clientset.Core().Services(v1.NamespaceAll).List(options)
+					versionedOptions := util.VersionizeV1ListOptions(options)
+					return clientset.Core().Services(v1.NamespaceAll).List(versionedOptions)
 				},
 				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					return clientset.Core().Services(v1.NamespaceAll).Watch(options)
+					versionedOptions := util.VersionizeV1ListOptions(options)
+					return clientset.Core().Services(v1.NamespaceAll).Watch(versionedOptions)
 				},
 			},
 			&v1.Service{},
@@ -149,6 +153,7 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterNa
 					glog.V(2).Infof("Service %s/%s deletion found and enque to service store %s", service.Namespace, service.Name, clusterName)
 				},
 			},
+			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 		)
 		cc.clientMap[clusterName] = cachedClusterClient
 		go cachedClusterClient.serviceController.Run(wait.NeverStop)
@@ -195,10 +200,10 @@ func (cc *clusterClientCache) addToClientMap(obj interface{}) {
 	}
 }
 
-func newClusterClientset(c *v1beta1.Cluster) (*release_1_4.Clientset, error) {
+func newClusterClientset(c *v1beta1.Cluster) (*kubeclientset.Clientset, error) {
 	clusterConfig, err := util.BuildClusterConfig(c)
 	if clusterConfig != nil {
-		clientset := release_1_4.NewForConfigOrDie(restclient.AddUserAgent(clusterConfig, UserAgentName))
+		clientset := kubeclientset.NewForConfigOrDie(restclient.AddUserAgent(clusterConfig, UserAgentName))
 		return clientset, nil
 	}
 	return nil, err

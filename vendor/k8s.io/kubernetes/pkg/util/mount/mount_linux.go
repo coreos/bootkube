@@ -74,9 +74,9 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 		}
 		return doMount(mounterPath, source, target, fstype, bindRemountOpts)
 	}
-	// These filesystem types are expected to be supported by the mount utility on the host across all Linux distros.
-	var defaultMounterFsTypes = sets.NewString("tmpfs", "ext4", "ext3", "ext2")
-	if !defaultMounterFsTypes.Has(fstype) {
+	// The list of filesystems that require containerized mounter on GCI image cluster
+	fsTypesNeedMounter := sets.NewString("nfs", "glusterfs")
+	if fsTypesNeedMounter.Has(fstype) {
 		mounterPath = mounter.mounterPath
 	}
 	return doMount(mounterPath, source, target, fstype, options)
@@ -109,8 +109,10 @@ func isBind(options []string) (bool, []string) {
 
 // doMount runs the mount command.
 func doMount(mountCmd string, source string, target string, fstype string, options []string) error {
+	glog.V(4).Infof("Mounting %s %s %s %v with command: %q", source, target, fstype, options, mountCmd)
 	mountArgs := makeMountArgs(source, target, fstype, options)
-	glog.V(4).Infof("Mounting with command (%q) and arguments (%s)", mountCmd, mountArgs)
+
+	glog.V(4).Infof("Mounting cmd (%s) with arguments (%s)", mountCmd, mountArgs)
 	command := exec.Command(mountCmd, mountArgs...)
 	output, err := command.CombinedOutput()
 	if err != nil {
@@ -227,6 +229,9 @@ func exclusiveOpenFailsOnDevice(pathname string) (bool, error) {
 
 func pathIsDevice(pathname string) (bool, error) {
 	finfo, err := os.Stat(pathname)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
 	// err in call to os.Stat
 	if err != nil {
 		return false, err

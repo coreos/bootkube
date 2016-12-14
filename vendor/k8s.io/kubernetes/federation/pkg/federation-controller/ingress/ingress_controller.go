@@ -18,19 +18,20 @@ package ingress
 
 import (
 	"fmt"
-	"reflect"
 	"sync"
 	"time"
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
+	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions_v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -47,11 +48,16 @@ const (
 	allClustersKey = ".ALL_CLUSTERS"
 	// TODO: Get the constants below directly from the Kubernetes Ingress Controller constants - but thats in a separate repo
 	staticIPNameKeyWritable = "kubernetes.io/ingress.global-static-ip-name" // The writable annotation on Ingress to tell the controller to use a specific, named, static IP
-	staticIPNameKeyReadonly = "static-ip"                                   // The readonly key via which the cluster's Ingress Controller communicates which static IP it used.  If staticIPNameKeyWritable above is specified, it is used.
+	staticIPNameKeyReadonly = "ingress.kubernetes.io/static-ip"             // The readonly key via which the cluster's Ingress Controller communicates which static IP it used.  If staticIPNameKeyWritable above is specified, it is used.
 	uidAnnotationKey        = "kubernetes.io/ingress.uid"                   // The annotation on federation clusters, where we store the ingress UID
 	uidConfigMapName        = "ingress-uid"                                 // Name of the config-map and key the ingress controller stores its uid in.
 	uidConfigMapNamespace   = "kube-system"
 	uidKey                  = "uid"
+	// Annotation on the ingress in federation control plane that is used to keep
+	// track of the first cluster in which we create ingress.
+	// We wait for ingress to be created in this cluster before creating it any
+	// other cluster.
+	firstClusterAnnotation = "ingress.federation.kubernetes.io/first-cluster"
 )
 
 type IngressController struct {
@@ -83,7 +89,7 @@ type IngressController struct {
 	ingressInformerController cache.ControllerInterface
 
 	// Client to federated api server.
-	federatedApiClient federation_release_1_4.Interface
+	federatedApiClient federationclientset.Interface
 
 	// Backoff manager for ingresses
 	ingressBackoff *flowcontrol.Backoff
@@ -93,6 +99,8 @@ type IngressController struct {
 	// For events
 	eventRecorder record.EventRecorder
 
+	deletionHelper *deletionhelper.DeletionHelper
+
 	ingressReviewDelay    time.Duration
 	configMapReviewDelay  time.Duration
 	clusterAvailableDelay time.Duration
@@ -101,7 +109,7 @@ type IngressController struct {
 }
 
 // NewIngressController returns a new ingress controller
-func NewIngressController(client federation_release_1_4.Interface) *IngressController {
+func NewIngressController(client federationclientset.Interface) *IngressController {
 	glog.V(4).Infof("->NewIngressController V(4)")
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
@@ -118,7 +126,7 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 		configMapBackoff:      flowcontrol.NewBackOff(5*time.Second, time.Minute),
 	}
 
-	// Build deliverers for triggering reconcilations.
+	// Build deliverers for triggering reconciliations.
 	ic.ingressDeliverer = util.NewDelayingDeliverer()
 	ic.clusterDeliverer = util.NewDelayingDeliverer()
 	ic.configMapDeliverer = util.NewDelayingDeliverer()
@@ -127,10 +135,12 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 	ic.ingressInformerStore, ic.ingressInformerController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				return client.Extensions().Ingresses(api.NamespaceAll).List(options)
+				versionedOptions := util.VersionizeV1ListOptions(options)
+				return client.Extensions().Ingresses(api.NamespaceAll).List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return client.Extensions().Ingresses(api.NamespaceAll).Watch(options)
+				versionedOptions := util.VersionizeV1ListOptions(options)
+				return client.Extensions().Ingresses(api.NamespaceAll).Watch(versionedOptions)
 			},
 		},
 		&extensions_v1beta1.Ingress{},
@@ -144,20 +154,22 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 	// Federated informer on ingresses in members of federation.
 	ic.ingressFederatedInformer = util.NewFederatedInformer(
 		client,
-		func(cluster *federation_api.Cluster, targetClient kube_release_1_4.Interface) (cache.Store, cache.ControllerInterface) {
+		func(cluster *federation_api.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
 			return cache.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-						return targetClient.Extensions().Ingresses(api.NamespaceAll).List(options)
+						versionedOptions := util.VersionizeV1ListOptions(options)
+						return targetClient.Extensions().Ingresses(api.NamespaceAll).List(versionedOptions)
 					},
 					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-						return targetClient.Extensions().Ingresses(api.NamespaceAll).Watch(options)
+						versionedOptions := util.VersionizeV1ListOptions(options)
+						return targetClient.Extensions().Ingresses(api.NamespaceAll).Watch(versionedOptions)
 					},
 				},
 				&extensions_v1beta1.Ingress{},
 				controller.NoResyncPeriodFunc(),
-				// Trigger reconcilation whenever something in federated cluster is changed. In most cases it
-				// would be just confirmation that some ingress operation suceeded.
+				// Trigger reconciliation whenever something in federated cluster is changed. In most cases it
+				// would be just confirmation that some ingress operation succeeded.
 				util.NewTriggerOnAllChanges(
 					func(obj pkg_runtime.Object) {
 						ic.deliverIngressObj(obj, ic.ingressReviewDelay, false)
@@ -176,7 +188,7 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 	// Federated informer on configmaps for ingress controllers in members of the federation.
 	ic.configMapFederatedInformer = util.NewFederatedInformer(
 		client,
-		func(cluster *federation_api.Cluster, targetClient kube_release_1_4.Interface) (cache.Store, cache.ControllerInterface) {
+		func(cluster *federation_api.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
 			glog.V(4).Infof("Returning new informer for cluster %q", cluster.Name)
 			return cache.NewInformer(
 				&cache.ListWatch{
@@ -184,13 +196,15 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 						if targetClient == nil {
 							glog.Errorf("Internal error: targetClient is nil")
 						}
-						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).List(options) // we only want to list one by name - unfortunately Kubernetes don't have a selector for that.
+						versionedOptions := util.VersionizeV1ListOptions(options)
+						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).List(versionedOptions) // we only want to list one by name - unfortunately Kubernetes don't have a selector for that.
 					},
 					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 						if targetClient == nil {
 							glog.Errorf("Internal error: targetClient is nil")
 						}
-						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).Watch(options) // as above
+						versionedOptions := util.VersionizeV1ListOptions(options)
+						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).Watch(versionedOptions) // as above
 					},
 				},
 				&v1.ConfigMap{},
@@ -213,7 +227,7 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 
 	// Federated ingress updater along with Create/Update/Delete operations.
 	ic.federatedIngressUpdater = util.NewFederatedUpdater(ic.ingressFederatedInformer,
-		func(client kube_release_1_4.Interface, obj pkg_runtime.Object) error {
+		func(client kubeclientset.Interface, obj pkg_runtime.Object) error {
 			ingress := obj.(*extensions_v1beta1.Ingress)
 			glog.V(4).Infof("Attempting to create Ingress: %v", ingress)
 			_, err := client.Extensions().Ingresses(ingress.Namespace).Create(ingress)
@@ -224,7 +238,7 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 			}
 			return err
 		},
-		func(client kube_release_1_4.Interface, obj pkg_runtime.Object) error {
+		func(client kubeclientset.Interface, obj pkg_runtime.Object) error {
 			ingress := obj.(*extensions_v1beta1.Ingress)
 			glog.V(4).Infof("Attempting to update Ingress: %v", ingress)
 			_, err := client.Extensions().Ingresses(ingress.Namespace).Update(ingress)
@@ -235,23 +249,23 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 			}
 			return err
 		},
-		func(client kube_release_1_4.Interface, obj pkg_runtime.Object) error {
+		func(client kubeclientset.Interface, obj pkg_runtime.Object) error {
 			ingress := obj.(*extensions_v1beta1.Ingress)
 			glog.V(4).Infof("Attempting to delete Ingress: %v", ingress)
-			err := client.Extensions().Ingresses(ingress.Namespace).Delete(ingress.Name, &api.DeleteOptions{})
+			err := client.Extensions().Ingresses(ingress.Namespace).Delete(ingress.Name, &v1.DeleteOptions{})
 			return err
 		})
 
 	// Federated configmap updater along with Create/Update/Delete operations.  Only Update should ever be called.
 	ic.federatedConfigMapUpdater = util.NewFederatedUpdater(ic.configMapFederatedInformer,
-		func(client kube_release_1_4.Interface, obj pkg_runtime.Object) error {
+		func(client kubeclientset.Interface, obj pkg_runtime.Object) error {
 			configMap := obj.(*v1.ConfigMap)
 			configMapName := types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}
 			glog.Errorf("Internal error: Incorrectly attempting to create ConfigMap: %q", configMapName)
 			_, err := client.Core().ConfigMaps(configMap.Namespace).Create(configMap)
 			return err
 		},
-		func(client kube_release_1_4.Interface, obj pkg_runtime.Object) error {
+		func(client kubeclientset.Interface, obj pkg_runtime.Object) error {
 			configMap := obj.(*v1.ConfigMap)
 			configMapName := types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}
 			glog.V(4).Infof("Attempting to update ConfigMap: %v", configMap)
@@ -263,14 +277,77 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 			}
 			return err
 		},
-		func(client kube_release_1_4.Interface, obj pkg_runtime.Object) error {
+		func(client kubeclientset.Interface, obj pkg_runtime.Object) error {
 			configMap := obj.(*v1.ConfigMap)
 			configMapName := types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}
 			glog.Errorf("Internal error: Incorrectly attempting to delete ConfigMap: %q", configMapName)
-			err := client.Core().ConfigMaps(configMap.Namespace).Delete(configMap.Name, &api.DeleteOptions{})
+			err := client.Core().ConfigMaps(configMap.Namespace).Delete(configMap.Name, &v1.DeleteOptions{})
 			return err
 		})
+
+	ic.deletionHelper = deletionhelper.NewDeletionHelper(
+		ic.hasFinalizerFunc,
+		ic.removeFinalizerFunc,
+		ic.addFinalizerFunc,
+		// objNameFunc
+		func(obj pkg_runtime.Object) string {
+			ingress := obj.(*extensions_v1beta1.Ingress)
+			return ingress.Name
+		},
+		ic.updateTimeout,
+		ic.eventRecorder,
+		ic.ingressFederatedInformer,
+		ic.federatedIngressUpdater,
+	)
 	return ic
+}
+
+// Returns true if the given object has the given finalizer in its ObjectMeta.
+func (ic *IngressController) hasFinalizerFunc(obj pkg_runtime.Object, finalizer string) bool {
+	ingress := obj.(*extensions_v1beta1.Ingress)
+	for i := range ingress.ObjectMeta.Finalizers {
+		if string(ingress.ObjectMeta.Finalizers[i]) == finalizer {
+			return true
+		}
+	}
+	return false
+}
+
+// Removes the finalizer from the given objects ObjectMeta.
+// Assumes that the given object is a ingress.
+func (ic *IngressController) removeFinalizerFunc(obj pkg_runtime.Object, finalizer string) (pkg_runtime.Object, error) {
+	ingress := obj.(*extensions_v1beta1.Ingress)
+	newFinalizers := []string{}
+	hasFinalizer := false
+	for i := range ingress.ObjectMeta.Finalizers {
+		if string(ingress.ObjectMeta.Finalizers[i]) != finalizer {
+			newFinalizers = append(newFinalizers, ingress.ObjectMeta.Finalizers[i])
+		} else {
+			hasFinalizer = true
+		}
+	}
+	if !hasFinalizer {
+		// Nothing to do.
+		return obj, nil
+	}
+	ingress.ObjectMeta.Finalizers = newFinalizers
+	ingress, err := ic.federatedApiClient.Extensions().Ingresses(ingress.Namespace).Update(ingress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to remove finalizer %s from ingress %s: %v", finalizer, ingress.Name, err)
+	}
+	return ingress, nil
+}
+
+// Adds the given finalizer to the given objects ObjectMeta.
+// Assumes that the given object is a ingress.
+func (ic *IngressController) addFinalizerFunc(obj pkg_runtime.Object, finalizer string) (pkg_runtime.Object, error) {
+	ingress := obj.(*extensions_v1beta1.Ingress)
+	ingress.ObjectMeta.Finalizers = append(ingress.ObjectMeta.Finalizers, finalizer)
+	ingress, err := ic.federatedApiClient.Extensions().Ingresses(ingress.Namespace).Update(ingress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add finalizer %s to ingress %s: %v", finalizer, ingress.Name, err)
+	}
+	return ingress, nil
 }
 
 func (ic *IngressController) Run(stopChan <-chan struct{}) {
@@ -286,6 +363,12 @@ func (ic *IngressController) Run(stopChan <-chan struct{}) {
 		ic.ingressFederatedInformer.Stop()
 		glog.Infof("Stopping ConfigMap Federated Informer")
 		ic.configMapFederatedInformer.Stop()
+		glog.Infof("Stopoing ingress deliverer")
+		ic.ingressDeliverer.Stop()
+		glog.Infof("Stopping configmap deliverer")
+		ic.configMapDeliverer.Stop()
+		glog.Infof("Stopping cluster deliverer")
+		ic.clusterDeliverer.Stop()
 	}()
 	ic.ingressDeliverer.StartWithHandler(func(item *util.DelayingDelivererItem) {
 		ingress := item.Value.(types.NamespacedName)
@@ -311,17 +394,9 @@ func (ic *IngressController) Run(stopChan <-chan struct{}) {
 		}
 		ic.reconcileConfigMapForCluster(clusterName)
 	})
-	go func() {
-		select {
-		case <-time.After(time.Minute):
-			glog.V(4).Infof("Ingress controller is garbage collecting")
-			ic.ingressBackoff.GC()
-			ic.configMapBackoff.GC()
-			glog.V(4).Infof("Ingress controller garbage collection complete")
-		case <-stopChan:
-			return
-		}
-	}()
+
+	util.StartBackoffGC(ic.ingressBackoff, stopChan)
+	util.StartBackoffGC(ic.configMapBackoff, stopChan)
 }
 
 func (ic *IngressController) deliverIngressObj(obj interface{}, delay time.Duration, failed bool) {
@@ -330,7 +405,7 @@ func (ic *IngressController) deliverIngressObj(obj interface{}, delay time.Durat
 }
 
 func (ic *IngressController) deliverIngress(ingress types.NamespacedName, delay time.Duration, failed bool) {
-	glog.V(4).Infof("Delivering ingress: %s", ingress)
+	glog.V(4).Infof("Delivering ingress: %s with delay: %v error: %v", ingress, delay, failed)
 	key := ingress.String()
 	if failed {
 		ic.ingressBackoff.Next(key, time.Now())
@@ -359,7 +434,7 @@ func (ic *IngressController) deliverConfigMap(cluster string, configMap types.Na
 }
 
 // Check whether all data stores are in sync. False is returned if any of the informer/stores is not yet
-// synced with the coresponding api server.
+// synced with the corresponding api server.
 func (ic *IngressController) isSynced() bool {
 	if !ic.ingressFederatedInformer.ClustersSynced() {
 		glog.V(2).Infof("Cluster list not synced for ingress federated informer")
@@ -579,6 +654,31 @@ func (ic *IngressController) updateClusterIngressUIDToMasters(cluster *federatio
 	}
 }
 
+func (ic *IngressController) isClusterReady(clusterName string) bool {
+	cluster, isReady, err := ic.ingressFederatedInformer.GetReadyCluster(clusterName)
+	return isReady && err == nil && cluster != nil
+}
+
+// updateAnnotationOnIngress updates the annotation with the given key on the given federated ingress.
+// Queues the ingress for resync when done.
+func (ic *IngressController) updateAnnotationOnIngress(ingress *extensions_v1beta1.Ingress, key, value string) {
+	if ingress.ObjectMeta.Annotations == nil {
+		ingress.ObjectMeta.Annotations = make(map[string]string)
+	}
+	ingress.ObjectMeta.Annotations[key] = value
+	ingressName := types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace}
+	glog.V(4).Infof("Attempting to update annotation %s:%s on base federated ingress: %v", key, value, ingressName)
+	if updatedFedIngress, err := ic.federatedApiClient.Extensions().Ingresses(ingress.Namespace).Update(ingress); err != nil {
+		glog.Errorf("Failed to update annotation %s:%s on federated ingress %q, will try again later: %v", key, value, ingressName, err)
+		ic.deliverIngress(ingressName, ic.ingressReviewDelay, true)
+		return
+	} else {
+		glog.V(4).Infof("Successfully updated annotation %s:%s on federated ingress %q, after update: %q", key, value, ingress, updatedFedIngress)
+		ic.deliverIngress(ingressName, ic.smallDelay, false)
+		return
+	}
+}
+
 func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 	glog.V(4).Infof("Reconciling ingress %q for all clusters", ingress)
 	if !ic.isSynced() {
@@ -587,7 +687,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 	}
 
 	key := ingress.String()
-	baseIngressObj, exist, err := ic.ingressInformerStore.GetByKey(key)
+	baseIngressObjFromStore, exist, err := ic.ingressInformerStore.GetByKey(key)
 	if err != nil {
 		glog.Errorf("Failed to query main ingress store for %v: %v", ingress, err)
 		ic.deliverIngress(ingress, 0, true)
@@ -598,12 +698,37 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 		glog.V(4).Infof("Ingress %q is not federated.  Ignoring.", ingress)
 		return
 	}
+	baseIngressObj, err := conversion.NewCloner().DeepCopy(baseIngressObjFromStore)
 	baseIngress, ok := baseIngressObj.(*extensions_v1beta1.Ingress)
-	if !ok {
-		glog.Errorf("Internal Error: Object retrieved from ingressInformerStore with key %q is not of correct type *extensions_v1beta1.Ingress: %v", key, baseIngressObj)
+	if err != nil || !ok {
+		glog.Errorf("Internal Error %v : Object retrieved from ingressInformerStore with key %q is not of correct type *extensions_v1beta1.Ingress: %v", err, key, baseIngressObj)
 	} else {
 		glog.V(4).Infof("Base (federated) ingress: %v", baseIngress)
 	}
+
+	if baseIngress.DeletionTimestamp != nil {
+		if err := ic.delete(baseIngress); err != nil {
+			glog.Errorf("Failed to delete %s: %v", ingress, err)
+			ic.eventRecorder.Eventf(baseIngress, api.EventTypeNormal, "DeleteFailed",
+				"Ingress delete failed: %v", err)
+			ic.deliverIngress(ingress, 0, true)
+		}
+		return
+	}
+
+	glog.V(3).Infof("Ensuring delete object from underlying clusters finalizer for ingress: %s",
+		baseIngress.Name)
+	// Add the required finalizers before creating a ingress in underlying clusters.
+	updatedIngressObj, err := ic.deletionHelper.EnsureFinalizers(baseIngress)
+	if err != nil {
+		glog.Errorf("Failed to ensure delete object from underlying clusters finalizer in ingress %s: %v",
+			baseIngress.Name, err)
+		ic.deliverIngress(ingress, 0, true)
+		return
+	}
+	baseIngress = updatedIngressObj.(*extensions_v1beta1.Ingress)
+
+	glog.V(3).Infof("Syncing ingress %s in underlying clusters", baseIngress.Name)
 
 	clusters, err := ic.ingressFederatedInformer.GetReadyClusters()
 	if err != nil {
@@ -616,8 +741,9 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 
 	operations := make([]util.FederatedOperation, 0)
 
-	for clusterIndex, cluster := range clusters {
+	for _, cluster := range clusters {
 		baseIPName, baseIPAnnotationExists := baseIngress.ObjectMeta.Annotations[staticIPNameKeyWritable]
+		firstClusterName, firstClusterExists := baseIngress.ObjectMeta.Annotations[firstClusterAnnotation]
 		clusterIngressObj, clusterIngressFound, err := ic.ingressFederatedInformer.GetTargetStore().GetByKey(cluster.Name, key)
 		if err != nil {
 			glog.Errorf("Failed to get cached ingress %s for cluster %s, will retry: %v", ingress, cluster.Name, err)
@@ -639,33 +765,44 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 		}
 		desiredIngress.Spec = objSpec.(extensions_v1beta1.IngressSpec)
 		if !ok {
-			glog.Errorf("Internal error: Failed to cast to extensions_v1beta1.IngressSpec: %v", objSpec)
+			glog.Errorf("Internal error: Failed to cast to extensions_v1beta1.Ingressespec: %v", objSpec)
 		}
 		glog.V(4).Infof("Desired Ingress: %v", desiredIngress)
 
 		if !clusterIngressFound {
 			glog.V(4).Infof("No existing Ingress %s in cluster %s - checking if appropriate to queue a create operation", ingress, cluster.Name)
 			// We can't supply server-created fields when creating a new object.
-			desiredIngress.ObjectMeta = util.DeepCopyObjectMeta(baseIngress.ObjectMeta)
+			desiredIngress.ObjectMeta = util.DeepCopyRelevantObjectMeta(baseIngress.ObjectMeta)
 			ic.eventRecorder.Eventf(baseIngress, api.EventTypeNormal, "CreateInCluster",
 				"Creating ingress in cluster %s", cluster.Name)
 
-			// We always first create an ingress in the first available cluster.  Once that ingress
+			// We always first create an ingress in the first available cluster. Once that ingress
 			// has been created and allocated a global IP (visible via an annotation),
 			// we record that annotation on the federated ingress, and create all other cluster
 			// ingresses with that same global IP.
-			// Note: If the first cluster becomes (e.g. temporarily) unavailable, the second cluster will be allocated
-			// index 0, but eventually all ingresses will share the single global IP recorded in the annotation
-			// of the federated ingress.
-			if baseIPAnnotationExists || (clusterIndex == 0) {
-				glog.V(4).Infof("No existing Ingress %s in cluster %s (index %d) and static IP annotation (%q) on base ingress - queuing a create operation", ingress, cluster.Name, clusterIndex, staticIPNameKeyWritable)
+			// Note: If the first cluster becomes (e.g. temporarily) unavailable, the
+			// second cluster will become the first cluster, but eventually all ingresses
+			// will share the single global IP recorded in the annotation of the
+			// federated ingress.
+			haveFirstCluster := firstClusterExists && firstClusterName != "" && ic.isClusterReady(firstClusterName)
+			if !haveFirstCluster {
+				glog.V(4).Infof("No cluster has been chosen as the first cluster. Electing cluster %s as the first cluster to create ingress in", cluster.Name)
+				ic.updateAnnotationOnIngress(baseIngress, firstClusterAnnotation, cluster.Name)
+				return
+			}
+			if baseIPAnnotationExists || firstClusterName == cluster.Name {
+				if baseIPAnnotationExists {
+					glog.V(4).Infof("No existing Ingress %s in cluster %s and static IP annotation (%q) exists on base ingress - queuing a create operation", ingress, cluster.Name, staticIPNameKeyWritable)
+				} else {
+					glog.V(4).Infof("No existing Ingress %s in cluster %s and no static IP annotation (%q) on base ingress - queuing a create operation in first cluster", ingress, cluster.Name, staticIPNameKeyWritable)
+				}
 				operations = append(operations, util.FederatedOperation{
 					Type:        util.OperationTypeAdd,
 					Obj:         desiredIngress,
 					ClusterName: cluster.Name,
 				})
 			} else {
-				glog.V(4).Infof("No annotation %q exists on ingress %q in federation, and index of cluster %q is %d and not zero.  Not queueing create operation for ingress %q until annotation exists", staticIPNameKeyWritable, ingress, cluster.Name, clusterIndex, ingress)
+				glog.V(4).Infof("No annotation %q exists on ingress %q in federation and waiting for ingress in cluster %s. Not queueing create operation for ingress until annotation exists", staticIPNameKeyWritable, ingress, firstClusterName)
 			}
 		} else {
 			clusterIngress := clusterIngressObj.(*extensions_v1beta1.Ingress)
@@ -677,17 +814,8 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 			if (!baseIPAnnotationExists && clusterIPNameExists) || (!baseLBStatusExists && clusterLBStatusExists) { // copy the IP name from the readonly annotation on the cluster ingress, to the writable annotation on the federated ingress
 				glog.V(4).Infof(logStr, "Transferring")
 				if !baseIPAnnotationExists && clusterIPNameExists {
-					baseIngress.ObjectMeta.Annotations[staticIPNameKeyWritable] = clusterIPName
-					glog.V(4).Infof("Attempting to update base federated ingress annotations: %v", baseIngress)
-					if updatedFedIngress, err := ic.federatedApiClient.Extensions().Ingresses(baseIngress.Namespace).Update(baseIngress); err != nil {
-						glog.Errorf("Failed to add static IP annotation to federated ingress %q, will try again later: %v", ingress, err)
-						ic.deliverIngress(ingress, ic.ingressReviewDelay, true)
-						return
-					} else {
-						glog.V(4).Infof("Successfully updated federated ingress %q (added IP annotation), after update: %q", ingress, updatedFedIngress)
-						ic.deliverIngress(ingress, ic.smallDelay, false)
-						return
-					}
+					ic.updateAnnotationOnIngress(baseIngress, staticIPNameKeyWritable, clusterIPName)
+					return
 				}
 				if !baseLBStatusExists && clusterLBStatusExists {
 					lbstatusObj, lbErr := conversion.NewCloner().DeepCopy(&clusterIngress.Status.LoadBalancer)
@@ -713,8 +841,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 				glog.V(4).Infof(logStr, "Not transferring")
 			}
 			// Update existing cluster ingress, if needed.
-			if util.ObjectMetaEquivalent(baseIngress.ObjectMeta, clusterIngress.ObjectMeta) &&
-				reflect.DeepEqual(baseIngress.Spec, clusterIngress.Spec) {
+			if util.ObjectMetaAndSpecEquivalent(baseIngress, clusterIngress) {
 				glog.V(4).Infof("Ingress %q in cluster %q does not need an update: cluster ingress is equivalent to federated ingress", ingress, cluster.Name)
 			} else {
 				glog.V(4).Infof("Ingress %s in cluster %s needs an update: cluster ingress %v is not equivalent to federated ingress %v", ingress, cluster.Name, clusterIngress, desiredIngress)
@@ -760,7 +887,6 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 	if len(operations) == 0 {
 		// Everything is in order
 		glog.V(4).Infof("Ingress %q is up-to-date in all clusters - no propagation to clusters required.", ingress)
-		ic.deliverIngress(ingress, ic.ingressReviewDelay, false)
 		return
 	}
 	glog.V(4).Infof("Calling federatedUpdater.Update() - operations: %v", operations)
@@ -775,4 +901,24 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 	}
 	// Schedule another periodic reconciliation, only to account for possible bugs in watch processing.
 	ic.deliverIngress(ingress, ic.ingressReviewDelay, false)
+}
+
+// delete deletes the given ingress or returns error if the deletion was not complete.
+func (ic *IngressController) delete(ingress *extensions_v1beta1.Ingress) error {
+	glog.V(3).Infof("Handling deletion of ingress: %v", *ingress)
+	_, err := ic.deletionHelper.HandleObjectInUnderlyingClusters(ingress)
+	if err != nil {
+		return err
+	}
+
+	err = ic.federatedApiClient.Extensions().Ingresses(ingress.Namespace).Delete(ingress.Name, nil)
+	if err != nil {
+		// Its all good if the error is not found error. That means it is deleted already and we do not have to do anything.
+		// This is expected when we are processing an update as a result of ingress finalizer deletion.
+		// The process that deleted the last finalizer is also going to delete the ingress and we do not have to do anything.
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to delete ingress: %v", err)
+		}
+	}
+	return nil
 }

@@ -21,12 +21,12 @@ import (
 	"time"
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	fake_federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4/fake"
+	fakefederationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
 	api "k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
-	fake_kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/fake"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	fake_kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -35,9 +35,9 @@ import (
 )
 
 // Basic test for Federated Informer. Checks whether the subinformer are added and deleted
-// when the corresponding cluster entries appear and dissapear from etcd.
+// when the corresponding cluster entries appear and disappear from etcd.
 func TestFederatedInformer(t *testing.T) {
-	fakeFederationClient := &fake_federation_release_1_4.Clientset{}
+	fakeFederationClient := &fakefederationclientset.Clientset{}
 
 	// Add a single cluster to federation and remove it when needed.
 	cluster := federation_api.Cluster{
@@ -63,7 +63,7 @@ func TestFederatedInformer(t *testing.T) {
 		return true, fakeWatch, nil
 	})
 
-	fakeKubeClient := &fake_kube_release_1_4.Clientset{}
+	fakeKubeClient := &fake_kubeclientset.Clientset{}
 	// There is a single service ns1/s1 in cluster mycluster.
 	service := api_v1.Service{
 		ObjectMeta: api_v1.ObjectMeta{
@@ -78,14 +78,16 @@ func TestFederatedInformer(t *testing.T) {
 		return true, watch.NewFake(), nil
 	})
 
-	targetInformerFactory := func(cluster *federation_api.Cluster, clientset kube_release_1_4.Interface) (cache.Store, cache.ControllerInterface) {
+	targetInformerFactory := func(cluster *federation_api.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
 		return cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-					return clientset.Core().Services(api_v1.NamespaceAll).List(options)
+					versionedOptions := VersionizeV1ListOptions(options)
+					return clientset.Core().Services(api_v1.NamespaceAll).List(versionedOptions)
 				},
 				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					return clientset.Core().Services(api_v1.NamespaceAll).Watch(options)
+					versionedOptions := VersionizeV1ListOptions(options)
+					return clientset.Core().Services(api_v1.NamespaceAll).Watch(versionedOptions)
 				},
 			},
 			&api_v1.Service{},
@@ -107,7 +109,7 @@ func TestFederatedInformer(t *testing.T) {
 	}
 
 	informer := NewFederatedInformer(fakeFederationClient, targetInformerFactory, &lifecycle).(*federatedInformerImpl)
-	informer.clientFactory = func(cluster *federation_api.Cluster) (kube_release_1_4.Interface, error) {
+	informer.clientFactory = func(cluster *federation_api.Cluster) (kubeclientset.Interface, error) {
 		return fakeKubeClient, nil
 	}
 	assert.NotNil(t, informer)
