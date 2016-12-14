@@ -23,7 +23,7 @@ const (
 )
 
 var requiredPods = []string{
-	"kube-api-checkpoint",
+	"pod-checkpointer",
 	"kube-apiserver",
 	"kube-scheduler",
 	"kube-controller-manager",

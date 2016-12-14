@@ -47,7 +47,6 @@ If you only have one, your cluster will be temporarily unavailable. Remember the
 
     kubectl get pods -n=kube-system
     NAME                                       READY     STATUS    RESTARTS   AGE
-    kube-api-checkpoint-node1.example.com      1/1       Running   0          12m
     kube-apiserver-vyg3t                       2/2       Running   0          2m
     kube-controller-manager-1510822774-qebia   1/1       Running   2          12m
     kube-dns-v20-3531996453-0tlv9              3/3       Running   0          12m
@@ -58,6 +57,7 @@ If you only have one, your cluster will be temporarily unavailable. Remember the
     kubelet-exe5k                              1/1       Running   0          12m
     kubelet-p3g98                              1/1       Running   0          12m
     kubelet-quhhg                              1/1       Running   0          12m
+    pod-checkpointer-node1.example.com         1/1       Running   0          12m
 
 ### kube-scheduler
 
@@ -77,7 +77,6 @@ Wait for the controller manager to be deployed.
 
     $ kubectl get pods -n=kube-system
     NAME                                       READY     STATUS    RESTARTS   AGE
-    kube-api-checkpoint-node1.example.com      1/1       Running   0          28m
     kube-apiserver-vyg3t                       2/2       Running   0          18m
     kube-controller-manager-1709527928-zj8c4   1/1       Running   0          4m
     kube-dns-v20-3531996453-0tlv9              3/3       Running   0          28m
@@ -88,6 +87,7 @@ Wait for the controller manager to be deployed.
     kubelet-exe5k                              1/1       Running   0          28m
     kubelet-p3g98                              1/1       Running   0          28m
     kubelet-quhhg                              1/1       Running   0          28m
+    pod-checkpointer-node1.example.com         1/1       Running   0          28m
 
 ### Verify
 
@@ -126,7 +126,6 @@ Since daemonsets don't yet support rolling, manually delete each kubelet and eac
 
     $ kubectl get pods -n=kube-system
     NAME                                       READY     STATUS    RESTARTS   AGE
-    kube-api-checkpoint-node1.example.com      1/1       Running   0          1h
     kube-apiserver-vyg3t                       2/2       Running   0          1h
     kube-controller-manager-1709527928-zj8c4   1/1       Running   0          47m
     kube-dns-v20-3531996453-0tlv9              3/3       Running   0          1h
@@ -137,6 +136,7 @@ Since daemonsets don't yet support rolling, manually delete each kubelet and eac
     kubelet-hfdwr                              1/1       Running   0          38s
     kubelet-oia47                              1/1       Running   0          52s
     kubelet-s6dab                              1/1       Running   0          59s
+    pod-checkpointer-node1.example.com         1/1       Running   0          1h
 
 ## Verify
 
