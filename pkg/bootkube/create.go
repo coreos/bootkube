@@ -8,7 +8,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -80,15 +80,18 @@ func createAssets(manifestDir string) error {
 		return err
 	}
 
-	includeExtendedAPIs := false
-	mapper, typer := f.Object(includeExtendedAPIs)
+	mapper, typer := f.Object()
 
-	recursive := false
+	filenameOpts := &resource.FilenameOptions{
+		Filenames: []string{manifestDir},
+		Recursive: false,
+	}
+
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, recursive, manifestDir).
+		FilenameParam(enforceNamespace, filenameOpts).
 		Flatten().
 		Do()
 	err = r.Err()
@@ -116,7 +119,7 @@ func createAssets(manifestDir string) error {
 		if !shortOutput {
 			f.PrintObjectSpecificMessage(info.Object, util.GlogWriter{})
 		}
-		cmdutil.PrintSuccess(mapper, shortOutput, util.GlogWriter{}, info.Mapping.Resource, info.Name, "created")
+		cmdutil.PrintSuccess(mapper, shortOutput, util.GlogWriter{}, info.Mapping.Resource, info.Name, false, "created")
 		UserOutput("\tcreated %23s %s\n", info.Name, strings.TrimSuffix(info.Mapping.Resource, "s"))
 		return nil
 	})

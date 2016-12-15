@@ -26,7 +26,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 
-	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/images/net/nat"
 
@@ -47,12 +46,8 @@ var _ = framework.KubeDescribe("Network", func() {
 	fr := framework.NewDefaultFramework("network")
 
 	It("should set TCP CLOSE_WAIT timeout", func() {
-		nodes := framework.GetReadySchedulableNodesOrDie(fr.Client)
+		nodes := framework.GetReadySchedulableNodesOrDie(fr.ClientSet)
 		ips := collectAddresses(nodes, api.NodeInternalIP)
-
-		// The matching change is not present in kube-proxy 1.4.5
-		// release which will causes this test to always fail.
-		framework.SkipUnlessServerVersionGTE(version.MustParse("v1.4.6"), fr.Client)
 
 		if len(nodes.Items) < 2 {
 			framework.Skipf(
@@ -185,7 +180,8 @@ var _ = framework.KubeDescribe("Network", func() {
 			fmt.Sprintf(
 				"sudo cat /proc/net/ip_conntrack "+
 					"| grep 'CLOSE_WAIT.*dst=%v.*dport=%v' "+
-					"| awk '{print $3}'",
+					"| tail -n 1"+
+					"| awk '{print $3}' ",
 				serverNodeInfo.nodeIp,
 				testDaemonTcpPort),
 			framework.TestContext.Provider,
@@ -198,7 +194,7 @@ var _ = framework.KubeDescribe("Network", func() {
 		// These must be synchronized from the default values set in
 		// pkg/apis/../defaults.go ConntrackTCPCloseWaitTimeout. The
 		// current defaults are hidden in the initialization code.
-		const epsilonSeconds = 10
+		const epsilonSeconds = 60
 		const expectedTimeoutSeconds = 60 * 60
 
 		framework.Logf("conntrack entry timeout was: %v, expected: %v",

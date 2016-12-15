@@ -392,7 +392,7 @@ func (a byCreationTime) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func getGCEImages(imageRegex, project string, previousImages int) ([]string, error) {
 	ilc, err := computeService.Images.List(project).Do()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to list images in project %q and zone %q", project, zone)
+		return nil, fmt.Errorf("Failed to list images in project %q: %v", project, err)
 	}
 	imageObjs := []imageObj{}
 	imageRe := regexp.MustCompile(imageRegex)
@@ -507,7 +507,7 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 			remote.AddHostnameIp(name, externalIp)
 		}
 		var output string
-		output, err = remote.RunSshCommand("ssh", remote.GetHostnameOrIp(name), "--", "sudo", "docker", "version")
+		output, err = remote.SSH(name, "docker", "version")
 		if err != nil {
 			err = fmt.Errorf("instance %s not running docker daemon - Command failed: %s", name, output)
 			continue
@@ -598,8 +598,8 @@ func imageToInstanceName(imageConfig *internalGCEImage) string {
 	if imageConfig.machine == "" {
 		return *instanceNamePrefix + "-" + imageConfig.image
 	}
-	// For benchmark test, node name has the format 'machine-image-uuid'.
-	// Node name is added to test data item labels and used for benchmark dashboard.
+	// For benchmark test, node name has the format 'machine-image-uuid' to run
+	// different machine types with the same image in parallel
 	return imageConfig.machine + "-" + imageConfig.image + "-" + uuid.NewUUID().String()[:8]
 }
 

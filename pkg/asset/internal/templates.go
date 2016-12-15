@@ -34,7 +34,7 @@ spec:
     spec:
       containers:
       - name: kubelet
-        image: quay.io/coreos/hyperkube:v1.4.7_coreos.0
+        image: quay.io/coreos/hyperkube:v1.5.1_coreos.0
         command:
         - /nsenter
         - --target=1
@@ -124,7 +124,7 @@ spec:
       hostNetwork: true
       containers:
       - name: kube-apiserver
-        image: quay.io/coreos/hyperkube:v1.4.7_coreos.0
+        image: quay.io/coreos/hyperkube:v1.5.1_coreos.0
         command:
         - /hyperkube
         - apiserver
@@ -143,6 +143,7 @@ spec:
         - --service-account-key-file=/etc/kubernetes/secrets/service-account.pub
         - --client-ca-file=/etc/kubernetes/secrets/ca.crt
         - --cloud-provider={{ .CloudProvider  }}
+        - --anonymous-auth=false
         env:
           - name: MY_POD_IP
             valueFrom:
@@ -208,7 +209,7 @@ spec:
     spec:
       containers:
       - name: kube-controller-manager
-        image: quay.io/coreos/hyperkube:v1.4.7_coreos.0
+        image: quay.io/coreos/hyperkube:v1.5.1_coreos.0
         command:
         - ./hyperkube
         - controller-manager
@@ -249,7 +250,7 @@ spec:
     spec:
       containers:
       - name: kube-scheduler
-        image: quay.io/coreos/hyperkube:v1.4.7_coreos.0
+        image: quay.io/coreos/hyperkube:v1.5.1_coreos.0
         command:
         - ./hyperkube
         - scheduler
@@ -271,7 +272,7 @@ spec:
       hostNetwork: true
       containers:
       - name: kube-proxy
-        image: quay.io/coreos/hyperkube:v1.4.7_coreos.0
+        image: quay.io/coreos/hyperkube:v1.5.1_coreos.0
         command:
         - /hyperkube
         - proxy
@@ -314,6 +315,10 @@ spec:
   # 1. In order to make Addon Manager do not reconcile this replicas parameter.
   # 2. Default is 1.
   # 3. Will be tuned in real time if DNS horizontal auto-scaling is turned on.
+  strategy:
+    rollingUpdate:
+      maxSurge: 10%
+      maxUnavailable: 0
   selector:
     matchLabels:
       k8s-app: kube-dns

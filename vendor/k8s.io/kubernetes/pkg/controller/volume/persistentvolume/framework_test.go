@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
@@ -95,7 +96,7 @@ type controllerTest struct {
 type testCall func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error
 
 const testNamespace = "default"
-const mockPluginName = "MockVolumePlugin"
+const mockPluginName = "kubernetes.io/mock-volume"
 
 var versionConflictError = errors.New("VersionError")
 var novolumes []*api.PersistentVolume
@@ -594,19 +595,18 @@ func newTestController(kubeClient clientset.Interface, volumeSource, claimSource
 	if classSource == nil {
 		classSource = fcache.NewFakeControllerSource()
 	}
-	ctrl := NewPersistentVolumeController(
-		kubeClient,
-		5*time.Second,        // sync period
-		nil,                  // alpha provisioner
-		[]vol.VolumePlugin{}, // recyclers
-		nil,                  // cloud
-		"",
-		volumeSource,
-		claimSource,
-		classSource,
-		record.NewFakeRecorder(1000), // event recorder
-		enableDynamicProvisioning,
-	)
+
+	params := ControllerParameters{
+		KubeClient:                kubeClient,
+		SyncPeriod:                5 * time.Second,
+		VolumePlugins:             []vol.VolumePlugin{},
+		VolumeSource:              volumeSource,
+		ClaimSource:               claimSource,
+		ClassSource:               classSource,
+		EventRecorder:             record.NewFakeRecorder(1000),
+		EnableDynamicProvisioning: enableDynamicProvisioning,
+	}
+	ctrl := NewController(params)
 
 	// Speed up the test
 	ctrl.createProvisionedPVInterval = 5 * time.Millisecond
@@ -651,7 +651,7 @@ func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase a
 			switch a {
 			case annDynamicallyProvisioned:
 				volume.Annotations[a] = mockPluginName
-			case annClass:
+			case storageutil.StorageClassAnnotation:
 				volume.Annotations[a] = "gold"
 			default:
 				volume.Annotations[a] = "yes"
@@ -700,13 +700,13 @@ func withMessage(message string, volumes []*api.PersistentVolume) []*api.Persist
 	return volumes
 }
 
-// volumeWithClass saves given class into annClass annotation.
+// volumeWithClass saves given class into storage.StorageClassAnnotation annotation.
 // Meant to be used to compose claims specified inline in a test.
 func volumeWithClass(className string, volumes []*api.PersistentVolume) []*api.PersistentVolume {
 	if volumes[0].Annotations == nil {
-		volumes[0].Annotations = map[string]string{annClass: className}
+		volumes[0].Annotations = map[string]string{storageutil.StorageClassAnnotation: className}
 	} else {
-		volumes[0].Annotations[annClass] = className
+		volumes[0].Annotations[storageutil.StorageClassAnnotation] = className
 	}
 	return volumes
 }
@@ -748,8 +748,10 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase api.Persiste
 		claim.Annotations = make(map[string]string)
 		for _, a := range annotations {
 			switch a {
-			case annClass:
+			case storageutil.StorageClassAnnotation:
 				claim.Annotations[a] = "gold"
+			case annStorageProvisioner:
+				claim.Annotations[a] = mockPluginName
 			default:
 				claim.Annotations[a] = "yes"
 			}
@@ -775,13 +777,24 @@ func newClaimArray(name, claimUID, capacity, boundToVolume string, phase api.Per
 	}
 }
 
-// claimWithClass saves given class into annClass annotation.
+// claimWithClass saves given class into storage.StorageClassAnnotation annotation.
 // Meant to be used to compose claims specified inline in a test.
 func claimWithClass(className string, claims []*api.PersistentVolumeClaim) []*api.PersistentVolumeClaim {
 	if claims[0].Annotations == nil {
-		claims[0].Annotations = map[string]string{annClass: className}
+		claims[0].Annotations = map[string]string{storageutil.StorageClassAnnotation: className}
 	} else {
-		claims[0].Annotations[annClass] = className
+		claims[0].Annotations[storageutil.StorageClassAnnotation] = className
+	}
+	return claims
+}
+
+// claimWithAnnotation saves given annotation into given claims.
+// Meant to be used to compose claims specified inline in a test.
+func claimWithAnnotation(name, value string, claims []*api.PersistentVolumeClaim) []*api.PersistentVolumeClaim {
+	if claims[0].Annotations == nil {
+		claims[0].Annotations = map[string]string{name: value}
+	} else {
+		claims[0].Annotations[name] = value
 	}
 	return claims
 }
@@ -1149,15 +1162,17 @@ func (plugin *mockVolumePlugin) Provision() (*api.PersistentVolume, error) {
 	}
 	if call.ret == nil {
 		// Create a fake PV with known GCE volume (to match expected volume)
+		capacity := plugin.provisionOptions.PVC.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
+		accessModes := plugin.provisionOptions.PVC.Spec.AccessModes
 		pv = &api.PersistentVolume{
 			ObjectMeta: api.ObjectMeta{
 				Name: plugin.provisionOptions.PVName,
 			},
 			Spec: api.PersistentVolumeSpec{
 				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): plugin.provisionOptions.Capacity,
+					api.ResourceName(api.ResourceStorage): capacity,
 				},
-				AccessModes:                   plugin.provisionOptions.AccessModes,
+				AccessModes:                   accessModes,
 				PersistentVolumeReclaimPolicy: plugin.provisionOptions.PersistentVolumeReclaimPolicy,
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},

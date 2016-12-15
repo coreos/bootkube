@@ -1,7 +1,6 @@
 package etcdutil
 
 import (
-	"bytes"
 	"fmt"
 	"net/http"
 	"time"
@@ -10,9 +9,9 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -28,9 +27,9 @@ func Migrate() error {
 	if err != nil {
 		return fmt.Errorf("fail to create kube client: %v", err)
 	}
-	httpcli := kubecli.CoreClient.RESTClient.Client
+	restClient := kubecli.CoreV1().RESTClient()
 
-	err = waitEtcdTPRReady(httpcli, 5*time.Second, 60*time.Second, apiserverAddr, api.NamespaceSystem)
+	err = waitEtcdTPRReady(restClient, 5*time.Second, 60*time.Second, api.NamespaceSystem)
 	if err != nil {
 		return err
 	}
@@ -41,7 +40,7 @@ func Migrate() error {
 	}
 	glog.Infof("boot-etcd pod IP is: %s", ip)
 
-	if err := createMigratedEtcdCluster(httpcli, apiserverAddr, ip); err != nil {
+	if err := createMigratedEtcdCluster(restClient, apiserverAddr, ip); err != nil {
 		glog.Errorf("fail to create migrated etcd cluster: %v", err)
 		return err
 	}
@@ -49,26 +48,28 @@ func Migrate() error {
 	return checkEtcdClusterUp()
 }
 
-func listETCDCluster(host, ns string, httpClient *http.Client) (*http.Response, error) {
-	return httpClient.Get(fmt.Sprintf("%s/apis/coreos.com/v1/namespaces/%s/etcdclusters",
-		host, ns))
+func listETCDCluster(ns string, restClient restclient.Interface) restclient.Result {
+	uri := fmt.Sprintf("/apis/coreos.com/v1/namespaces/%s/etcdclusters", ns)
+	return restClient.Get().RequestURI(uri).Do()
 }
 
-func waitEtcdTPRReady(httpClient *http.Client, interval, timeout time.Duration, host, ns string) error {
+func waitEtcdTPRReady(restClient restclient.Interface, interval, timeout time.Duration, ns string) error {
 	err := wait.Poll(interval, timeout, func() (bool, error) {
-		resp, err := listETCDCluster(host, ns, httpClient)
-		if err != nil {
-			return false, err
+		res := listETCDCluster(ns, restClient)
+		if res.Error() != nil {
+			return false, res.Error()
 		}
-		defer resp.Body.Close()
 
-		switch resp.StatusCode {
+		var status int
+		res.StatusCode(&status)
+
+		switch status {
 		case http.StatusOK:
 			return true, nil
 		case http.StatusNotFound: // not set up yet. wait.
 			return false, nil
 		default:
-			return false, fmt.Errorf("invalid status code: %v", resp.Status)
+			return false, fmt.Errorf("invalid status code: %v", status)
 		}
 	})
 	if err != nil {
@@ -80,8 +81,8 @@ func waitEtcdTPRReady(httpClient *http.Client, interval, timeout time.Duration, 
 func getBootEtcdPodIP(kubecli clientset.Interface) (string, error) {
 	var ip string
 	err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
-		podList, err := kubecli.Core().Pods(api.NamespaceSystem).List(api.ListOptions{
-			LabelSelector: labels.SelectorFromSet(labels.Set{"k8s-app": "boot-etcd"}),
+		podList, err := kubecli.CoreV1().Pods(api.NamespaceSystem).List(v1.ListOptions{
+			LabelSelector: "k8s-app=boot-etcd",
 		})
 		if err != nil {
 			glog.Errorf("fail to list 'boot-etcd' pod: %v", err)
@@ -102,7 +103,7 @@ func getBootEtcdPodIP(kubecli clientset.Interface) (string, error) {
 	return ip, err
 }
 
-func createMigratedEtcdCluster(httpcli *http.Client, host, podIP string) error {
+func createMigratedEtcdCluster(restclient restclient.Interface, host, podIP string) error {
 	b := []byte(fmt.Sprintf(`{
   "apiVersion": "coreos.com/v1",
   "kind": "EtcdCluster",
@@ -119,16 +120,18 @@ func createMigratedEtcdCluster(httpcli *http.Client, host, podIP string) error {
   }
 }`, podIP))
 
-	resp, err := httpcli.Post(
-		fmt.Sprintf("%s/apis/coreos.com/v1/namespaces/kube-system/etcdclusters", host),
-		"application/json", bytes.NewReader(b))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
+	uri := "/apis/coreos.com/v1/namespaces/kube-system/etcdclusters"
+	res := restclient.Post().RequestURI(uri).SetHeader("Content-Type", "application/json").Body(b).Do()
 
-	if resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("fail to create etcd cluster object, status (%v), object (%s)", resp.Status, string(b))
+	if res.Error() != nil {
+		return res.Error()
+	}
+
+	var status int
+	res.StatusCode(&status)
+
+	if status != http.StatusCreated {
+		return fmt.Errorf("fail to create etcd cluster object, status (%v), object (%s)", status, string(b))
 	}
 	return nil
 }

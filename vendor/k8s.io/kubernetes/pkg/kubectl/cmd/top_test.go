@@ -23,27 +23,29 @@ import (
 	"io/ioutil"
 	"time"
 
+	"testing"
+
 	metrics_api "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	"testing"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 const (
-	baseHeapsterServiceAddress = "/api/v1/namespaces/kube-system/services/http:heapster:"
-	baseMetricsAddress         = baseHeapsterServiceAddress + "/proxy/apis/metrics"
+	baseHeapsterServiceAddress = "/api/v1/proxy/namespaces/kube-system/services/http:heapster:"
+	baseMetricsAddress         = baseHeapsterServiceAddress + "/apis/metrics"
 	metricsApiVersion          = "v1alpha1"
 )
 
 func TestTopSubcommandsExist(t *testing.T) {
 	initTestErrorHandler(t)
 
-	f, _, _, _ := NewAPIFactory()
+	f, _, _, _ := cmdtesting.NewAPIFactory()
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdTop(f, buf)
+	cmd := NewCmdTop(f, buf, buf)
 	if !cmd.HasSubCommands() {
 		t.Error("top command should have subcommands")
 	}

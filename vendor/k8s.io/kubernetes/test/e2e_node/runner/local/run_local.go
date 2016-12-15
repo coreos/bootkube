@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/kubernetes/test/e2e_node/build"
+	"k8s.io/kubernetes/test/e2e_node/builder"
 
 	"github.com/golang/glog"
 )
@@ -37,16 +37,17 @@ func main() {
 
 	// Build dependencies - ginkgo, kubelet and apiserver.
 	if *buildDependencies {
-		if err := build.BuildGo(); err != nil {
+		if err := builder.BuildGo(); err != nil {
 			glog.Fatalf("Failed to build the dependencies: %v", err)
 		}
 	}
 
 	// Run node e2e test
-	outputDir, err := build.GetK8sBuildOutputDir()
+	outputDir, err := builder.GetK8sBuildOutputDir()
 	if err != nil {
 		glog.Fatalf("Failed to get build output directory: %v", err)
 	}
+	glog.Infof("Got build output dir: %v", outputDir)
 	ginkgo := filepath.Join(outputDir, "ginkgo")
 	test := filepath.Join(outputDir, "e2e_node.test")
 	runCommand(ginkgo, *ginkgoFlags, test, "--", *testFlags)
@@ -54,7 +55,8 @@ func main() {
 }
 
 func runCommand(name string, args ...string) error {
-	cmd := exec.Command("sh", "-c", strings.Join(append([]string{name}, args...), " "))
+	glog.Infof("Running command: %v %v", name, strings.Join(args, " "))
+	cmd := exec.Command("sudo", "sh", "-c", strings.Join(append([]string{name}, args...), " "))
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()

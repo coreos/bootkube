@@ -33,8 +33,8 @@ func NewPodSandboxManager(PodSandboxManagerConfig) (kubeletApi.PodSandboxManager
 	return &PodSandboxManager{}, nil
 }
 
-// CreatePodSandbox creates a pod sandbox given a pod sandbox configuration.
-func (*PodSandboxManager) CreatePodSandbox(*runtimeApi.PodSandboxConfig) (string, error) {
+// RunPodSandbox creates and starts a pod sandbox given a pod sandbox configuration.
+func (*PodSandboxManager) RunPodSandbox(*runtimeApi.PodSandboxConfig) (string, error) {
 	panic("not implemented")
 }
 
@@ -55,5 +55,10 @@ func (*PodSandboxManager) PodSandboxStatus(string) (*runtimeApi.PodSandboxStatus
 
 // ListPodSandbox lists existing sandboxes, filtered by the PodSandboxFilter.
 func (*PodSandboxManager) ListPodSandbox(*runtimeApi.PodSandboxFilter) ([]*runtimeApi.PodSandbox, error) {
+	panic("not implemented")
+}
+
+// PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
+func (*PodSandboxManager) PortForward(*runtimeApi.PortForwardRequest) (*runtimeApi.PortForwardResponse, error) {
 	panic("not implemented")
 }

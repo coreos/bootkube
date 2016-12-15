@@ -23,11 +23,11 @@ import (
 	"time"
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
+	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	api "k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -54,6 +54,9 @@ type FederatedReadOnlyStore interface {
 	// Returns all items from a cluster.
 	ListFromCluster(clusterName string) ([]interface{}, error)
 
+	// GetKeyFor returns the key under which the item would be put in the store.
+	GetKeyFor(item interface{}) string
+
 	// GetByKey returns the item stored under the given key in the specified cluster (if exist).
 	GetByKey(clusterName string, key string) (interface{}, bool, error)
 
@@ -72,7 +75,10 @@ type FederatedReadOnlyStore interface {
 // An interface to access federation members and clients.
 type FederationView interface {
 	// GetClientsetForCluster returns a clientset for the cluster, if present.
-	GetClientsetForCluster(clusterName string) (kube_release_1_4.Interface, error)
+	GetClientsetForCluster(clusterName string) (kubeclientset.Interface, error)
+
+	// GetUnreadyClusters returns a list of all clusters that are not ready yet.
+	GetUnreadyClusters() ([]*federation_api.Cluster, error)
 
 	// GetReadyClusers returns all clusters for which the sub-informers are run.
 	GetReadyClusters() ([]*federation_api.Cluster, error)
@@ -106,12 +112,12 @@ type FederatedInformer interface {
 type FederatedInformerForTestOnly interface {
 	FederatedInformer
 
-	SetClientFactory(func(*federation_api.Cluster) (kube_release_1_4.Interface, error))
+	SetClientFactory(func(*federation_api.Cluster) (kubeclientset.Interface, error))
 }
 
 // A function that should be used to create an informer on the target object. Store should use
 // cache.DeletionHandlingMetaNamespaceKeyFunc as a keying function.
-type TargetInformerFactory func(*federation_api.Cluster, kube_release_1_4.Interface) (cache.Store, cache.ControllerInterface)
+type TargetInformerFactory func(*federation_api.Cluster, kubeclientset.Interface) (cache.Store, cache.ControllerInterface)
 
 // A structure with cluster lifecycle handler functions. Cluster is available (and ClusterAvailable is fired)
 // when it is created in federated etcd and ready. Cluster becomes unavailable (and ClusterUnavailable is fired)
@@ -127,16 +133,16 @@ type ClusterLifecycleHandlerFuncs struct {
 
 // Builds a FederatedInformer for the given federation client and factory.
 func NewFederatedInformer(
-	federationClient federation_release_1_4.Interface,
+	federationClient federationclientset.Interface,
 	targetInformerFactory TargetInformerFactory,
 	clusterLifecycle *ClusterLifecycleHandlerFuncs) FederatedInformer {
 
 	federatedInformer := &federatedInformerImpl{
 		targetInformerFactory: targetInformerFactory,
-		clientFactory: func(cluster *federation_api.Cluster) (kube_release_1_4.Interface, error) {
+		clientFactory: func(cluster *federation_api.Cluster) (kubeclientset.Interface, error) {
 			clusterConfig, err := BuildClusterConfig(cluster)
 			if err == nil && clusterConfig != nil {
-				clientset := kube_release_1_4.NewForConfigOrDie(restclient.AddUserAgent(clusterConfig, userAgentName))
+				clientset := kubeclientset.NewForConfigOrDie(restclient.AddUserAgent(clusterConfig, userAgentName))
 				return clientset, nil
 			}
 			return nil, err
@@ -156,10 +162,12 @@ func NewFederatedInformer(
 	federatedInformer.clusterInformer.store, federatedInformer.clusterInformer.controller = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				return federationClient.Federation().Clusters().List(options)
+				versionedOptions := VersionizeV1ListOptions(options)
+				return federationClient.Federation().Clusters().List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return federationClient.Federation().Clusters().Watch(options)
+				versionedOptions := VersionizeV1ListOptions(options)
+				return federationClient.Federation().Clusters().Watch(versionedOptions)
 			},
 		},
 		&federation_api.Cluster{},
@@ -255,8 +263,11 @@ type federatedInformerImpl struct {
 	targetInformers map[string]informer
 
 	// A function to build clients.
-	clientFactory func(*federation_api.Cluster) (kube_release_1_4.Interface, error)
+	clientFactory func(*federation_api.Cluster) (kubeclientset.Interface, error)
 }
+
+// *federatedInformerImpl implements FederatedInformer interface.
+var _ FederatedInformer = &federatedInformerImpl{}
 
 type federatedStoreImpl struct {
 	federatedInformer *federatedInformerImpl
@@ -283,7 +294,7 @@ func (f *federatedInformerImpl) Start() {
 	go f.clusterInformer.controller.Run(f.clusterInformer.stopChan)
 }
 
-func (f *federatedInformerImpl) SetClientFactory(clientFactory func(*federation_api.Cluster) (kube_release_1_4.Interface, error)) {
+func (f *federatedInformerImpl) SetClientFactory(clientFactory func(*federation_api.Cluster) (kubeclientset.Interface, error)) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -291,13 +302,13 @@ func (f *federatedInformerImpl) SetClientFactory(clientFactory func(*federation_
 }
 
 // GetClientsetForCluster returns a clientset for the cluster, if present.
-func (f *federatedInformerImpl) GetClientsetForCluster(clusterName string) (kube_release_1_4.Interface, error) {
+func (f *federatedInformerImpl) GetClientsetForCluster(clusterName string) (kubeclientset.Interface, error) {
 	f.Lock()
 	defer f.Unlock()
 	return f.getClientsetForClusterUnlocked(clusterName)
 }
 
-func (f *federatedInformerImpl) getClientsetForClusterUnlocked(clusterName string) (kube_release_1_4.Interface, error) {
+func (f *federatedInformerImpl) getClientsetForClusterUnlocked(clusterName string) (kubeclientset.Interface, error) {
 	// No locking needed. Will happen in f.GetCluster.
 	glog.V(4).Infof("Getting clientset for cluster %q", clusterName)
 	if cluster, found, err := f.getReadyClusterUnlocked(clusterName); found && err == nil {
@@ -309,6 +320,24 @@ func (f *federatedInformerImpl) getClientsetForClusterUnlocked(clusterName strin
 		}
 	}
 	return nil, fmt.Errorf("cluster %q not found", clusterName)
+}
+
+func (f *federatedInformerImpl) GetUnreadyClusters() ([]*federation_api.Cluster, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	items := f.clusterInformer.store.List()
+	result := make([]*federation_api.Cluster, 0, len(items))
+	for _, item := range items {
+		if cluster, ok := item.(*federation_api.Cluster); ok {
+			if !isClusterReady(cluster) {
+				result = append(result, cluster)
+			}
+		} else {
+			return nil, fmt.Errorf("wrong data in FederatedInformerImpl cluster store: %v", item)
+		}
+	}
+	return result, nil
 }
 
 // GetReadyClusers returns all clusters for which the sub-informers are run.

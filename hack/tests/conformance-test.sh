@@ -2,7 +2,7 @@
 set -euo pipefail
 
 CONFORMANCE_REPO=${CONFORMANCE_REPO:-github.com/coreos/kubernetes}
-CONFORMANCE_VERSION=${CONFORMANCE_VERSION:-v1.4.7+coreos.0}
+CONFORMANCE_VERSION=${CONFORMANCE_VERSION:-v1.5.1+coreos.0}
 
 usage() {
     echo "USAGE:"
@@ -42,7 +42,7 @@ BUILD="cd /go/src/k8s.io/kubernetes && \
 
 CONFORMANCE="\
  KUBECONFIG=/kubeconfig KUBERNETES_PROVIDER=skeleton KUBERNETES_CONFORMANCE_TEST=Y go run hack/e2e.go \
- -v --test -check_version_skew=false -check_node_count=false --test_args='--ginkgo.focus=\[Conformance\]'"
+ -v --test -check_version_skew=false --test_args='--ginkgo.focus=\[Conformance\]'"
 
-CMD="sudo rkt run --insecure-options=image ${RKT_OPTS} docker://golang:1.6.3 --exec /bin/bash -- -c \"${INIT} && ${BUILD} && ${CONFORMANCE}\""
+CMD="sudo rkt run --insecure-options=image ${RKT_OPTS} docker://golang:1.7.4 --exec /bin/bash -- -c \"${INIT} && ${BUILD} && ${CONFORMANCE}\""
 ssh -q -o stricthostkeychecking=no -i ${ssh_key} -p ${ssh_port} core@${ssh_host} "${CMD}"
