@@ -31,12 +31,13 @@ BOOTKUBE_REPO=${BOOTKUBE_REPO:-}
 BOOTKUBE_VERSION=${BOOTKUBE_VERSION:-}
 COREOS_IMAGE=${COREOS_IMAGE:-'https://www.googleapis.com/compute/v1/projects/coreos-cloud/global/images/coreos-stable-1122-2-0-v20160906'}
 WORKER_COUNT=4
+GCE_PREFIX=${GCE_PREFIX:-'bootkube-ci'}
 
 function cleanup {
-    gcloud compute instances delete --quiet --zone us-central1-a bootkube-ci-m1 || true
-    gcloud compute firewall-rules delete --quiet bootkube-ci-api-443 || true
+    gcloud compute instances delete --quiet --zone us-central1-a ${GCE_PREFIX}-m1 || true
+    gcloud compute firewall-rules delete --quiet ${GCE_PREFIX}-api-443 || true
     for i in $(seq 1 ${WORKER_COUNT}); do
-        gcloud compute instances delete --quiet --zone us-central1-a bootkube-ci-w${i} || true
+        gcloud compute instances delete --quiet --zone us-central1-a ${GCE_PREFIX}-w${i} || true
     done
     rm -rf /build/cluster
 }
@@ -45,23 +46,23 @@ function init {
     curl https://sdk.cloud.google.com | bash
     source ~/.bashrc
     gcloud config set project coreos-gce-testing
-    gcloud auth activate-service-account bootkube-ci@coreos-gce-testing.iam.gserviceaccount.com --key-file=/build/keyfile
+    gcloud auth activate-service-account ${GCE_PREFIX}@coreos-gce-testing.iam.gserviceaccount.com --key-file=/build/keyfile
     apt-get update && apt-get install -y jq
 
     ssh-keygen -t rsa -f /root/.ssh/id_rsa -N ""
-    awk '{print "core:" $1 " " $2 " core@bootkube-ci"}' /root/.ssh/id_rsa.pub > /root/.ssh/gce-format.pub
+    awk '{print "core:" $1 " " $2 " core@conformance"}' /root/.ssh/id_rsa.pub > /root/.ssh/gce-format.pub
 }
 
 function add_master {
-    gcloud compute instances create bootkube-ci-m1 \
+    gcloud compute instances create ${GCE_PREFIX}-m1 \
         --image ${COREOS_IMAGE} --zone us-central1-a --machine-type n1-standard-4 --boot-disk-size=10GB
 
-    gcloud compute instances add-tags --zone us-central1-a bootkube-ci-m1 --tags bootkube-ci-apiserver
-    gcloud compute firewall-rules create bootkube-ci-api-443 --target-tags=bootkube-ci-apiserver --allow tcp:443
+    gcloud compute instances add-tags --zone us-central1-a ${GCE_PREFIX}-m1 --tags ${GCE_PREFIX}-apiserver
+    gcloud compute firewall-rules create ${GCE_PREFIX}-api-443 --target-tags=${GCE_PREFIX}-apiserver --allow tcp:443
 
-    gcloud compute instances add-metadata bootkube-ci-m1 --zone us-central1-a --metadata-from-file ssh-keys=/root/.ssh/gce-format.pub
+    gcloud compute instances add-metadata ${GCE_PREFIX}-m1 --zone us-central1-a --metadata-from-file ssh-keys=/root/.ssh/gce-format.pub
 
-    MASTER_IP=$(gcloud compute instances list bootkube-ci-m1 --format=json | jq --raw-output '.[].networkInterfaces[].accessConfigs[].natIP')
+    MASTER_IP=$(gcloud compute instances list ${GCE_PREFIX}-m1 --format=json | jq --raw-output '.[].networkInterfaces[].accessConfigs[].natIP')
     cd /build/bootkube/hack/quickstart && SSH_OPTS="-o StrictHostKeyChecking=no" \
         CLUSTER_DIR=/build/cluster BOOTKUBE_REPO=${BOOTKUBE_REPO} BOOTKUBE_VERSION=${BOOTKUBE_VERSION} ./init-master.sh ${MASTER_IP}
 }
@@ -69,12 +70,12 @@ function add_master {
 function add_workers {
     #TODO (aaron): parallelize launching workers
     for i in $(seq 1 ${WORKER_COUNT}); do
-        gcloud compute instances create bootkube-ci-w${i} \
+        gcloud compute instances create ${GCE_PREFIX}-w${i} \
             --image ${COREOS_IMAGE} --zone us-central1-a --machine-type n1-standard-1
 
-        gcloud compute instances add-metadata bootkube-ci-w${i} --zone us-central1-a --metadata-from-file ssh-keys=/root/.ssh/gce-format.pub
+        gcloud compute instances add-metadata ${GCE_PREFIX}-w${i} --zone us-central1-a --metadata-from-file ssh-keys=/root/.ssh/gce-format.pub
 
-        local WORKER_IP=$(gcloud compute instances list bootkube-ci-w${i} --format=json | jq --raw-output '.[].networkInterfaces[].accessConfigs[].natIP')
+        local WORKER_IP=$(gcloud compute instances list ${GCE_PREFIX}-w${i} --format=json | jq --raw-output '.[].networkInterfaces[].accessConfigs[].natIP')
         cd /build/bootkube/hack/quickstart && SSH_OPTS="-o StrictHostKeyChecking=no" ./init-worker.sh ${WORKER_IP} /build/cluster/auth/kubeconfig
     done
 }
