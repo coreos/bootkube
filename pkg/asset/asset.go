@@ -50,6 +50,14 @@ type Config struct {
 	SelfHostedEtcd  bool
 	StorageBackend  string
 	CloudProvider   string
+	OIDCIssuer      *OIDCIssuer
+}
+
+type OIDCIssuer struct {
+	IssuerURL     string
+	ClientID      string
+	UsernameClaim string
+	CAPath        string
 }
 
 // NewDefaultAssets returns a list of default assets, optionally
