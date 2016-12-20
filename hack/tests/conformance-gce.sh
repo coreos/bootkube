@@ -29,7 +29,7 @@ set -euo pipefail
 #
 BOOTKUBE_REPO=${BOOTKUBE_REPO:-}
 BOOTKUBE_VERSION=${BOOTKUBE_VERSION:-}
-COREOS_IMAGE=${COREOS_IMAGE:-'https://www.googleapis.com/compute/v1/projects/coreos-cloud/global/images/coreos-stable-1122-2-0-v20160906'}
+COREOS_CHANNEL=${COREOS_CHANNEL:-'coreos-stable'}
 WORKER_COUNT=4
 GCE_PREFIX=${GCE_PREFIX:-'bootkube-ci'}
 
@@ -55,7 +55,7 @@ function init {
 
 function add_master {
     gcloud compute instances create ${GCE_PREFIX}-m1 \
-        --image ${COREOS_IMAGE} --zone us-central1-a --machine-type n1-standard-4 --boot-disk-size=10GB
+        --image-project coreos-cloud --image-family ${COREOS_CHANNEL} --zone us-central1-a --machine-type n1-standard-4 --boot-disk-size=10GB
 
     gcloud compute instances add-tags --zone us-central1-a ${GCE_PREFIX}-m1 --tags ${GCE_PREFIX}-apiserver
     gcloud compute firewall-rules create ${GCE_PREFIX}-api-443 --target-tags=${GCE_PREFIX}-apiserver --allow tcp:443
@@ -71,7 +71,7 @@ function add_workers {
     #TODO (aaron): parallelize launching workers
     for i in $(seq 1 ${WORKER_COUNT}); do
         gcloud compute instances create ${GCE_PREFIX}-w${i} \
-            --image ${COREOS_IMAGE} --zone us-central1-a --machine-type n1-standard-1
+            --image-project coreos-cloud --image-family ${COREOS_CHANNEL} --zone us-central1-a --machine-type n1-standard-1
 
         gcloud compute instances add-metadata ${GCE_PREFIX}-w${i} --zone us-central1-a --metadata-from-file ssh-keys=/root/.ssh/gce-format.pub
 
@@ -107,5 +107,5 @@ else
     )
 
     sudo rkt run --insecure-options=image ${RKT_OPTS} docker://golang:1.7.4 --exec /bin/bash -- -c \
-        "IN_CONTAINER=true BOOTKUBE_REPO=${BOOTKUBE_REPO} BOOTKUBE_VERSION=${BOOTKUBE_VERSION} COREOS_IMAGE=${COREOS_IMAGE} /build/bootkube/hack/tests/$(basename $0)"
+        "IN_CONTAINER=true BOOTKUBE_REPO=${BOOTKUBE_REPO} BOOTKUBE_VERSION=${BOOTKUBE_VERSION} COREOS_CHANNEL=${COREOS_CHANNEL} /build/bootkube/hack/tests/$(basename $0)"
 fi
