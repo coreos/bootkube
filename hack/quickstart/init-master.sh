@@ -8,7 +8,7 @@ IDENT=${IDENT:-${HOME}/.ssh/id_rsa}
 SSH_OPTS=${SSH_OPTS:-}
 
 BOOTKUBE_REPO=${BOOTKUBE_REPO:-quay.io/coreos/bootkube}
-BOOTKUBE_VERSION=${BOOTKUBE_VERSION:-v0.2.4}
+BOOTKUBE_VERSION=${BOOTKUBE_VERSION:-v0.3.0}
 
 function usage() {
     echo "USAGE:"

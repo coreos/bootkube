@@ -4,7 +4,7 @@ After=docker.service flanneld.service
 
 [Service]
 Environment=KUBELET_ACI=quay.io/coreos/hyperkube
-Environment=KUBELET_VERSION=v1.4.5_coreos.0
+Environment=KUBELET_VERSION=v1.5.1_coreos.0
 Environment="RKT_OPTS=--volume etc-resolv,kind=host,source=/etc/resolv.conf --mount volume=etc-resolv,target=/etc/resolv.conf"
 EnvironmentFile=/etc/environment
 
