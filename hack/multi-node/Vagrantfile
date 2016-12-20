@@ -85,11 +85,11 @@ Vagrant.configure("2") do |config|
     (1..$etcd_count).each do |i|
       config.vm.define vm_name = "e%d" % i do |etcd|
 
-        data = YAML.load(IO.readlines(ETCD_CLOUD_CONFIG_PATH)[1..-1].join)
-        data['coreos']['etcd2']['initial-cluster'] = initial_etcd_cluster
-        data['coreos']['etcd2']['name'] = vm_name
+        data = File.read(ETCD_CLOUD_CONFIG_PATH)
+        data = data.gsub("{{ETCD_NODE_NAME}}", vm_name)
+        data = data.gsub("{{ETCD_INITIAL_CLUSTER}}", initial_etcd_cluster)
         etcd_config_file = Tempfile.new('etcd_config')
-        etcd_config_file.write("#cloud-config\n#{data.to_yaml}")
+        etcd_config_file.write(data)
         etcd_config_file.close
 
         etcd.vm.hostname = vm_name

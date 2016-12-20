@@ -17,9 +17,9 @@ function usage() {
 }
 
 function configure_etcd() {
-    [ -f "/etc/systemd/system/etcd2.service.d/10-etcd2.conf" ] || {
-        mkdir -p /etc/systemd/system/etcd2.service.d
-        cat << EOF > /etc/systemd/system/etcd2.service.d/10-etcd2.conf
+    [ -f "/etc/systemd/system/etcd-member.service.d/10-etcd-member.conf" ] || {
+        mkdir -p /etc/systemd/system/etcd-member.service.d
+        cat << EOF > /etc/systemd/system/etcd-member.service.d/10-etcd-member.conf
 [Service]
 Environment="ETCD_NAME=controller"
 Environment="ETCD_INITIAL_CLUSTER=controller=http://${COREOS_PRIVATE_IPV4}:2380"
@@ -36,9 +36,9 @@ function init_master_node() {
     systemctl daemon-reload
     systemctl stop update-engine; systemctl mask update-engine
 
-    # Start etcd and configure network settings
+    # Start etcd.
     configure_etcd
-    systemctl enable etcd2; sudo systemctl start etcd2
+    systemctl enable etcd-member; sudo systemctl start etcd-member
 
     # Render cluster assets
     /usr/bin/rkt run \

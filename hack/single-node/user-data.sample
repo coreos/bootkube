@@ -2,7 +2,8 @@
 
 coreos:
   units:
-    - name: etcd2.service
+    - name: etcd-member.service
+      enable: true
       command: start
     - name: kubelet.service
       enable: true
