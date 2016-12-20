@@ -10,13 +10,11 @@ export CLUSTER_PREFIX=quickstart
 
 ### Launch Nodes
 
-To find the latest CoreOS alpha/beta/stable images, please see the [CoreOS GCE Documentation](https://coreos.com/os/docs/latest/booting-on-google-compute-engine.html). Then replace the `--image` flag in the command below.
-
 Launch nodes:
 
 ```
 $ gcloud compute instances create ${CLUSTER_PREFIX}-core1 \
-  --image https://www.googleapis.com/compute/v1/projects/coreos-cloud/global/images/coreos-stable-1068-9-0-v20160809 \
+  --image-project coreos-cloud --image-family coreos-stable \
   --zone us-central1-a --machine-type n1-standard-1
 ```
 
