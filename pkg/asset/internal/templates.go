@@ -19,6 +19,7 @@ contexts:
     cluster: local
     user: kubelet
 `)
+
 	KubeletTemplate = []byte(`apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
@@ -36,13 +37,11 @@ spec:
       - name: kubelet
         image: quay.io/coreos/hyperkube:v1.5.1_coreos.0
         command:
-        - /nsenter
-        - --target=1
-        - --mount
-        - --wd=.
-        - --
         - ./hyperkube
         - kubelet
+        - --network-plugin=cni
+        - --cni-conf-dir=/etc/kubernetes/cni/net.d
+        - --cni-bin-dir=/opt/cni/bin
         - --pod-manifest-path=/etc/kubernetes/manifests
         - --allow-privileged
         - --hostname-override=$(NODE_NAME)
@@ -51,6 +50,7 @@ spec:
         - --kubeconfig=/etc/kubernetes/kubeconfig
         - --require-kubeconfig
         - --lock-file=/var/run/lock/kubelet.lock
+        - --containerized
         env:
           - name: NODE_NAME
             valueFrom:
@@ -78,6 +78,8 @@ spec:
           mountPath: /var/lib/kubelet
         - name: var-lib-rkt
           mountPath: /var/lib/rkt
+        - name: rootfs
+          mountPath: /rootfs
       hostNetwork: true
       hostPID: true
       volumes:
@@ -105,7 +107,11 @@ spec:
       - name: var-lib-rkt
         hostPath:
           path: /var/lib/rkt
+      - name: rootfs
+        hostPath:
+          path: /
 `)
+
 	APIServerTemplate = []byte(`apiVersion: "extensions/v1beta1"
 kind: DaemonSet
 metadata:
@@ -209,6 +215,9 @@ spec:
         command:
         - ./hyperkube
         - controller-manager
+        - --allocate-node-cidrs=true
+        - --configure-cloud-routes=false
+        - --cluster-cidr=10.2.0.0/16
         - --root-ca-file=/etc/kubernetes/secrets/ca.crt
         - --service-account-private-key-file=/etc/kubernetes/secrets/service-account.key
         - --leader-elect=true
@@ -471,6 +480,7 @@ spec:
     port: 53
     protocol: TCP
 `)
+
 	EtcdOperatorTemplate = []byte(`apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
@@ -494,6 +504,7 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
 `)
+
 	EtcdSvcTemplate = []byte(`apiVersion: v1
 kind: Service
 metadata:
@@ -508,5 +519,93 @@ spec:
   - name: client
     port: 2379
     protocol: TCP
+`)
+
+	KubeFlannelCfgTemplate = []byte(`apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kube-flannel-cfg
+  namespace: kube-system
+  labels:
+    tier: node
+    app: flannel
+data:
+  cni-conf.json: |
+    {
+      "name": "cbr0",
+      "type": "flannel",
+      "delegate": {
+        "isDefaultGateway": true
+      }
+    }
+  net-conf.json: |
+    {
+      "Network": "10.2.0.0/16",
+      "Backend": {
+        "Type": "vxlan"
+      }
+    }
+`)
+
+	KubeFlannelTemplate = []byte(`apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: kube-flannel
+  namespace: kube-system
+  labels:
+    tier: node
+    app: flannel
+spec:
+  template:
+    metadata:
+      labels:
+        tier: node
+        app: flannel
+    spec:
+      hostNetwork: true
+      containers:
+      - name: kube-flannel
+        image: quay.io/coreos/flannel-git:v0.6.1-60-g4b752d1-amd64
+        command: [ "/opt/bin/flanneld", "--ip-masq", "--kube-subnet-mgr", "--iface=$(POD_IP)"]
+        securityContext:
+          privileged: true
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        volumeMounts:
+        - name: run
+          mountPath: /run
+        - name: cni
+          mountPath: /etc/cni/net.d
+        - name: flannel-cfg
+          mountPath: /etc/kube-flannel/
+      - name: install-cni
+        image: busybox
+        command: [ "/bin/sh", "-c", "set -e -x; TMP=/etc/cni/net.d/.tmp-flannel-cfg; cp /etc/kube-flannel/cni-conf.json ${TMP}; mv ${TMP} /etc/cni/net.d/10-flannel.conf; while :; do sleep 3600; done" ]
+        volumeMounts:
+        - name: cni
+          mountPath: /etc/cni/net.d
+        - name: flannel-cfg
+          mountPath: /etc/kube-flannel/
+      volumes:
+        - name: run
+          hostPath:
+            path: /run
+        - name: cni
+          hostPath:
+            path: /etc/kubernetes/cni/net.d
+        - name: flannel-cfg
+          configMap:
+            name: kube-flannel-cfg
 `)
 )

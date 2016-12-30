@@ -1,17 +1,18 @@
-[Unit]
-Requires=docker.service flanneld.service
-After=docker.service flanneld.service
-
 [Service]
 Environment=KUBELET_ACI=quay.io/coreos/hyperkube
 Environment=KUBELET_VERSION=v1.5.1_coreos.0
-Environment="RKT_OPTS=--volume etc-resolv,kind=host,source=/etc/resolv.conf --mount volume=etc-resolv,target=/etc/resolv.conf"
+Environment="RKT_OPTS=\
+--volume etc-resolv,kind=host,source=/etc/resolv.conf --mount volume=etc-resolv,target=/etc/resolv.conf \
+--volume var-lib-cni,kind=host,source=/var/lib/cni --mount volume=var-lib-cni,target=/var/lib/cni"
 EnvironmentFile=/etc/environment
-
 ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests
+ExecStartPre=/bin/mkdir -p /etc/kubernetes/cni/net.d
+ExecStartPre=/bin/mkdir -p /var/lib/cni
 ExecStart=/usr/lib/coreos/kubelet-wrapper \
   --api-servers=https://{{apiserver}}:443 \
   --kubeconfig=/etc/kubernetes/kubeconfig \
+  --cni-conf-dir=/etc/kubernetes/cni/net.d \
+  --network-plugin=cni \
   --lock-file=/var/run/lock/kubelet.lock \
   --exit-on-lock-contention \
   --allow-privileged \
