@@ -45,17 +45,17 @@ spec:
         - kubelet
         - --pod-manifest-path=/etc/kubernetes/manifests
         - --allow-privileged
-        - --hostname-override=$(MY_POD_IP)
+        - --hostname-override=$(NODE_NAME)
         - --cluster-dns=10.3.0.10
         - --cluster-domain=cluster.local
         - --kubeconfig=/etc/kubernetes/kubeconfig
         - --require-kubeconfig
         - --lock-file=/var/run/lock/kubelet.lock
         env:
-          - name: MY_POD_IP
+          - name: NODE_NAME
             valueFrom:
               fieldRef:
-                fieldPath: status.podIP
+                fieldPath: spec.nodeName
         securityContext:
           privileged: true
         volumeMounts:
@@ -133,7 +133,6 @@ spec:
         - --bind-address=0.0.0.0
         - --secure-port=443
         - --insecure-port=8080
-        - --advertise-address=$(MY_POD_IP)
         - --etcd-servers={{ range $i, $e := .EtcdServers }}{{ if $i }},{{end}}{{ $e }}{{end}}
         - --storage-backend={{.StorageBackend}}
         - --allow-privileged=true
@@ -146,11 +145,6 @@ spec:
         - --client-ca-file=/etc/kubernetes/secrets/ca.crt
         - --cloud-provider={{ .CloudProvider  }}
         - --anonymous-auth=false
-        env:
-          - name: MY_POD_IP
-            valueFrom:
-              fieldRef:
-                fieldPath: status.podIP
         volumeMounts:
         - mountPath: /etc/ssl/certs
           name: ssl-certs-host
@@ -280,13 +274,13 @@ spec:
         - proxy
         - --kubeconfig=/etc/kubernetes/kubeconfig
         - --proxy-mode=iptables
-        - --hostname-override=$(POD_IP)
+        - --hostname-override=$(NODE_NAME)
         - --cluster-cidr=10.2.0.0/16
         env:
-        - name: POD_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
         securityContext:
           privileged: true
         volumeMounts:
