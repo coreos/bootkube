@@ -75,6 +75,9 @@ And optionally, to install into $GOPATH/bin:
 make install
 ```
 
+### Development
+Running `make run-single` or `make run-multi` resets the single-node or multi-node Vagrant environments, respectively, in the background while compiling bootkube and provisions the fresh VM with bootkube when compilation is complete. This is intended to speed up iteration.
+
 ## Conformance Tests
 
 This repository includes scripts for running the Kubernetes conformance tests agains the [hack/single-node](hack/single-node) and [hack/multi-node](hack/multi-node) launched clusters.
