@@ -1,13 +1,13 @@
 package etcdutil
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd-operator/pkg/spec"
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -18,7 +18,11 @@ import (
 const (
 	apiserverAddr = "http://127.0.0.1:8080"
 	etcdServiceIP = "10.3.0.15"
+
+	etcdClusterName = "kube-etcd"
 )
+
+var waitEtcdClusterRunningTime = 300 * time.Second
 
 func Migrate() error {
 	kubecli, err := clientset.NewForConfig(&restclient.Config{
@@ -45,7 +49,7 @@ func Migrate() error {
 		return err
 	}
 
-	return checkEtcdClusterUp()
+	return waitEtcdClusterRunning(restClient, apiserverAddr)
 }
 
 func listETCDCluster(ns string, restClient restclient.Interface) restclient.Result {
@@ -108,7 +112,7 @@ func createMigratedEtcdCluster(restclient restclient.Interface, host, podIP stri
   "apiVersion": "coreos.com/v1",
   "kind": "EtcdCluster",
   "metadata": {
-    "name": "etcd-cluster",
+    "name": "%s",
     "namespace": "kube-system"
   },
   "spec": {
@@ -118,7 +122,7 @@ func createMigratedEtcdCluster(restclient restclient.Interface, host, podIP stri
 		"bootMemberClientEndpoint": "http://%s:12379"
     }
   }
-}`, podIP))
+}`, etcdClusterName, podIP))
 
 	uri := "/apis/coreos.com/v1/namespaces/kube-system/etcdclusters"
 	res := restclient.Post().RequestURI(uri).SetHeader("Content-Type", "application/json").Body(b).Do()
@@ -136,41 +140,41 @@ func createMigratedEtcdCluster(restclient restclient.Interface, host, podIP stri
 	return nil
 }
 
-func checkEtcdClusterUp() error {
+func waitEtcdClusterRunning(restclient restclient.Interface, host string) error {
 	glog.Infof("initial delaying (30s)...")
 	time.Sleep(30 * time.Second)
 
-	// The checking does:
-	// - Trying to talk to etcd cluster via etcd service. The assumption here is that
-	//   the etcd service only selects the etcd pods newly created, excluding the boot one.
-	//   Once we can talk to it, we are sure that etcd cluster is created.
-	// - Then we list members and see if it's been reduced to 1 member. Because when we
-	//   can talk to the etcd cluster, we are certain there are 2 members at the beginning,
-	//   and will reduce to 1 eventually. That's the timeline of expected events.
-	//   As long as 1 member cluster is reached, we are certain cluster has been migrated successfully.
-	err := wait.PollImmediate(10*time.Second, 60*time.Second, func() (bool, error) {
-		cfg := clientv3.Config{
-			Endpoints:   []string{fmt.Sprintf("http://%s:2379", etcdServiceIP)},
-			DialTimeout: 5 * time.Second,
+	err := wait.Poll(10*time.Second, waitEtcdClusterRunningTime, func() (bool, error) {
+		res := restclient.Get().RequestURI(makeEtcdClusterURI(host, etcdClusterName)).Do()
+		if res.Error() != nil {
+			return false, res.Error()
 		}
-		etcdcli, err := clientv3.New(cfg)
+
+		var status int
+		res.StatusCode(&status)
+
+		if status != http.StatusOK {
+			return false, fmt.Errorf("invalid status code: %v", status)
+		}
+
+		e := &spec.EtcdCluster{}
+		err := res.Into(e)
 		if err != nil {
-			glog.Errorf("fail to create etcd client, retrying...: %v", err)
+			return false, err
+		}
+		switch e.Status.Phase {
+		case spec.ClusterPhaseRunning:
+			return true, nil
+		case spec.ClusterPhaseFailed:
+			return false, errors.New("failed to create etcd cluster")
+		default:
+			// All the other phases are not ready
 			return false, nil
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		m, err := etcdcli.MemberList(ctx)
-		if err != nil {
-			glog.Errorf("fail to list etcd members, retrying...: %v", err)
-			return false, nil
-		}
-		if len(m.Members) != 1 {
-			glog.Infof("Still migrating boot etcd member, retrying...")
-			return false, nil
-		}
-		glog.Infof("etcd cluster is up. Member: %v", m.Members[0].Name)
-		return true, nil
 	})
-	return err
+	return fmt.Errorf("wait etcd cluster running failed: %v", err)
+}
+
+func makeEtcdClusterURI(host, name string) string {
+	return fmt.Sprintf("%s/apis/coreos.com/v1/namespaces/kube-system/etcdclusters/%s", host, name)
 }

@@ -519,7 +519,7 @@ metadata:
 spec:
   selector:
     app: etcd
-    etcd_cluster: etcd-cluster
+    etcd_cluster: kube-etcd
   clusterIP: 10.3.0.15
   ports:
   - name: client
