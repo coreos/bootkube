@@ -1,77 +1,26 @@
-# How to Contribute
+# Contributing guidelines
 
-CoreOS projects are [Apache 2.0 licensed](LICENSE) and accept contributions via
-GitHub pull requests.  This document outlines some of the conventions on
-development workflow, commit message formatting, contact points and other
-resources to make it easier to get your contribution accepted.
+## How to become a contributor and submit your own code
 
-# Certificate of Origin
+### Contributor License Agreements
 
-By contributing to this project you agree to the Developer Certificate of
-Origin (DCO). This document was created by the Linux Kernel community and is a
-simple statement that you, as a contributor, have the legal right to make the
-contribution. See the [DCO](DCO) file for details.
+We'd love to accept your patches! Before we can take them, we have to jump a couple of legal hurdles.
 
-# Email and Chat
+Please fill out either the individual or corporate Contributor License Agreement (CLA).
 
-The project currently uses the general CoreOS email list and IRC channel:
-- Email: [coreos-dev](https://groups.google.com/forum/#!forum/coreos-dev)
-- IRC: #[coreos](irc://irc.freenode.org:6667/#coreos) IRC channel on freenode.org
+  * If you are an individual writing original source code and you're sure you own the intellectual property, then you'll need to sign an [individual CLA](https://identity.linuxfoundation.org/node/285/node/285/individual-signup).
+  * If you work for a company that wants to allow you to contribute your work, then you'll need to sign a [corporate CLA](https://identity.linuxfoundation.org/node/285/organization-signup).
 
-Please avoid emailing maintainers found in the MAINTAINERS file directly. They
-are very busy and read the mailing lists.
+Follow either of the two links above to access the appropriate CLA and instructions for how to sign and return it. Once we receive it, we'll be able to accept your pull requests.
 
-## Getting Started
+### Contributing A Patch
 
-- Fork the repository on GitHub
-- Read the [README](README.md) for build and test instructions
-- Play with the project, submit bugs, submit patches!
+1. Submit an issue describing your proposed change to the repo in question.
+1. The [repo owners](OWNERS) will respond to your issue promptly.
+1. If your proposed change is accepted, and you haven't already done so, sign a Contributor License Agreement (see details above).
+1. Fork the desired repo, develop and test your code changes.
+1. Submit a pull request.
 
-## Contribution Flow
+### Adding dependencies
 
-This is a rough outline of what a contributor's workflow looks like:
-
-- Create a topic branch from where you want to base your work (usually master).
-- Make commits of logical units.
-- Make sure your commit messages are in the proper format (see below).
-- Push your changes to a topic branch in your fork of the repository.
-- Make sure the tests pass, and add any new tests as appropriate.
-- Submit a pull request to the original repository.
-
-Thanks for your contributions!
-
-### Coding Style
-
-CoreOS projects written in Go follow a set of style guidelines that we've documented 
-[here](https://github.com/coreos/docs/tree/master/golang). Please follow them when 
-working on your contributions.
-
-### Format of the Commit Message
-
-We follow a rough convention for commit messages that is designed to answer two
-questions: what changed and why. The subject line should feature the what and
-the body of the commit should describe the why.
-
-```
-scripts: add the test-cluster command
-
-this uses tmux to setup a test cluster that you can easily kill and
-start for debugging.
-
-Fixes #38
-```
-
-The format can be described more formally as follows:
-
-```
-<subsystem>: <what changed>
-<BLANK LINE>
-<why this change was made>
-<BLANK LINE>
-<footer>
-```
-
-The first line is the subject and should be no longer than 70 characters, the
-second line is always blank, and other lines should be wrapped at 80 characters.
-This allows the message to be easier to read on GitHub as well as in various
-git tools.
+If your patch depends on new packages, add that package with [`godep`](https://github.com/tools/godep). Follow the [instructions to add a dependency](https://github.com/kubernetes/kubernetes/blob/master/docs/devel/development.md#godep-and-dependency-management).
