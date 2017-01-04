@@ -139,6 +139,7 @@ spec:
         - --bind-address=0.0.0.0
         - --secure-port=443
         - --insecure-port=8080
+        - --advertise-address=$(POD_IP)
         - --etcd-servers={{ range $i, $e := .EtcdServers }}{{ if $i }},{{end}}{{ $e }}{{end}}
         - --storage-backend={{.StorageBackend}}
         - --allow-privileged=true
@@ -151,6 +152,11 @@ spec:
         - --client-ca-file=/etc/kubernetes/secrets/ca.crt
         - --cloud-provider={{ .CloudProvider  }}
         - --anonymous-auth=false
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         volumeMounts:
         - mountPath: /etc/ssl/certs
           name: ssl-certs-host
