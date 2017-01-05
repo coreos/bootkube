@@ -60,7 +60,7 @@ spec:
         valueFrom:
           fieldRef:
             fieldPath: status.podIP
-    image: quay.io/coreos/etcd:v3.1.0-alpha.1
+    image: quay.io/coreos/etcd:v3.1.0-rc.1
     name: etcd
   hostNetwork: true
   restartPolicy: Never
