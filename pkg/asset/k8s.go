@@ -29,6 +29,8 @@ func newStaticAssets(selfHostKubelet, selfHostedEtcd bool) Assets {
 		mustCreateAssetFromTemplate(AssetPathCheckpointer, internal.CheckpointerTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathKubeFlannel, internal.KubeFlannelTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathKubeFlannelCfg, internal.KubeFlannelCfgTemplate, noData),
+		mustCreateAssetFromTemplate(AssetPathKubeletBootstrapRoleBinding, internal.KubeletBootstrapRoleBindingTemplate, noData),
+		mustCreateAssetFromTemplate(AssetPathKubeSystemSARoleBinding, internal.KubeSystemSARoleBindingTemplate, noData),
 	}
 	if selfHostKubelet {
 		assets = append(assets, mustCreateAssetFromTemplate(AssetPathKubelet, internal.KubeletTemplate, noData))

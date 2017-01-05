@@ -25,6 +25,21 @@ contexts:
     user: {{ .UserName }}
 `)
 
+	KubeSystemSARoleBindingTemplate = []byte(`apiVersion: rbac.authorization.k8s.io/v1alpha1
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1alpha1
+metadata:
+  name: system:default-sa
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+`)
+
 	KubeletTemplate = []byte(`apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
@@ -119,6 +134,28 @@ spec:
           path: /
 `)
 
+	KubeletBootstrapRoleBindingTemplate = []byte(`apiVersion: rbac.authorization.k8s.io/v1alpha1
+kind: ClusterRole
+metadata:
+  name: system:kubelet-bootstrap
+rules:
+  - apiGroups: ["certificates.k8s.io"]
+    resources: ["certificatesigningrequests"]
+    verbs: ["create", "watch"]
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1alpha1
+metadata:
+  name: system:kubelet-bootstrap
+subjects:
+  - kind: Group
+    name: system:kubelet-bootstrap
+roleRef:
+  kind: ClusterRole
+  name: system:kubelet-bootstrap
+  apiGroup: rbac.authorization.k8s.io
+`)
+
 	APIServerTemplate = []byte(`apiVersion: "extensions/v1beta1"
 kind: DaemonSet
 metadata:
@@ -162,6 +199,7 @@ spec:
         - --service-account-key-file=/etc/kubernetes/secrets/service-account.pub
         - --client-ca-file=/etc/kubernetes/secrets/ca.crt
         - --token-auth-file=/etc/kubernetes/secrets/bootstrap-auth-token
+        - --authorization-mode=RBAC
         - --cloud-provider={{ .CloudProvider  }}
         - --anonymous-auth=false
         env:

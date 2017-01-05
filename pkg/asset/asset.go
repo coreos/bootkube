@@ -26,6 +26,8 @@ const (
 	AssetPathBootstrapAuthToken          = "auth/bootstrap-auth-token"
 	AssetPathManifests                   = "manifests"
 	AssetPathKubelet                     = "manifests/kubelet.yaml"
+	AssetPathKubeletBootstrapRoleBinding = "manifests/kubelet-bootstrap-role-binding.yaml"
+	AssetPathKubeSystemSARoleBinding     = "manifests/kube-sa-role-binding.yaml"
 	AssetPathProxy                       = "manifests/kube-proxy.yaml"
 	AssetPathKubeFlannel                 = "manifests/kube-flannel.yaml"
 	AssetPathKubeFlannelCfg              = "manifests/kube-flannel-cfg.yaml"
