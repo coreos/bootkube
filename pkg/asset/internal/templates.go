@@ -209,6 +209,8 @@ spec:
       labels:
         k8s-app: kube-controller-manager
     spec:
+      nodeSelector:
+        kubernetes.io/role: "master"
       containers:
       - name: kube-controller-manager
         image: quay.io/coreos/hyperkube:v1.5.1_coreos.0
@@ -253,6 +255,8 @@ spec:
       labels:
         k8s-app: kube-scheduler
     spec:
+      nodeSelector:
+        kubernetes.io/role: "master"
       containers:
       - name: kube-scheduler
         image: quay.io/coreos/hyperkube:v1.5.1_coreos.0
@@ -335,6 +339,8 @@ spec:
         scheduler.alpha.kubernetes.io/critical-pod: ''
         scheduler.alpha.kubernetes.io/tolerations: '[{"key":"CriticalAddonsOnly", "operator":"Exists"}]'
     spec:
+      nodeSelector:
+        kubernetes.io/role: "master"
       containers:
       - name: kubedns
         image: gcr.io/google_containers/kubedns-amd64:1.9
