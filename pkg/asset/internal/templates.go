@@ -128,7 +128,7 @@ spec:
         checkpointer.alpha.coreos.com/checkpoint: "true"
     spec:
       nodeSelector:
-        master: "true"
+        kubernetes.io/role: "master"
       hostNetwork: true
       containers:
       - name: kube-apiserver
@@ -180,7 +180,7 @@ spec:
         k8s-app: pod-checkpoint-installer
     spec:
       nodeSelector:
-        master: "true"
+        kubernetes.io/role: "master"
       hostNetwork: true
       containers:
       - name: checkpoint-installer

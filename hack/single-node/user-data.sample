@@ -28,7 +28,7 @@ coreos:
           --allow-privileged \
           --pod-manifest-path=/etc/kubernetes/manifests \
           --hostname-override=${COREOS_PUBLIC_IPV4} \
-          --node-labels=master=true \
+          --node-labels=kubernetes.io/role=master \
           --cluster_dns=10.3.0.10 \
           --cluster_domain=cluster.local
 

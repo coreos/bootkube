@@ -14,7 +14,7 @@ if [ ! -d "cluster" ]; then
   cat user-data.sample > cluster/user-data && sed 's/^/      /' cluster/auth/kubeconfig >> cluster/user-data
   cp cluster/user-data{,-worker}
   cp cluster/user-data{,-controller}
-  sed -i.bak -e '/--node-labels=master=true/d' cluster/user-data-worker
+  sed -i.bak -e 's/--node-labels=kubernetes.io\/role=master/--node-labels=kubernetes.io\/role=node/' cluster/user-data-worker
 fi
 
 # Start the VM
