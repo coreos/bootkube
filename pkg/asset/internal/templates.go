@@ -134,6 +134,10 @@ spec:
       - name: kube-apiserver
         image: quay.io/coreos/hyperkube:v1.5.1_coreos.0
         command:
+        - /usr/bin/flock
+        - --exclusive
+        - --timeout=30
+        - /var/lock/api-server.lock
         - /hyperkube
         - apiserver
         - --bind-address=0.0.0.0
@@ -164,6 +168,9 @@ spec:
         - mountPath: /etc/kubernetes/secrets
           name: secrets
           readOnly: true
+        - mountPath: /var/lock
+          name: var-lock
+          readOnly: false
       volumes:
       - name: ssl-certs-host
         hostPath:
@@ -171,6 +178,9 @@ spec:
       - name: secrets
         secret:
           secretName: kube-apiserver
+      - name: var-lock
+        hostPath:
+          path: /var/lock
 `)
 	CheckpointerTemplate = []byte(`apiVersion: "extensions/v1beta1"
 kind: DaemonSet
