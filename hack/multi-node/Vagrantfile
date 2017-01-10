@@ -13,15 +13,12 @@ $controller_count = 1
 $controller_vm_memory = 2048
 $worker_count = 1
 $worker_vm_memory = 1024
-$etcd_count = 1
-$etcd_vm_memory = 512
 
 if $worker_vm_memory < 1024
   puts "Workers should have at least 1024 MB of memory"
 end
 
 CONTROLLER_CLUSTER_IP="10.3.0.1"
-ETCD_CLOUD_CONFIG_PATH = File.expand_path("./etcd-cloud-config.yaml")
 CONTROLLER_USER_DATA_PATH = File.expand_path("./cluster/user-data-controller")
 WORKER_USER_DATA_PATH = File.expand_path("./cluster/user-data-worker")
 
@@ -37,8 +34,14 @@ def workerIP(num)
   return "172.17.4.#{num+200}"
 end
 
-etcdIPs = [*1..$etcd_count].map{ |i| etcdIP(i) }
-initial_etcd_cluster = etcdIPs.map.with_index{ |ip, i| "e#{i+1}=http://#{ip}:2380" }.join(",")
+$self_host_etcd = true if ENV['SELF_HOST_ETCD'] == "true"
+if !$self_host_etcd
+    $etcd_count = 1
+    $etcd_vm_memory = 512
+    ETCD_CLOUD_CONFIG_PATH = File.expand_path("./etcd-cloud-config.yaml")
+    etcdIPs = [*1..$etcd_count].map{ |i| etcdIP(i) }
+    initial_etcd_cluster = etcdIPs.map.with_index{ |ip, i| "e#{i+1}=http://#{ip}:2380" }.join(",")
+end
 
 Vagrant.configure("2") do |config|
   # always use Vagrant's insecure key
@@ -78,32 +81,34 @@ Vagrant.configure("2") do |config|
     vb.gui = false
   end
 
-  (1..$etcd_count).each do |i|
-    config.vm.define vm_name = "e%d" % i do |etcd|
+  if !$self_host_etcd
+    (1..$etcd_count).each do |i|
+      config.vm.define vm_name = "e%d" % i do |etcd|
 
-      data = YAML.load(IO.readlines(ETCD_CLOUD_CONFIG_PATH)[1..-1].join)
-      data['coreos']['etcd2']['initial-cluster'] = initial_etcd_cluster
-      data['coreos']['etcd2']['name'] = vm_name
-      etcd_config_file = Tempfile.new('etcd_config')
-      etcd_config_file.write("#cloud-config\n#{data.to_yaml}")
-      etcd_config_file.close
+        data = YAML.load(IO.readlines(ETCD_CLOUD_CONFIG_PATH)[1..-1].join)
+        data['coreos']['etcd2']['initial-cluster'] = initial_etcd_cluster
+        data['coreos']['etcd2']['name'] = vm_name
+        etcd_config_file = Tempfile.new('etcd_config')
+        etcd_config_file.write("#cloud-config\n#{data.to_yaml}")
+        etcd_config_file.close
 
-      etcd.vm.hostname = vm_name
+        etcd.vm.hostname = vm_name
 
-      ["vmware_fusion", "vmware_workstation"].each do |vmware|
-        etcd.vm.provider vmware do |v|
-          v.vmx['memsize'] = $etcd_vm_memory
+        ["vmware_fusion", "vmware_workstation"].each do |vmware|
+          etcd.vm.provider vmware do |v|
+            v.vmx['memsize'] = $etcd_vm_memory
+          end
         end
+
+        etcd.vm.provider :virtualbox do |vb|
+          vb.memory = $etcd_vm_memory
+        end
+
+        etcd.vm.network :private_network, ip: etcdIP(i)
+
+        etcd.vm.provision :file, source: etcd_config_file.path, destination: "/tmp/vagrantfile-user-data"
+        etcd.vm.provision :shell, inline: "mv /tmp/vagrantfile-user-data /var/lib/coreos-vagrant/", privileged: true
       end
-
-      etcd.vm.provider :virtualbox do |vb|
-        vb.memory = $etcd_vm_memory
-      end
-
-      etcd.vm.network :private_network, ip: etcdIP(i)
-
-      etcd.vm.provision :file, source: etcd_config_file.path, destination: "/tmp/vagrantfile-user-data"
-      etcd.vm.provision :shell, inline: "mv /tmp/vagrantfile-user-data /var/lib/coreos-vagrant/", privileged: true
     end
   end
 
