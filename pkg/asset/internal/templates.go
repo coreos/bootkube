@@ -581,7 +581,7 @@ spec:
       hostNetwork: true
       containers:
       - name: kube-flannel
-        image: quay.io/coreos/flannel-git:v0.6.1-60-g4b752d1-amd64
+        image: quay.io/coreos/flannel:v0.7.0-amd64
         command: [ "/opt/bin/flanneld", "--ip-masq", "--kube-subnet-mgr", "--iface=$(POD_IP)"]
         securityContext:
           privileged: true
