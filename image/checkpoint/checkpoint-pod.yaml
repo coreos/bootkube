@@ -11,6 +11,7 @@ spec:
     image: {{ REPO }}:{{ TAG }}
     command:
     - /checkpoint
+    - --v=4
     env:
     - name: NODE_NAME
       valueFrom:
