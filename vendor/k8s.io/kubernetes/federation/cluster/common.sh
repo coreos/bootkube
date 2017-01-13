@@ -293,7 +293,7 @@ function push-federation-images {
     : "${FEDERATION_PUSH_REPO_BASE?Must set FEDERATION_PUSH_REPO_BASE env var}"
     : "${FEDERATION_IMAGE_TAG?Must set FEDERATION_IMAGE_TAG env var}"
 
-    source "${KUBE_ROOT}/build-tools/common.sh"
+    source "${KUBE_ROOT}/build/common.sh"
     source "${KUBE_ROOT}/hack/lib/util.sh"
 
     local FEDERATION_BINARIES=${FEDERATION_BINARIES:-"hyperkube"}
@@ -333,7 +333,7 @@ function push-federation-images {
         # TODO(madhusudancs): Remove this code when the new turn up mechanism work
         # is merged.
         kube::log::status "Building docker image ${docker_image_tag} from the binary"
-        docker build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
+        docker build --pull -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
 
         rm -rf ${docker_build_path}
 
