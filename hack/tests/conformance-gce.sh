@@ -70,11 +70,16 @@ function add_master {
 function add_workers {
     #TODO (aaron): parallelize launching workers
     for i in $(seq 1 ${WORKER_COUNT}); do
+        echo "Launching worker"
         gcloud compute instances create ${GCE_PREFIX}-w${i} \
             --image-project coreos-cloud --image-family ${COREOS_CHANNEL} --zone us-central1-a --machine-type n1-standard-1
 
+        echo "Adding ssh-key to worker metadata"
         gcloud compute instances add-metadata ${GCE_PREFIX}-w${i} --zone us-central1-a --metadata-from-file ssh-keys=/root/.ssh/gce-format.pub
 
+        echo "Waiting 30s before retrieving worker metadata"
+        sleep 30 # TODO(aaron) Have seen "Too many authentication failures" in CI jobs. This seems to help, but should dig into why
+        echo "Getting worker public IP"
         local WORKER_IP=$(gcloud compute instances list ${GCE_PREFIX}-w${i} --format=json | jq --raw-output '.[].networkInterfaces[].accessConfigs[].natIP')
         cd /build/bootkube/hack/quickstart && SSH_OPTS="-o StrictHostKeyChecking=no" ./init-worker.sh ${WORKER_IP} /build/cluster/auth/kubeconfig
     done
