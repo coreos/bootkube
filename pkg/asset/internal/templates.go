@@ -225,6 +225,8 @@ spec:
       labels:
         k8s-app: kube-controller-manager
     spec:
+      nodeSelector:
+        master: "true"
       containers:
       - name: kube-controller-manager
         image: quay.io/coreos/hyperkube:v1.5.1_coreos.0
@@ -269,6 +271,8 @@ spec:
       labels:
         k8s-app: kube-scheduler
     spec:
+      nodeSelector:
+        master: "true"
       containers:
       - name: kube-scheduler
         image: quay.io/coreos/hyperkube:v1.5.1_coreos.0
