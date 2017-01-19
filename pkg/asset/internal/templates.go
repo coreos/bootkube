@@ -35,7 +35,7 @@ spec:
     spec:
       containers:
       - name: kubelet
-        image: quay.io/coreos/hyperkube:v1.5.2_coreos.0
+        image: quay.io/coreos/hyperkube:v1.5.2_coreos.1
         command:
         - ./hyperkube
         - kubelet
@@ -132,7 +132,7 @@ spec:
       hostNetwork: true
       containers:
       - name: kube-apiserver
-        image: quay.io/coreos/hyperkube:v1.5.2_coreos.0
+        image: quay.io/coreos/hyperkube:v1.5.2_coreos.1
         command:
         - /usr/bin/flock
         - --exclusive
@@ -227,7 +227,7 @@ spec:
     spec:
       containers:
       - name: kube-controller-manager
-        image: quay.io/coreos/hyperkube:v1.5.2_coreos.0
+        image: quay.io/coreos/hyperkube:v1.5.2_coreos.1
         command:
         - ./hyperkube
         - controller-manager
@@ -271,7 +271,7 @@ spec:
     spec:
       containers:
       - name: kube-scheduler
-        image: quay.io/coreos/hyperkube:v1.5.2_coreos.0
+        image: quay.io/coreos/hyperkube:v1.5.2_coreos.1
         command:
         - ./hyperkube
         - scheduler
@@ -293,7 +293,7 @@ spec:
       hostNetwork: true
       containers:
       - name: kube-proxy
-        image: quay.io/coreos/hyperkube:v1.5.2_coreos.0
+        image: quay.io/coreos/hyperkube:v1.5.2_coreos.1
         command:
         - /hyperkube
         - proxy
