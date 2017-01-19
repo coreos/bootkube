@@ -9,7 +9,7 @@ coreos:
         [Service]
         EnvironmentFile=/etc/environment
         Environment=KUBELET_ACI=quay.io/coreos/hyperkube
-        Environment=KUBELET_VERSION=v1.5.2_coreos.0
+        Environment=KUBELET_VERSION=v1.5.2_coreos.1
         Environment="RKT_OPTS=--volume var-lib-cni,kind=host,source=/var/lib/cni --mount volume=var-lib-cni,target=/var/lib/cni"
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/cni/net.d
