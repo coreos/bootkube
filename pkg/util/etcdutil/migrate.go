@@ -1,14 +1,17 @@
 package etcdutil
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
+	"github.com/coreos/etcd-operator/pkg/spec"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -18,6 +21,13 @@ import (
 const (
 	apiserverAddr = "http://127.0.0.1:8080"
 	etcdServiceIP = "10.3.0.15"
+
+	etcdClusterName = "kube-etcd"
+)
+
+var (
+	waitEtcdClusterRunningTime = 300 * time.Second
+	waitBootEtcdRemovedTime    = 300 * time.Second
 )
 
 func Migrate() error {
@@ -33,6 +43,7 @@ func Migrate() error {
 	if err != nil {
 		return err
 	}
+	glog.Infof("etcd cluster TPR is setup")
 
 	ip, err := getBootEtcdPodIP(kubecli)
 	if err != nil {
@@ -41,11 +52,20 @@ func Migrate() error {
 	glog.Infof("boot-etcd pod IP is: %s", ip)
 
 	if err := createMigratedEtcdCluster(restClient, apiserverAddr, ip); err != nil {
-		glog.Errorf("fail to create migrated etcd cluster: %v", err)
-		return err
+		return fmt.Errorf("fail to create migrated etcd cluster: %v", err)
 	}
+	glog.Infof("etcd cluster for migration is created")
 
-	return checkEtcdClusterUp()
+	if err := waitEtcdClusterRunning(restClient); err != nil {
+		return fmt.Errorf("wait etcd cluster running failed: %v", err)
+	}
+	glog.Info("etcd cluster for migration is now running")
+
+	if err := waitBootEtcdRemoved(); err != nil {
+		return fmt.Errorf("wait boot etcd deleted failed: %v", err)
+	}
+	glog.Info("the boot etcd is removed from the migration cluster")
+	return nil
 }
 
 func listETCDCluster(ns string, restClient restclient.Interface) restclient.Result {
@@ -56,21 +76,13 @@ func listETCDCluster(ns string, restClient restclient.Interface) restclient.Resu
 func waitEtcdTPRReady(restClient restclient.Interface, interval, timeout time.Duration, ns string) error {
 	err := wait.Poll(interval, timeout, func() (bool, error) {
 		res := listETCDCluster(ns, restClient)
-		if res.Error() != nil {
-			return false, res.Error()
+		if err := res.Error(); err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			}
+			return false, err
 		}
-
-		var status int
-		res.StatusCode(&status)
-
-		switch status {
-		case http.StatusOK:
-			return true, nil
-		case http.StatusNotFound: // not set up yet. wait.
-			return false, nil
-		default:
-			return false, fmt.Errorf("invalid status code: %v", status)
-		}
+		return true, nil
 	})
 	if err != nil {
 		return fmt.Errorf("fail to wait etcd TPR to be ready: %v", err)
@@ -108,7 +120,7 @@ func createMigratedEtcdCluster(restclient restclient.Interface, host, podIP stri
   "apiVersion": "coreos.com/v1",
   "kind": "EtcdCluster",
   "metadata": {
-    "name": "etcd-cluster",
+    "name": "%s",
     "namespace": "kube-system"
   },
   "spec": {
@@ -118,59 +130,74 @@ func createMigratedEtcdCluster(restclient restclient.Interface, host, podIP stri
 		"bootMemberClientEndpoint": "http://%s:12379"
     }
   }
-}`, podIP))
+}`, etcdClusterName, podIP))
 
 	uri := "/apis/coreos.com/v1/namespaces/kube-system/etcdclusters"
 	res := restclient.Post().RequestURI(uri).SetHeader("Content-Type", "application/json").Body(b).Do()
 
-	if res.Error() != nil {
-		return res.Error()
-	}
-
-	var status int
-	res.StatusCode(&status)
-
-	if status != http.StatusCreated {
-		return fmt.Errorf("fail to create etcd cluster object, status (%v), object (%s)", status, string(b))
-	}
-	return nil
+	return res.Error()
 }
 
-func checkEtcdClusterUp() error {
+func waitEtcdClusterRunning(restclient restclient.Interface) error {
 	glog.Infof("initial delaying (30s)...")
 	time.Sleep(30 * time.Second)
 
-	// The checking does:
-	// - Trying to talk to etcd cluster via etcd service. The assumption here is that
-	//   the etcd service only selects the etcd pods newly created, excluding the boot one.
-	//   Once we can talk to it, we are sure that etcd cluster is created.
-	// - Then we list members and see if it's been reduced to 1 member. Because when we
-	//   can talk to the etcd cluster, we are certain there are 2 members at the beginning,
-	//   and will reduce to 1 eventually. That's the timeline of expected events.
-	//   As long as 1 member cluster is reached, we are certain cluster has been migrated successfully.
-	err := wait.PollImmediate(10*time.Second, 60*time.Second, func() (bool, error) {
+	err := wait.Poll(10*time.Second, waitEtcdClusterRunningTime, func() (bool, error) {
+		b, err := restclient.Get().RequestURI(makeEtcdClusterURI(etcdClusterName)).DoRaw()
+		if err != nil {
+			return false, fmt.Errorf("fail to get etcdcluster: %v", err)
+		}
+
+		e := &spec.EtcdCluster{}
+		if err := json.Unmarshal(b, e); err != nil {
+			return false, err
+		}
+		if e.Status == nil {
+			return false, nil
+		}
+		switch e.Status.Phase {
+		case spec.ClusterPhaseRunning:
+			return true, nil
+		case spec.ClusterPhaseFailed:
+			return false, errors.New("failed to create etcd cluster")
+		default:
+			// All the other phases are not ready
+			return false, nil
+		}
+	})
+	return err
+}
+
+func waitBootEtcdRemoved() error {
+	err := wait.Poll(10*time.Second, waitBootEtcdRemovedTime, func() (bool, error) {
 		cfg := clientv3.Config{
 			Endpoints:   []string{fmt.Sprintf("http://%s:2379", etcdServiceIP)},
 			DialTimeout: 5 * time.Second,
 		}
 		etcdcli, err := clientv3.New(cfg)
 		if err != nil {
-			glog.Errorf("fail to create etcd client, retrying...: %v", err)
+			glog.Errorf("fail to create etcd client, will retry: %v", err)
 			return false, nil
 		}
+
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
 		m, err := etcdcli.MemberList(ctx)
+		cancel()
+		etcdcli.Close()
 		if err != nil {
-			glog.Errorf("fail to list etcd members, retrying...: %v", err)
+			glog.Errorf("fail to list member, will retry: %v", err)
 			return false, nil
 		}
+
 		if len(m.Members) != 1 {
-			glog.Infof("Still migrating boot etcd member, retrying...")
+			glog.Info("Still waiting boot etcd to be deletd...")
 			return false, nil
 		}
-		glog.Infof("etcd cluster is up. Member: %v", m.Members[0].Name)
 		return true, nil
 	})
 	return err
+}
+
+func makeEtcdClusterURI(name string) string {
+	return fmt.Sprintf("/apis/coreos.com/v1/namespaces/kube-system/etcdclusters/%s", name)
 }

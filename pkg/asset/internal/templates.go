@@ -513,7 +513,7 @@ spec:
     spec:
       containers:
       - name: etcd-operator
-        image: quay.io/coreos/etcd-operator
+        image: quay.io/coreos/etcd-operator:c391d8b7638deb81aa877773a0acce389f602415
         env:
         - name: MY_POD_NAMESPACE
           valueFrom:
@@ -529,7 +529,7 @@ metadata:
 spec:
   selector:
     app: etcd
-    etcd_cluster: etcd-cluster
+    etcd_cluster: kube-etcd
   clusterIP: 10.3.0.15
   ports:
   - name: client
