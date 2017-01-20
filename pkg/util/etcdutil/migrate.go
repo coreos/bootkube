@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/coreos/etcd-operator/pkg/spec"
@@ -65,7 +66,7 @@ func Migrate() error {
 		return fmt.Errorf("wait boot etcd deleted failed: %v", err)
 	}
 	glog.Info("the boot etcd is removed from the migration cluster")
-	return nil
+	return os.Remove(bootEtcdFilePath)
 }
 
 func listETCDCluster(ns string, restClient restclient.Interface) restclient.Result {
