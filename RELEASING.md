@@ -18,7 +18,7 @@
 
 ### Run conformance test
 
-Easiest is to use internal jenkins jobs
+Easiest is to use internal jenkins jobs (`bootkube-dev`)
 
 Or, manually:
 
@@ -37,13 +37,21 @@ make conformance-multi
 ./hack/tests/conformance-test.sh
 ```
 
+### Tag a release
+
+```
+git tag -s vX.Y.Z
+git push origin vX.Y.Z
+```
+
 ### Cut a release image
 
-Easiest is to use internal jenkins jobs
+Easiest is to use internal jenkins jobs (`bootkube-release`using release tag). This job will push the image to the quay.io/coreos/bootkube repo, and archive a tarball of binary releases (manually upload to github release)
 
 Or, manually:
 
 ```
+git checkout vX.Y.Z
 PUSH_IMAGE=true ./build/build-image.sh
 ```
 
