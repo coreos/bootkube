@@ -9,8 +9,10 @@ import (
 	"github.com/golang/glog"
 )
 
+const bootEtcdFilePath = "/etc/kubernetes/manifests/boot-etcd.yaml"
+
 func StartEtcd(endpoint string) error {
-	if err := ioutil.WriteFile("/etc/kubernetes/manifests/boot-etcd.yaml", []byte(etcdPodYaml), 0600); err != nil {
+	if err := ioutil.WriteFile(bootEtcdFilePath, []byte(etcdPodYaml), 0600); err != nil {
 		return fmt.Errorf("fail to write file '/etc/kubernetes/manifests/boot-etcd.yaml': %v", err)
 	}
 	glog.Info("etcd server has been defined to run by kubelet. Please wait...")
