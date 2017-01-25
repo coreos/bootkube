@@ -257,6 +257,17 @@ spec:
           path: /usr/share/ca-certificates
       dnsPolicy: Default # Don't use cluster DNS.
 `)
+	ControllerManagerDisruptionTemplate = []byte(`apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: kube-controller-manager
+  namespace: kube-system
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      k8s-app: kube-controller-manager
+`)
 	SchedulerTemplate = []byte(`apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
@@ -280,6 +291,17 @@ spec:
         - ./hyperkube
         - scheduler
         - --leader-elect=true
+`)
+	SchedulerDisruptionTemplate = []byte(`apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: kube-scheduler
+  namespace: kube-system
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      k8s-app: kube-scheduler
 `)
 	ProxyTemplate = []byte(`apiVersion: "extensions/v1beta1"
 kind: DaemonSet
