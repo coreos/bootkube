@@ -4,6 +4,11 @@ coreos:
   units:
     - name: etcd-member.service
       enable: true
+      drop-ins:
+        - name: 10-version.conf
+          content: |
+            [Service]
+            Environment="ETCD_IMAGE_TAG=v3.1.0"
       command: start
     - name: kubelet.service
       enable: true

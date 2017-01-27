@@ -13,6 +13,7 @@ coreos:
       - name: 40-etcd-cluster.conf
         content: |
           [Service]
+          Environment="ETCD_IMAGE_TAG=v3.1.0"
           Environment="ETCD_NAME={{ETCD_NODE_NAME}}"
           Environment="ETCD_ADVERTISE_CLIENT_URLS=http://$private_ipv4:2379"
           Environment="ETCD_INITIAL_ADVERTISE_PEER_URLS=http://$private_ipv4:2380"
