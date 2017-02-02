@@ -10,10 +10,10 @@ Let's upgrade a self-hosted Kubernetes v1.4.1 cluster to v1.4.3 as an example.
 Show the control plane daemonsets and deployments which will need to be updated.
 
     $ kubectl get daemonsets -n=kube-system
-    NAME             DESIRED   CURRENT   NODE-SELECTOR   AGE
-    kube-apiserver   1         1         master=true     5m
-    kube-proxy       3         3         <none>          5m
-    kubelet          3         3         <none>          5m
+    NAME             DESIRED   CURRENT   NODE-SELECTOR                AGE
+    kube-apiserver   1         1         kubernetes.io/role=master    5m
+    kube-proxy       3         3         <none>                       5m
+    kubelet          3         3         <none>                       5m
 
     $ kubectl get deployments -n=kube-system
     NAME                      DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE

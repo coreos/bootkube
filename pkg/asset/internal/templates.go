@@ -128,7 +128,7 @@ spec:
         checkpointer.alpha.coreos.com/checkpoint: "true"
     spec:
       nodeSelector:
-        master: "true"
+        kubernetes.io/role: "master"
       hostNetwork: true
       containers:
       - name: kube-apiserver
@@ -196,7 +196,7 @@ spec:
         k8s-app: pod-checkpoint-installer
     spec:
       nodeSelector:
-        master: "true"
+        kubernetes.io/role: "master"
       hostNetwork: true
       containers:
       - name: checkpoint-installer
@@ -225,6 +225,8 @@ spec:
       labels:
         k8s-app: kube-controller-manager
     spec:
+      nodeSelector:
+        kubernetes.io/role: "master"
       containers:
       - name: kube-controller-manager
         image: quay.io/coreos/hyperkube:v1.5.2_coreos.1
@@ -269,6 +271,8 @@ spec:
       labels:
         k8s-app: kube-scheduler
     spec:
+      nodeSelector:
+        kubernetes.io/role: "master"
       containers:
       - name: kube-scheduler
         image: quay.io/coreos/hyperkube:v1.5.2_coreos.1
@@ -351,6 +355,8 @@ spec:
         scheduler.alpha.kubernetes.io/critical-pod: ''
         scheduler.alpha.kubernetes.io/tolerations: '[{"key":"CriticalAddonsOnly", "operator":"Exists"}]'
     spec:
+      nodeSelector:
+        kubernetes.io/role: "master"
       containers:
       - name: kubedns
         image: gcr.io/google_containers/kubedns-amd64:1.9

@@ -19,7 +19,7 @@ ExecStart=/usr/lib/coreos/kubelet-wrapper \
   --exit-on-lock-contention \
   --allow-privileged \
   --hostname-override=${COREOS_PRIVATE_IPV4} \
-  --node-labels=master=true \
+  --node-labels=kubernetes.io/role=master \
   --minimum-container-ttl-duration=3m0s \
   --cluster_dns=10.3.0.10 \
   --cluster_domain=cluster.local \
