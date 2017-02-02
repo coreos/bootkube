@@ -93,9 +93,7 @@ func makeAPIServerFlags(config Config) []string {
 		"--service-account-key-file=" + filepath.Join(config.AssetDir, asset.AssetPathServiceAccountPubKey),
 		"--admission-control=NamespaceLifecycle,ServiceAccount",
 		"--runtime-config=api/all=true",
-	}
-	if config.SelfHostedEtcd {
-		res = append(res, "--storage-backend=etcd3")
+		"--storage-backend=etcd3",
 	}
 	return res
 }

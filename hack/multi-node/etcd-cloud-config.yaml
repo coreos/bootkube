@@ -4,16 +4,19 @@ coreos:
   update:
     reboot-strategy: "off"
 
-  etcd2:
-    name: {{ETCD_NODE_NAME}}
-    initial-cluster: {{ETCD_INITIAL_CLUSTER}}
-    advertise-client-urls: http://$private_ipv4:2379
-    listen-client-urls: http://0.0.0.0:2379
-    initial-advertise-peer-urls: http://$private_ipv4:2380
-    listen-peer-urls: http://$private_ipv4:2380
-
   units:
 
-  - name: etcd2.service
+  - name: etcd-member.service
+    enable: true
     command: start
-
+    drop-ins:
+      - name: 40-etcd-cluster.conf
+        content: |
+          [Service]
+          Environment="ETCD_IMAGE_TAG=v3.1.0"
+          Environment="ETCD_NAME={{ETCD_NODE_NAME}}"
+          Environment="ETCD_ADVERTISE_CLIENT_URLS=http://$private_ipv4:2379"
+          Environment="ETCD_INITIAL_ADVERTISE_PEER_URLS=http://$private_ipv4:2380"
+          Environment="ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379"
+          Environment="ETCD_LISTEN_PEER_URLS=http://$private_ipv4:2380"
+          Environment="ETCD_INITIAL_CLUSTER={{ETCD_INITIAL_CLUSTER}}"

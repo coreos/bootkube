@@ -34,7 +34,6 @@ var (
 		apiServers        string
 		altNames          string
 		selfHostKubelet   bool
-		storageBackend    string
 		cloudProvider     string
 		selfHostedEtcd    bool
 	}
@@ -46,7 +45,6 @@ func init() {
 	cmdRender.Flags().StringVar(&renderOpts.caCertificatePath, "ca-certificate-path", "", "Path to an existing PEM encoded CA. If provided, TLS assets will be generated using this certificate authority.")
 	cmdRender.Flags().StringVar(&renderOpts.caPrivateKeyPath, "ca-private-key-path", "", "Path to an existing Certificate Authority RSA private key. Required if --ca-certificate is set.")
 	cmdRender.Flags().StringVar(&renderOpts.etcdServers, "etcd-servers", "http://127.0.0.1:2379", "List of etcd servers URLs including host:port, comma separated")
-	cmdRender.Flags().StringVar(&renderOpts.storageBackend, "storage-backend", "etcd2", "storage backend for APIServer. Supports: etcd2, etcd3.")
 	cmdRender.Flags().StringVar(&renderOpts.apiServers, "api-servers", "https://127.0.0.1:443", "List of API server URLs including host:port, commma seprated")
 	cmdRender.Flags().StringVar(&renderOpts.altNames, "api-server-alt-names", "", "List of SANs to use in api-server certificate. Example: 'IP=127.0.0.1,IP=127.0.0.2,DNS=localhost'. If empty, SANs will be extracted from the --api-servers flag.")
 	cmdRender.Flags().BoolVar(&renderOpts.selfHostKubelet, "self-host-kubelet", false, "Create a self-hosted kubelet daemonset.")
@@ -120,7 +118,6 @@ func flagsToAssetConfig() (c *asset.Config, err error) {
 		APIServers:      apiServers,
 		AltNames:        altNames,
 		SelfHostKubelet: renderOpts.selfHostKubelet,
-		StorageBackend:  renderOpts.storageBackend,
 		CloudProvider:   renderOpts.cloudProvider,
 		SelfHostedEtcd:  renderOpts.selfHostedEtcd,
 	}, nil

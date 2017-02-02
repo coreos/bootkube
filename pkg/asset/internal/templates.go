@@ -145,7 +145,7 @@ spec:
         - --insecure-port=8080
         - --advertise-address=$(POD_IP)
         - --etcd-servers={{ range $i, $e := .EtcdServers }}{{ if $i }},{{end}}{{ $e }}{{end}}
-        - --storage-backend={{.StorageBackend}}
+        - --storage-backend=etcd3
         - --allow-privileged=true
         - --service-cluster-ip-range=10.3.0.0/24
         - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota

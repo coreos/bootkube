@@ -50,7 +50,6 @@ type Config struct {
 	AltNames        *tlsutil.AltNames
 	SelfHostKubelet bool
 	SelfHostedEtcd  bool
-	StorageBackend  string
 	CloudProvider   string
 }
 

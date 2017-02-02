@@ -55,7 +55,7 @@ function init {
 
 function add_master {
     gcloud compute instances create ${GCE_PREFIX}-m1 \
-        --image-project coreos-cloud --image-family ${COREOS_CHANNEL} --zone us-central1-a --machine-type n1-standard-4 --boot-disk-size=10GB
+        --image-project coreos-cloud --image-family ${COREOS_CHANNEL} --zone us-central1-a --machine-type n1-standard-4 --boot-disk-size=30GB
 
     gcloud compute instances add-tags --zone us-central1-a ${GCE_PREFIX}-m1 --tags ${GCE_PREFIX}-apiserver
     gcloud compute firewall-rules create ${GCE_PREFIX}-api-443 --target-tags=${GCE_PREFIX}-apiserver --allow tcp:443
@@ -72,7 +72,7 @@ function add_workers {
     for i in $(seq 1 ${WORKER_COUNT}); do
         echo "Launching worker"
         gcloud compute instances create ${GCE_PREFIX}-w${i} \
-            --image-project coreos-cloud --image-family ${COREOS_CHANNEL} --zone us-central1-a --machine-type n1-standard-1
+            --image-project coreos-cloud --image-family ${COREOS_CHANNEL} --zone us-central1-a --machine-type n1-standard-2 --boot-disk-size=15GB
 
         echo "Adding ssh-key to worker metadata"
         gcloud compute instances add-metadata ${GCE_PREFIX}-w${i} --zone us-central1-a --metadata-from-file ssh-keys=/root/.ssh/gce-format.pub
