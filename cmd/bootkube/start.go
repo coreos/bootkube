@@ -24,9 +24,10 @@ var (
 	}
 
 	startOpts struct {
-		assetDir       string
-		etcdServer     string
-		selfHostedEtcd bool
+		assetDir              string
+		etcdServer            string
+		selfHostedEtcd        bool
+		serviceClusterIPRange string
 	}
 )
 
@@ -35,6 +36,7 @@ func init() {
 	cmdStart.Flags().StringVar(&startOpts.etcdServer, "etcd-server", "http://127.0.0.1:2379", "Single etcd node to use during bootkube bootstrap process.")
 	cmdStart.Flags().StringVar(&startOpts.assetDir, "asset-dir", "", "Path to the cluster asset directory. Expected layout genereted by the `bootkube render` command.")
 	cmdStart.Flags().BoolVar(&startOpts.selfHostedEtcd, "experimental-self-hosted-etcd", false, "Self hosted etcd mode. Includes starting the initial etcd member by bootkube.")
+	cmdStart.Flags().StringVar(&startOpts.serviceClusterIPRange, "service-cluster-ip-range", "10.3.0.0/24", "A CIDR notation IP range from which to assign service cluster IPs.")
 }
 
 func runCmdStart(cmd *cobra.Command, args []string) error {
@@ -51,9 +53,10 @@ func runCmdStart(cmd *cobra.Command, args []string) error {
 	}
 
 	bk, err := bootkube.NewBootkube(bootkube.Config{
-		AssetDir:       startOpts.assetDir,
-		EtcdServer:     etcdServer,
-		SelfHostedEtcd: startOpts.selfHostedEtcd,
+		AssetDir:              startOpts.assetDir,
+		EtcdServer:            etcdServer,
+		SelfHostedEtcd:        startOpts.selfHostedEtcd,
+		ServiceClusterIPRange: startOpts.serviceClusterIPRange,
 	})
 
 	if err != nil {
