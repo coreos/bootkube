@@ -21,6 +21,8 @@ func newStaticAssets(selfHostKubelet, selfHostedEtcd bool) Assets {
 	var noData interface{}
 	assets := Assets{
 		mustCreateAssetFromTemplate(AssetPathScheduler, internal.SchedulerTemplate, noData),
+		mustCreateAssetFromTemplate(AssetPathSchedulerDisruption, internal.SchedulerDisruptionTemplate, noData),
+		mustCreateAssetFromTemplate(AssetPathControllerManagerDisruption, internal.ControllerManagerDisruptionTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathProxy, internal.ProxyTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathKubeDNSDeployment, internal.DNSDeploymentTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathKubeDNSSvc, internal.DNSSvcTemplate, noData),
