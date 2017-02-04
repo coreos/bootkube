@@ -1,6 +1,6 @@
 [Service]
 Environment=KUBELET_ACI=quay.io/coreos/hyperkube
-Environment=KUBELET_VERSION=v1.5.2_coreos.1
+Environment=KUBELET_VERSION=v1.5.2_coreos.2
 Environment="RKT_OPTS=\
 --volume etc-resolv,kind=host,source=/etc/resolv.conf --mount volume=etc-resolv,target=/etc/resolv.conf \
 --volume var-lib-cni,kind=host,source=/var/lib/cni --mount volume=var-lib-cni,target=/var/lib/cni"
