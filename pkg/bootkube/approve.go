@@ -27,6 +27,7 @@ func ApproveKubeletCSRs() error {
 	if err != nil {
 		return err
 	}
+	csrClient := client.CertificatesV1alpha1Client.CertificateSigningRequests()
 
 	watchList := cache.NewListWatchFromClient(
 		client.CertificatesV1alpha1().RESTClient(),
@@ -38,15 +39,16 @@ func ApproveKubeletCSRs() error {
 	_, controller := cache.NewInformer(
 		watchList,
 		&certificates.CertificateSigningRequest{},
-		time.Second*5,
+		time.Second*30,
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				if request, ok := obj.(*certificates.CertificateSigningRequest); ok {
-					approveCSR(
-						client.CertificatesV1alpha1().CertificateSigningRequests(),
-						request,
-						errCh,
-					)
+					approveCSR(csrClient, request, errCh)
+				}
+			},
+			UpdateFunc: func(_, obj interface{}) {
+				if request, ok := obj.(*certificates.CertificateSigningRequest); ok {
+					approveCSR(csrClient, request, errCh)
 				}
 			},
 		},
@@ -64,8 +66,20 @@ func approveCSR(client v1alpha1.CertificateSigningRequestInterface, request *cer
 	}
 
 	for {
+		// Verify that the CSR hasn't been approved or denied already.
+		//
+		// There are only two possible conditions (CertificateApproved and
+		// CertificateDenied). Therefore if the CSR already has a condition,
+		// it means that the request has already been approved or denied, and that
+		// we should ignore the request.
+		if len(request.Status.Conditions) > 0 {
+			return
+		}
+
+		// Approve the CSR.
 		request.Status.Conditions = append(request.Status.Conditions, condition)
 
+		// Submit the updated CSR.
 		if _, err := client.UpdateApproval(request); err != nil {
 			if strings.Contains(err.Error(), "the object has been modified") {
 				// The CSR might have been updated by a third-party, retry until we
