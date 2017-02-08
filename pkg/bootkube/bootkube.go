@@ -110,6 +110,9 @@ func (b *bootkube) Run() error {
 			errch <- err
 		}
 	}()
+	if b.selfHostedEtcd {
+		requiredPods = append(requiredPods, "etcd-operator")
+	}
 	go func() { errch <- WaitUntilPodsRunning(requiredPods, assetTimeout, b.selfHostedEtcd) }()
 
 	// If any of the bootkube services exit, it means it is unrecoverable and we should exit.
