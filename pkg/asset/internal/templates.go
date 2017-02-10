@@ -10,14 +10,34 @@ clusters:
     server: {{ .Server }}
     certificate-authority-data: {{ .CACert }}
 users:
-- name: kubelet
+- name: {{ .UserName }}
   user:
-    client-certificate-data: {{ .KubeletCert}}
-    client-key-data: {{ .KubeletKey }}
+{{ if .UserToken }}
+    token: {{ .UserToken }}
+{{ end }}
+{{ if and .UserCert .UserKey }}
+    client-certificate-data: {{ .UserCert }}
+    client-key-data: {{ .UserKey }}
+{{ end }}
 contexts:
 - context:
     cluster: local
-    user: kubelet
+    user: {{ .UserName }}
+`)
+
+	KubeSystemSARoleBindingTemplate = []byte(`apiVersion: rbac.authorization.k8s.io/v1alpha1
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1alpha1
+metadata:
+  name: system:default-sa
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
 `)
 
 	KubeletTemplate = []byte(`apiVersion: extensions/v1beta1
@@ -48,6 +68,8 @@ spec:
         - --cluster-dns=10.3.0.10
         - --cluster-domain=cluster.local
         - --kubeconfig=/etc/kubernetes/kubeconfig
+        - --experimental-bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubeconfig
+        - --cert-dir=/etc/kubernetes/secrets
         - --require-kubeconfig
         - --lock-file=/var/run/lock/kubelet.lock
         - --containerized
@@ -112,6 +134,28 @@ spec:
           path: /
 `)
 
+	KubeletBootstrapRoleBindingTemplate = []byte(`apiVersion: rbac.authorization.k8s.io/v1alpha1
+kind: ClusterRole
+metadata:
+  name: system:kubelet-bootstrap
+rules:
+  - apiGroups: ["certificates.k8s.io"]
+    resources: ["certificatesigningrequests"]
+    verbs: ["create", "watch"]
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1alpha1
+metadata:
+  name: system:kubelet-bootstrap
+subjects:
+  - kind: Group
+    name: system:kubelet-bootstrap
+roleRef:
+  kind: ClusterRole
+  name: system:kubelet-bootstrap
+  apiGroup: rbac.authorization.k8s.io
+`)
+
 	APIServerTemplate = []byte(`apiVersion: "extensions/v1beta1"
 kind: DaemonSet
 metadata:
@@ -154,6 +198,8 @@ spec:
         - --tls-private-key-file=/etc/kubernetes/secrets/apiserver.key
         - --service-account-key-file=/etc/kubernetes/secrets/service-account.pub
         - --client-ca-file=/etc/kubernetes/secrets/ca.crt
+        - --token-auth-file=/etc/kubernetes/secrets/bootstrap-auth-token
+        - --authorization-mode=RBAC
         - --cloud-provider={{ .CloudProvider  }}
         - --anonymous-auth=false
         env:
@@ -237,9 +283,11 @@ spec:
         - --configure-cloud-routes=false
         - --cluster-cidr=10.2.0.0/16
         - --root-ca-file=/etc/kubernetes/secrets/ca.crt
+        - --cluster-signing-cert-file=/etc/kubernetes/secrets/ca.crt
+        - --cluster-signing-key-file=/etc/kubernetes/secrets/ca.key
         - --service-account-private-key-file=/etc/kubernetes/secrets/service-account.key
         - --leader-elect=true
-        - --cloud-provider={{ .CloudProvider  }}
+        - --cloud-provider={{ .CloudProvider }}
         - --configure-cloud-routes=false
         volumeMounts:
         - name: secrets

@@ -1,9 +1,14 @@
 package asset
 
 import (
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
+	"errors"
+	"fmt"
 	"net"
+	"strings"
 
 	"github.com/kubernetes-incubator/bootkube/pkg/tlsutil"
 )
@@ -36,7 +41,12 @@ func newTLSAssets(caCert *x509.Certificate, caPrivKey *rsa.PrivateKey, altNames 
 		return assets, err
 	}
 
-	kubeletKey, kubeletCert, err := newKubeletKeyAndCert(caCert, caPrivKey)
+	adminKey, adminCert, err := newAdminKeyAndCert(caCert, caPrivKey)
+	if err != nil {
+		return assets, err
+	}
+
+	bootstrapToken, err := newBootstrapAuthToken()
 	if err != nil {
 		return assets, err
 	}
@@ -48,8 +58,9 @@ func newTLSAssets(caCert *x509.Certificate, caPrivKey *rsa.PrivateKey, altNames 
 		{Name: AssetPathAPIServerCert, Data: tlsutil.EncodeCertificatePEM(apiCert)},
 		{Name: AssetPathServiceAccountPrivKey, Data: tlsutil.EncodePrivateKeyPEM(saPrivKey)},
 		{Name: AssetPathServiceAccountPubKey, Data: saPubKey},
-		{Name: AssetPathKubeletKey, Data: tlsutil.EncodePrivateKeyPEM(kubeletKey)},
-		{Name: AssetPathKubeletCert, Data: tlsutil.EncodeCertificatePEM(kubeletCert)},
+		{Name: AssetPathAdminKey, Data: tlsutil.EncodePrivateKeyPEM(adminKey)},
+		{Name: AssetPathAdminCert, Data: tlsutil.EncodeCertificatePEM(adminCert)},
+		{Name: AssetPathBootstrapAuthToken, Data: bootstrapToken},
 	}...)
 	return assets, nil
 }
@@ -98,18 +109,55 @@ func newAPIKeyAndCert(caCert *x509.Certificate, caPrivKey *rsa.PrivateKey, altNa
 	return key, cert, err
 }
 
-func newKubeletKeyAndCert(caCert *x509.Certificate, caPrivKey *rsa.PrivateKey) (*rsa.PrivateKey, *x509.Certificate, error) {
+func newAdminKeyAndCert(caCert *x509.Certificate, caPrivKey *rsa.PrivateKey) (*rsa.PrivateKey, *x509.Certificate, error) {
 	key, err := tlsutil.NewPrivateKey()
 	if err != nil {
 		return nil, nil, err
 	}
 	config := tlsutil.CertConfig{
-		CommonName:   "kubelet",
-		Organization: []string{"kube-node"},
+		CommonName:   "cluster-admin",
+		Organization: []string{"system:masters"},
 	}
 	cert, err := tlsutil.NewSignedCertificate(config, key, caCert, caPrivKey)
 	if err != nil {
 		return nil, nil, err
 	}
 	return key, cert, err
+}
+
+// newBootstrapAuthToken creates a static token, containing a single
+// randomly-generated bearer token mapped to the user and group
+// 'kubelet-bootstrap', as documented in k8s.io/docs/admin/authentication/.
+//
+// This auth token is meant to be used by kubelet to bootstrap its TLS
+// certificate: k8s.io/docs/admin/kubelet-tls-bootstrapping.
+func newBootstrapAuthToken() ([]byte, error) {
+	// We must create at least 128 bits of entropy from a secure source.
+	bearer, err := generateRandomString(16)
+	if err != nil {
+		return nil, err
+	}
+
+	token := fmt.Sprintf("%s,kubelet-bootstrap,10001,\"system:kubelet-bootstrap\"\n", bearer)
+	return []byte(token), nil
+}
+
+// parseBootstrapAuthToken retrieves the first bearer token from the
+// given data of a static token file.
+func parseBootstrapAuthToken(data []byte) (string, error) {
+	// The format is: token,user,uid,"group1,group2,group3".
+	sp := strings.Split(string(data), ",")
+	if len(sp) < 3 {
+		return "", errors.New("could not extract bearer token: invalid format")
+	}
+	return sp[0], nil
+}
+
+func generateRandomString(len int) (string, error) {
+	b := make([]byte, len)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(b), nil
 }

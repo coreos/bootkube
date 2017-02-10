@@ -19,11 +19,15 @@ const (
 	AssetPathAPIServerCert               = "tls/apiserver.crt"
 	AssetPathServiceAccountPrivKey       = "tls/service-account.key"
 	AssetPathServiceAccountPubKey        = "tls/service-account.pub"
-	AssetPathKubeletKey                  = "tls/kubelet.key"
-	AssetPathKubeletCert                 = "tls/kubelet.crt"
-	AssetPathKubeConfig                  = "auth/kubeconfig"
+	AssetPathAdminKey                    = "tls/admin.key"
+	AssetPathAdminCert                   = "tls/admin.crt"
+	AssetPathAdminKubeConfig             = "auth/admin-kubeconfig"
+	AssetPathBootstrapKubeConfig         = "auth/bootstrap-kubeconfig"
+	AssetPathBootstrapAuthToken          = "auth/bootstrap-auth-token"
 	AssetPathManifests                   = "manifests"
 	AssetPathKubelet                     = "manifests/kubelet.yaml"
+	AssetPathKubeletBootstrapRoleBinding = "manifests/kubelet-bootstrap-role-binding.yaml"
+	AssetPathKubeSystemSARoleBinding     = "manifests/kube-sa-role-binding.yaml"
 	AssetPathProxy                       = "manifests/kube-proxy.yaml"
 	AssetPathKubeFlannel                 = "manifests/kube-flannel.yaml"
 	AssetPathKubeFlannelCfg              = "manifests/kube-flannel-cfg.yaml"
@@ -36,7 +40,6 @@ const (
 	AssetPathSchedulerDisruption         = "manifests/kube-scheduler-disruption.yaml"
 	AssetPathKubeDNSDeployment           = "manifests/kube-dns-deployment.yaml"
 	AssetPathKubeDNSSvc                  = "manifests/kube-dns-svc.yaml"
-	AssetPathSystemNamespace             = "manifests/kube-system-ns.yaml"
 	AssetPathCheckpointer                = "manifests/pod-checkpoint-installer.yaml"
 	AssetPathEtcdOperator                = "manifests/etcd-operator.yaml"
 	AssetPathEtcdSvc                     = "manifests/etcd-service.yaml"
@@ -45,14 +48,15 @@ const (
 // AssetConfig holds all configuration needed when generating
 // the default set of assets.
 type Config struct {
-	EtcdServers     []*url.URL
-	APIServers      []*url.URL
-	CACert          *x509.Certificate
-	CAPrivKey       *rsa.PrivateKey
-	AltNames        *tlsutil.AltNames
-	SelfHostKubelet bool
-	SelfHostedEtcd  bool
-	CloudProvider   string
+	EtcdServers        []*url.URL
+	APIServers         []*url.URL
+	CACert             *x509.Certificate
+	CAPrivKey          *rsa.PrivateKey
+	BootstrapAuthToken string
+	AltNames           *tlsutil.AltNames
+	SelfHostKubelet    bool
+	SelfHostedEtcd     bool
+	CloudProvider      string
 }
 
 // NewDefaultAssets returns a list of default assets, optionally
@@ -69,12 +73,21 @@ func NewDefaultAssets(conf Config) (Assets, error) {
 	}
 	as = append(as, tlsAssets...)
 
-	// K8S kubeconfig
-	kubeConfig, err := newKubeConfigAsset(as, conf)
+	// K8S bootstrap-kubeconfig
+	// Used by kubelets to bootstrap their TLS certificate
+	bootstrapKubeConfig, err := newBootstrapKubeConfigAsset(as, conf)
 	if err != nil {
 		return Assets{}, err
 	}
-	as = append(as, kubeConfig)
+	as = append(as, bootstrapKubeConfig)
+
+	// K8S admin-kubeconfig
+	// Used by operators to interact with the cluster
+	adminKubeConfig, err := newAdminKubeConfigAsset(as, conf)
+	if err != nil {
+		return Assets{}, err
+	}
+	as = append(as, adminKubeConfig)
 
 	// K8S APIServer secret
 	apiSecret, err := newAPIServerSecretAsset(as)

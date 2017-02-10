@@ -27,15 +27,16 @@ var (
 	}
 
 	renderOpts struct {
-		assetDir          string
-		caCertificatePath string
-		caPrivateKeyPath  string
-		etcdServers       string
-		apiServers        string
-		altNames          string
-		selfHostKubelet   bool
-		cloudProvider     string
-		selfHostedEtcd    bool
+		assetDir           string
+		caCertificatePath  string
+		caPrivateKeyPath   string
+		bootstrapAuthToken string
+		etcdServers        string
+		apiServers         string
+		altNames           string
+		selfHostKubelet    bool
+		cloudProvider      string
+		selfHostedEtcd     bool
 	}
 )
 
