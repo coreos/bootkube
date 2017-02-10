@@ -15,6 +15,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
+const (
+	kubeletBootstrapUsername = "kubelet-bootstrap"
+	kubeletBootstrapGroup    = "system:kubelet-bootstrap"
+)
+
 // ApproveKubeletCSRs indefinitely approves any CSRs submitted by Kubelet
 // instances, that are in the process of bootstrapping their TLS assets, without
 // making any kind of validation.
@@ -73,6 +78,23 @@ func approveCSR(client v1alpha1.CertificateSigningRequestInterface, request *cer
 		// it means that the request has already been approved or denied, and that
 		// we should ignore the request.
 		if len(request.Status.Conditions) > 0 {
+			return
+		}
+
+		// Ensure the CSR has been submitted by a kubelet performing its TLS
+		// bootstrapping by checking the username and the group.
+		if request.Spec.Username != kubeletBootstrapUsername {
+			return
+		}
+
+		isKubeletBootstrapGroup := false
+		for _, group := range request.Spec.Groups {
+			if group == kubeletBootstrapGroup {
+				isKubeletBootstrapGroup = true
+				break
+			}
+		}
+		if !isKubeletBootstrapGroup {
 			return
 		}
 
