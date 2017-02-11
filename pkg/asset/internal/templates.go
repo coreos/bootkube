@@ -270,6 +270,26 @@ spec:
     metadata:
       labels:
         k8s-app: kube-controller-manager
+      annotations:
+        scheduler.alpha.kubernetes.io/affinity: |
+          {
+            "podAntiAffinity": {
+              "preferredDuringSchedulingIgnoredDuringExecution": [
+                {
+                  "weight": 100,
+                  "labelSelector": {
+                    "matchExpressions": [
+                      {
+                        "key": "k8s-app",
+                        "operator": "In",
+                        "values": ["kube-controller-manager"]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
     spec:
       nodeSelector:
         master: "true"
@@ -329,6 +349,26 @@ spec:
     metadata:
       labels:
         k8s-app: kube-scheduler
+      annotations:
+        scheduler.alpha.kubernetes.io/affinity: |
+          {
+            "podAntiAffinity": {
+              "preferredDuringSchedulingIgnoredDuringExecution": [
+                {
+                  "weight": 100,
+                  "labelSelector": {
+                    "matchExpressions": [
+                      {
+                        "key": "k8s-app",
+                        "operator": "In",
+                        "values": ["kube-scheduler"]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
     spec:
       nodeSelector:
         master: "true"
