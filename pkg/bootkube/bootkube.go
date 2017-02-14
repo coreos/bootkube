@@ -114,6 +114,9 @@ func (b *bootkube) Run() error {
 			errch <- err
 		}
 	}()
+	if b.selfHostedEtcd {
+		requiredPods = append(requiredPods, "etcd-operator")
+	}
 	go func() { errch <- WaitUntilPodsRunning(requiredPods, assetTimeout, b.selfHostedEtcd) }()
 	go func() { errch <- ApproveKubeletCSRs() }()
 
