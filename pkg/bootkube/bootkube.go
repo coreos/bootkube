@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	assetTimeout    = 10 * time.Minute
+	assetTimeout    = 20 * time.Minute
 	insecureAPIAddr = "http://127.0.0.1:8080"
 )
 
