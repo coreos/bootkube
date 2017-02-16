@@ -126,7 +126,7 @@ func createMigratedEtcdCluster(restclient restclient.Interface, host, podIP stri
   },
   "spec": {
     "size": 1,
-    "version": "v3.1.0",
+    "version": "v3.1.0-alpha.1",
     "selfHosted": {
 		"bootMemberClientEndpoint": "http://%s:12379"
     }
