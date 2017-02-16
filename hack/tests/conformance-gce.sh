@@ -63,7 +63,7 @@ function add_master {
     gcloud compute instances add-metadata ${GCE_PREFIX}-m1 --zone us-central1-a --metadata-from-file ssh-keys=/root/.ssh/gce-format.pub
 
     MASTER_IP=$(gcloud compute instances list ${GCE_PREFIX}-m1 --format=json | jq --raw-output '.[].networkInterfaces[].accessConfigs[].natIP')
-    cd /build/bootkube/hack/quickstart && SSH_OPTS="-o StrictHostKeyChecking=no" \
+    cd /build/bootkube/hack/quickstart && SSH_OPTS="-o StrictHostKeyChecking=no" CSR_AUTOAPPROVE="true" \
         CLUSTER_DIR=/build/cluster BOOTKUBE_REPO=${BOOTKUBE_REPO} BOOTKUBE_VERSION=${BOOTKUBE_VERSION} ./init-master.sh ${MASTER_IP}
 }
 

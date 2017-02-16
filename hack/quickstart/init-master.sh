@@ -7,6 +7,10 @@ CLUSTER_DIR=${CLUSTER_DIR:-cluster}
 IDENT=${IDENT:-${HOME}/.ssh/id_rsa}
 SSH_OPTS=${SSH_OPTS:-}
 
+# WARNING: This deployment should not be used in production clusters as it will
+# automatically approve every kubelet CSRs without making any kind of validation
+CSR_AUTOAPPROVE=${CSR_AUTOAPPROVE:-false}
+
 BOOTKUBE_REPO=${BOOTKUBE_REPO:-quay.io/coreos/bootkube}
 BOOTKUBE_VERSION=${BOOTKUBE_VERSION:-v0.3.8}
 
@@ -64,6 +68,11 @@ function init_master_node() {
         --mount volume=home,target=/core \
         --net=host ${BOOTKUBE_REPO}:${BOOTKUBE_VERSION} --exec \
         /bootkube -- start --asset-dir=/core/assets
+
+    # Add auto-approver asset.
+    if [[ "${CSR_AUTOAPPROVE}" == "true" ]]; then
+        curl -H "Content-Type: application/yaml" -XPOST -d"$(cat /home/core/assets/extra/kubelet-approver.yaml)" "http://127.0.0.1:8080/apis/extensions/v1beta1/namespaces/kube-system/deployments"
+    fi
 }
 
 [ "$#" == 1 ] || usage

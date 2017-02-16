@@ -30,6 +30,7 @@ func newStaticAssets(selfHostKubelet, selfHostedEtcd bool) Assets {
 		mustCreateAssetFromTemplate(AssetPathKubeFlannel, internal.KubeFlannelTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathKubeFlannelCfg, internal.KubeFlannelCfgTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathKubeletBootstrapRoleBinding, internal.KubeletBootstrapRoleBindingTemplate, noData),
+		mustCreateAssetFromTemplate(AssetPathExtraKubeletApprover, internal.KubeletApproverTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathKubeSystemSARoleBinding, internal.KubeSystemSARoleBindingTemplate, noData),
 	}
 	if selfHostKubelet {
