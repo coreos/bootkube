@@ -52,6 +52,8 @@ function init_master_node() {
     chown -R core:core /home/core/assets
     mkdir -p /etc/kubernetes
     cp /home/core/assets/auth/bootstrap-kubeconfig /etc/kubernetes/
+    # Conformance scripts run kubectl on the master node via admin-kubeconfig
+    cp /home/core/assets/auth/admin-kubeconfig /etc/kubernetes/
 
     # Start the kubelet
     systemctl enable kubelet; sudo systemctl start kubelet
