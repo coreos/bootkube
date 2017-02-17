@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -50,6 +51,11 @@ type Config struct {
 	CACert          *x509.Certificate
 	CAPrivKey       *rsa.PrivateKey
 	AltNames        *tlsutil.AltNames
+	PodCIDR         *net.IPNet
+	ServiceCIDR     *net.IPNet
+	APIServiceIP    net.IP
+	DNSServiceIP    net.IP
+	ETCDServiceIP   net.IP
 	SelfHostKubelet bool
 	SelfHostedEtcd  bool
 	CloudProvider   string
@@ -59,8 +65,11 @@ type Config struct {
 // configured via a user provided AssetConfig. Default assets include
 // TLS assets (certs, keys and secrets), and k8s component manifests.
 func NewDefaultAssets(conf Config) (Assets, error) {
-	as := newStaticAssets(conf.SelfHostKubelet, conf.SelfHostedEtcd)
+	as := newStaticAssets()
 	as = append(as, newDynamicAssets(conf)...)
+
+	// Add kube-apiserver service IP
+	conf.AltNames.IPs = append(conf.AltNames.IPs, conf.APIServiceIP)
 
 	// TLS assets
 	tlsAssets, err := newTLSAssets(conf.CACert, conf.CAPrivKey, *conf.AltNames)

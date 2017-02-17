@@ -3,7 +3,6 @@ package asset
 import (
 	"crypto/rsa"
 	"crypto/x509"
-	"net"
 
 	"github.com/kubernetes-incubator/bootkube/pkg/tlsutil"
 )
@@ -78,7 +77,6 @@ func newAPIKeyAndCert(caCert *x509.Certificate, caPrivKey *rsa.PrivateKey, altNa
 	if err != nil {
 		return nil, nil, err
 	}
-	altNames.IPs = append(altNames.IPs, net.ParseIP("10.3.0.1"))
 	altNames.DNSNames = append(altNames.DNSNames, []string{
 		"kubernetes",
 		"kubernetes.default",
