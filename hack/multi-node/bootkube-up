@@ -12,7 +12,7 @@ fi
 SELF_HOST_ETCD=${SELF_HOST_ETCD:-false}
 if [ ${SELF_HOST_ETCD} = "true" ]; then
     echo "WARNING: THIS IS NOT YET FULLY WORKING - merely here to make ongoing testing easier"
-    etcd_render_flags="--etcd-servers=http://10.3.0.15:2379 --storage-backend=etcd3 --experimental-self-hosted-etcd"
+    etcd_render_flags="--etcd-servers=http://10.3.0.15:2379 --experimental-self-hosted-etcd"
     etcd_start_flags="--etcd-server=http://172.17.4.101:12379 --experimental-self-hosted-etcd"
 else
     etcd_render_flags="--etcd-servers=http://172.17.4.51:2379"
