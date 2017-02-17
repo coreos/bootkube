@@ -81,7 +81,7 @@ function add_workers {
         sleep 30 # TODO(aaron) Have seen "Too many authentication failures" in CI jobs. This seems to help, but should dig into why
         echo "Getting worker public IP"
         local WORKER_IP=$(gcloud compute instances list ${GCE_PREFIX}-w${i} --format=json | jq --raw-output '.[].networkInterfaces[].accessConfigs[].natIP')
-        cd /build/bootkube/hack/quickstart && SSH_OPTS="-o StrictHostKeyChecking=no" ./init-worker.sh ${WORKER_IP} /build/cluster/auth/kubeconfig
+        cd /build/bootkube/hack/quickstart && SSH_OPTS="-o StrictHostKeyChecking=no" CLUSTER_DIR=/build/cluster ./init-worker.sh ${WORKER_IP} 
     done
 }
 
@@ -92,7 +92,7 @@ if [ "${IN_CONTAINER}" == true ]; then
     init
     add_master
     add_workers
-    KUBECONFIG=/etc/kubernetes/kubeconfig WORKER_COUNT=${WORKER_COUNT} /build/bootkube/hack/tests/conformance-test.sh ${MASTER_IP} 22 /root/.ssh/id_rsa
+    KUBECONFIG=/etc/kubernetes/admin-kubeconfig WORKER_COUNT=${WORKER_COUNT} /build/bootkube/hack/tests/conformance-test.sh ${MASTER_IP} 22 /root/.ssh/id_rsa
 else
     BUILD_ROOT=${BUILD_ROOT:-}
     if [ -z "$BUILD_ROOT" ]; then
