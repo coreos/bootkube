@@ -11,6 +11,8 @@
 - Update on-host kubelet versions (`KUBELET_VERSION`)
     - hack/multi-node/user-data.sample
     - hack/single-node/user-data.sample
+    - hack/quickstart/kubelet.master
+    - hack/quickstart/kubelet.worker
 
 ### Update conformance test k8s version
 
@@ -58,11 +60,6 @@ PUSH_IMAGE=true ./build/build-image.sh
 # Updating quickstart guides
 
 Note: the quickstart guides use the release images, so we should not update them until after building/pushing new release.
-
-Update on-host kubelet version (`KUBELET_VERSION`)
-
-- hack/quickstart/kubelet.master
-- hack/quickstart/kubelet.worker
 
 Update the bootkube image version (to latest release)
 
