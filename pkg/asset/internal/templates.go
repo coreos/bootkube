@@ -156,6 +156,36 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 `)
 
+	KubeletApproverTemplate = []byte(`
+# WARNING: This deployment should not be used in production clusters as it will
+# automatically approve every kubelet CSRs without making any kind of validation
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: kubelet-approver
+  namespace: kube-system
+  labels:
+    k8s-app: kubelet-approver
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: kubelet-approver
+      labels:
+        k8s-app: kubelet-approver
+    spec:
+      containers:
+      - name: kubelet-approver
+        image: quay.io/coreos/kapprover:v0.0.1
+        resources:
+          requests:
+            cpu: 100m
+            memory: 50Mi
+          limits:
+            cpu: 100m
+            memory: 50Mi
+`)
+
 	APIServerTemplate = []byte(`apiVersion: "extensions/v1beta1"
 kind: DaemonSet
 metadata:

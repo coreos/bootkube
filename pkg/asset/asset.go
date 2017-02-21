@@ -43,6 +43,7 @@ const (
 	AssetPathCheckpointer                = "manifests/pod-checkpoint-installer.yaml"
 	AssetPathEtcdOperator                = "manifests/etcd-operator.yaml"
 	AssetPathEtcdSvc                     = "manifests/etcd-service.yaml"
+	AssetPathExtraKubeletApprover        = "extra/kubelet-approver.yaml"
 )
 
 // AssetConfig holds all configuration needed when generating
