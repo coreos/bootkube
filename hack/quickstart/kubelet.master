@@ -11,10 +11,8 @@ ExecStartPre=/bin/mkdir -p /etc/kubernetes/checkpoint-secrets
 ExecStartPre=/bin/mkdir -p /srv/kubernetes/manifests
 ExecStartPre=/bin/mkdir -p /var/lib/cni
 ExecStart=/usr/lib/coreos/kubelet-wrapper \
+  --api-servers=https://${COREOS_PRIVATE_IPV4}:443 \
   --kubeconfig=/etc/kubernetes/kubeconfig \
-  --experimental-bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubeconfig \
-  --cert-dir=/etc/kubernetes/secrets \
-  --require-kubeconfig \
   --cni-conf-dir=/etc/kubernetes/cni/net.d \
   --network-plugin=cni \
   --lock-file=/var/run/lock/kubelet.lock \

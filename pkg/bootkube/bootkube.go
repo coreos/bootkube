@@ -92,8 +92,6 @@ func makeAPIServerFlags(config Config) ([]string, error) {
 		"--tls-private-key-file=" + filepath.Join(config.AssetDir, asset.AssetPathAPIServerKey),
 		"--tls-cert-file=" + filepath.Join(config.AssetDir, asset.AssetPathAPIServerCert),
 		"--client-ca-file=" + filepath.Join(config.AssetDir, asset.AssetPathCACert),
-		"--token-auth-file=" + filepath.Join(config.AssetDir, asset.AssetPathBootstrapAuthToken),
-		"--authorization-mode=RBAC",
 		"--etcd-servers=" + config.EtcdServer.String(),
 		"--service-cluster-ip-range=" + serviceCIDR,
 		"--service-account-key-file=" + filepath.Join(config.AssetDir, asset.AssetPathServiceAccountPubKey),
@@ -112,8 +110,6 @@ func makeControllerManagerFlags(config Config) ([]string, error) {
 		"--master=" + insecureAPIAddr,
 		"--service-account-private-key-file=" + filepath.Join(config.AssetDir, asset.AssetPathServiceAccountPrivKey),
 		"--root-ca-file=" + filepath.Join(config.AssetDir, asset.AssetPathCACert),
-		"--cluster-signing-cert-file=" + filepath.Join(config.AssetDir, asset.AssetPathCACert),
-		"--cluster-signing-key-file=" + filepath.Join(config.AssetDir, asset.AssetPathCAKey),
 		"--allocate-node-cidrs=true",
 		"--cluster-cidr=" + podCIDR,
 		"--configure-cloud-routes=false",
@@ -137,7 +133,6 @@ func (b *bootkube) Run() error {
 		requiredPods = append(requiredPods, "etcd-operator")
 	}
 	go func() { errch <- WaitUntilPodsRunning(requiredPods, assetTimeout, b.selfHostedEtcd) }()
-	go func() { errch <- ApproveKubeletCSRs() }()
 
 	// If any of the bootkube services exit, it means it is unrecoverable and we should exit.
 	err := <-errch

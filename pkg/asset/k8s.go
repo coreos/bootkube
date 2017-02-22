@@ -29,8 +29,6 @@ func newStaticAssets(selfHostKubelet, selfHostedEtcd bool) Assets {
 		mustCreateAssetFromTemplate(AssetPathCheckpointer, internal.CheckpointerTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathKubeFlannel, internal.KubeFlannelTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathKubeFlannelCfg, internal.KubeFlannelCfgTemplate, noData),
-		mustCreateAssetFromTemplate(AssetPathKubeletBootstrapRoleBinding, internal.KubeletBootstrapRoleBindingTemplate, noData),
-		mustCreateAssetFromTemplate(AssetPathKubeSystemSARoleBinding, internal.KubeSystemSARoleBindingTemplate, noData),
 	}
 	if selfHostKubelet {
 		assets = append(assets, mustCreateAssetFromTemplate(AssetPathKubelet, internal.KubeletTemplate, noData))
@@ -52,71 +50,35 @@ func newDynamicAssets(conf Config) Assets {
 	}
 }
 
-func newAdminKubeConfigAsset(assets Assets, conf Config) (Asset, error) {
+func newKubeConfigAsset(assets Assets, conf Config) (Asset, error) {
 	caCert, err := assets.Get(AssetPathCACert)
 	if err != nil {
 		return Asset{}, err
 	}
 
-	adminCert, err := assets.Get(AssetPathAdminCert)
+	kubeletCert, err := assets.Get(AssetPathKubeletCert)
 	if err != nil {
 		return Asset{}, err
 	}
 
-	adminKey, err := assets.Get(AssetPathAdminKey)
+	kubeletKey, err := assets.Get(AssetPathKubeletKey)
 	if err != nil {
 		return Asset{}, err
 	}
 
-	templateCfg := struct {
-		Server    string
-		CACert    string
-		UserName  string
-		UserCert  string
-		UserKey   string
-		UserToken string
-	}{
-		Server:   conf.APIServers[0].String(),
-		CACert:   base64.StdEncoding.EncodeToString(caCert.Data),
-		UserName: "admin",
-		UserCert: base64.StdEncoding.EncodeToString(adminCert.Data),
-		UserKey:  base64.StdEncoding.EncodeToString(adminKey.Data),
+	type templateCfg struct {
+		Server      string
+		CACert      string
+		KubeletCert string
+		KubeletKey  string
 	}
 
-	return assetFromTemplate(AssetPathAdminKubeConfig, internal.KubeConfigTemplate, templateCfg)
-}
-
-func newBootstrapKubeConfigAsset(assets Assets, conf Config) (Asset, error) {
-	caCert, err := assets.Get(AssetPathCACert)
-	if err != nil {
-		return Asset{}, err
-	}
-
-	tokenFile, err := assets.Get(AssetPathBootstrapAuthToken)
-	if err != nil {
-		return Asset{}, err
-	}
-
-	token, err := parseBootstrapAuthToken(tokenFile.Data)
-	if err != nil {
-		return Asset{}, err
-	}
-
-	templateCfg := struct {
-		Server    string
-		CACert    string
-		UserName  string
-		UserCert  string
-		UserKey   string
-		UserToken string
-	}{
-		Server:    conf.APIServers[0].String(),
-		CACert:    base64.StdEncoding.EncodeToString(caCert.Data),
-		UserName:  "kubelet-bootstrap",
-		UserToken: token,
-	}
-
-	return assetFromTemplate(AssetPathBootstrapKubeConfig, internal.KubeConfigTemplate, templateCfg)
+	return assetFromTemplate(AssetPathKubeConfig, internal.KubeConfigTemplate, templateCfg{
+		Server:      conf.APIServers[0].String(),
+		CACert:      base64.StdEncoding.EncodeToString(caCert.Data),
+		KubeletCert: base64.StdEncoding.EncodeToString(kubeletCert.Data),
+		KubeletKey:  base64.StdEncoding.EncodeToString(kubeletKey.Data),
+	})
 }
 
 func newAPIServerSecretAsset(assets Assets) (Asset, error) {
@@ -125,7 +87,6 @@ func newAPIServerSecretAsset(assets Assets) (Asset, error) {
 		AssetPathAPIServerCert,
 		AssetPathServiceAccountPubKey,
 		AssetPathCACert,
-		AssetPathBootstrapAuthToken,
 	}
 
 	secretYAML, err := secretFromAssets(secretAPIServerName, secretNamespace, secretAssets, assets)
@@ -140,7 +101,6 @@ func newControllerManagerSecretAsset(assets Assets) (Asset, error) {
 	secretAssets := []string{
 		AssetPathServiceAccountPrivKey,
 		AssetPathCACert, //TODO(aaron): do we want this also distributed as secret? or expect available on host?
-		AssetPathCAKey,  // ^
 	}
 
 	secretYAML, err := secretFromAssets(secretCMName, secretNamespace, secretAssets, assets)
