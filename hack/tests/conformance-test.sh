@@ -20,7 +20,7 @@ ssh_host=$1
 ssh_port=$2
 ssh_key=$3
 
-KUBECONFIG=${KUBECONFIG:-/home/core/cluster/auth/admin-kubeconfig}
+KUBECONFIG=${KUBECONFIG:-/home/core/cluster/auth/kubeconfig}
 K8S_SRC=/home/core/go/src/k8s.io/kubernetes
 ssh -q -o stricthostkeychecking=no -i ${ssh_key} -p ${ssh_port} core@${ssh_host} \
     "mkdir -p ${K8S_SRC} && [[ -d ${K8S_SRC}/.git ]] || git clone https://${CONFORMANCE_REPO} ${K8S_SRC}"
