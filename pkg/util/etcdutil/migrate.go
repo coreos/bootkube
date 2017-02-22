@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/coreos/etcd-operator/pkg/spec"
@@ -70,7 +71,7 @@ func Migrate() error {
 }
 
 func listETCDCluster(ns string, restClient restclient.Interface) restclient.Result {
-	uri := fmt.Sprintf("/apis/coreos.com/v1/namespaces/%s/etcdclusters", ns)
+	uri := fmt.Sprintf("/apis/%s/%s/namespaces/%s/%s", spec.TPRGroup, spec.TPRVersion, ns, spec.TPRKindPlural)
 	return restClient.Get().RequestURI(uri).Do()
 }
 
@@ -118,22 +119,22 @@ func getBootEtcdPodIP(kubecli clientset.Interface) (string, error) {
 
 func createMigratedEtcdCluster(restclient restclient.Interface, host, podIP string) error {
 	b := []byte(fmt.Sprintf(`{
-  "apiVersion": "coreos.com/v1",
-  "kind": "EtcdCluster",
+  "apiVersion": "%s/%s",
+  "kind": "%s",
   "metadata": {
     "name": "%s",
     "namespace": "kube-system"
   },
   "spec": {
     "size": 1,
-    "version": "v3.1.0-alpha.1",
+    "version": "v3.1.0",
     "selfHosted": {
 		"bootMemberClientEndpoint": "http://%s:12379"
     }
   }
-}`, etcdClusterName, podIP))
+}`, spec.TPRGroup, spec.TPRVersion, strings.Title(spec.TPRKind), etcdClusterName, podIP))
 
-	uri := "/apis/coreos.com/v1/namespaces/kube-system/etcdclusters"
+	uri := fmt.Sprintf("/apis/%s/%s/namespaces/kube-system/%s", spec.TPRGroup, spec.TPRVersion, spec.TPRKindPlural)
 	res := restclient.Post().RequestURI(uri).SetHeader("Content-Type", "application/json").Body(b).Do()
 
 	return res.Error()
@@ -149,12 +150,9 @@ func waitEtcdClusterRunning(restclient restclient.Interface) error {
 			return false, fmt.Errorf("fail to get etcdcluster: %v", err)
 		}
 
-		e := &spec.EtcdCluster{}
+		e := &spec.Cluster{}
 		if err := json.Unmarshal(b, e); err != nil {
 			return false, err
-		}
-		if e.Status == nil {
-			return false, nil
 		}
 		switch e.Status.Phase {
 		case spec.ClusterPhaseRunning:
@@ -200,5 +198,5 @@ func waitBootEtcdRemoved() error {
 }
 
 func makeEtcdClusterURI(name string) string {
-	return fmt.Sprintf("/apis/coreos.com/v1/namespaces/kube-system/etcdclusters/%s", name)
+	return fmt.Sprintf("/apis/%s/%s/namespaces/kube-system/%s/%s", spec.TPRGroup, spec.TPRVersion, spec.TPRKindPlural, name)
 }
