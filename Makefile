@@ -55,7 +55,7 @@ conformance-%: clean all
 # This will naively try and create a vendor dir from a k8s release
 # USE: make vendor VENDOR_VERSION=vX.Y.Z
 VENDOR_VERSION = v1.5.3+coreos.0
-ETCD_OPERATOR_VERSION = 7315cda48a511c8bcab1e575ee0626eae7d07d2d
+ETCD_OPERATOR_VERSION = v0.2.1
 vendor:
 	@echo "Creating k8s vendor for: $(VENDOR_VERSION)"
 	@rm -rf vendor
@@ -67,7 +67,7 @@ vendor:
 	@mv $@/k8s.io/kubernetes/vendor/* $(abspath $@)
 	@cd $@/k8s.io/ && ln -sf kubernetes/staging/src/k8s.io/client-go client-go
 	@rm -rf $@/k8s.io/kubernetes/vendor $@/k8s.io/kubernetes/.git
-	@echo "vendoring etcd-operator spec"
+	@echo "vendoring etcd-operator spec: $(ETCD_OPERATOR_VERSION)"
 	@git clone https://github.com/coreos/etcd-operator /tmp/etcd-operator > /dev/null 2>&1
 	@cd /tmp/etcd-operator && git checkout $(ETCD_OPERATOR_VERSION) > /dev/null 2>&1
 	@mkdir -p $@/github.com/coreos/etcd-operator/pkg/
