@@ -45,7 +45,7 @@ spec:
         - --pod-manifest-path=/etc/kubernetes/manifests
         - --allow-privileged
         - --hostname-override=$(NODE_NAME)
-        - --cluster-dns=10.3.0.10
+        - --cluster-dns={{ .DNSServiceIP }}
         - --cluster-domain=cluster.local
         - --kubeconfig=/etc/kubernetes/kubeconfig
         - --require-kubeconfig
@@ -147,7 +147,7 @@ spec:
         - --etcd-servers={{ range $i, $e := .EtcdServers }}{{ if $i }},{{end}}{{ $e }}{{end}}
         - --storage-backend=etcd3
         - --allow-privileged=true
-        - --service-cluster-ip-range=10.3.0.0/24
+        - --service-cluster-ip-range={{ .ServiceCIDR }}
         - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota
         - --runtime-config=api/all=true
         - --tls-cert-file=/etc/kubernetes/secrets/apiserver.crt
@@ -235,7 +235,7 @@ spec:
         - controller-manager
         - --allocate-node-cidrs=true
         - --configure-cloud-routes=false
-        - --cluster-cidr=10.2.0.0/16
+        - --cluster-cidr={{ .PodCIDR }}
         - --root-ca-file=/etc/kubernetes/secrets/ca.crt
         - --service-account-private-key-file=/etc/kubernetes/secrets/service-account.key
         - --leader-elect=true
@@ -326,7 +326,7 @@ spec:
         - --kubeconfig=/etc/kubernetes/kubeconfig
         - --proxy-mode=iptables
         - --hostname-override=$(NODE_NAME)
-        - --cluster-cidr=10.2.0.0/16
+        - --cluster-cidr={{ .PodCIDR }}
         env:
           - name: NODE_NAME
             valueFrom:
@@ -513,7 +513,7 @@ metadata:
 spec:
   selector:
     k8s-app: kube-dns
-  clusterIP: 10.3.0.10
+  clusterIP: {{ .DNSServiceIP }}
   ports:
   - name: dns
     port: 53
@@ -556,7 +556,7 @@ spec:
   selector:
     app: etcd
     etcd_cluster: kube-etcd
-  clusterIP: 10.3.0.15
+  clusterIP: {{ .ETCDServiceIP }}
   ports:
   - name: client
     port: 2379
@@ -582,7 +582,7 @@ data:
     }
   net-conf.json: |
     {
-      "Network": "10.2.0.0/16",
+      "Network": "{{ .PodCIDR }}",
       "Backend": {
         "Type": "vxlan"
       }

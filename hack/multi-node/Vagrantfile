@@ -18,7 +18,6 @@ if $worker_vm_memory < 1024
   puts "Workers should have at least 1024 MB of memory"
 end
 
-CONTROLLER_CLUSTER_IP="10.3.0.1"
 CONTROLLER_USER_DATA_PATH = File.expand_path("./cluster/user-data-controller")
 WORKER_USER_DATA_PATH = File.expand_path("./cluster/user-data-worker")
 

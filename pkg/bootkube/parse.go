@@ -74,6 +74,20 @@ func detectPodCIDR(config Config) (string, error) {
 	return "", fmt.Errorf("can't detect --cluster-cidr flag in %s", asset.AssetPathControllerManager)
 }
 
+// detectEtcdIP deserializes the etcd-service ClusterIP.
+func detectEtcdIP(assetDir string) (string, error) {
+	b, err := ioutil.ReadFile(filepath.Join(assetDir, asset.AssetPathEtcdSvc))
+	if err != nil {
+		return "", fmt.Errorf("can't read file %s: %v", asset.AssetPathEtcdSvc, err)
+	}
+	var service v1.Service
+	err = yaml.Unmarshal(b, &service)
+	if err != nil {
+		return "", fmt.Errorf("can't unmarshal %s: %v", asset.AssetPathEtcdSvc, err)
+	}
+	return service.Spec.ClusterIP, nil
+}
+
 func findFlag(flagName string, args []string) string {
 	for _, arg := range args {
 		if strings.HasPrefix(arg, flagName+"=") {

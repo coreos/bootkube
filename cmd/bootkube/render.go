@@ -16,6 +16,13 @@ import (
 	"github.com/kubernetes-incubator/bootkube/pkg/tlsutil"
 )
 
+const (
+	apiOffset            = 1
+	dnsOffset            = 10
+	etcdOffset           = 15
+	defaultServiceBaseIP = "10.3.0.0"
+)
+
 var (
 	cmdRender = &cobra.Command{
 		Use:          "render",
@@ -33,6 +40,8 @@ var (
 		etcdServers       string
 		apiServers        string
 		altNames          string
+		podCIDR           string
+		serviceCIDR       string
 		selfHostKubelet   bool
 		cloudProvider     string
 		selfHostedEtcd    bool
@@ -47,6 +56,8 @@ func init() {
 	cmdRender.Flags().StringVar(&renderOpts.etcdServers, "etcd-servers", "http://127.0.0.1:2379", "List of etcd servers URLs including host:port, comma separated")
 	cmdRender.Flags().StringVar(&renderOpts.apiServers, "api-servers", "https://127.0.0.1:443", "List of API server URLs including host:port, commma seprated")
 	cmdRender.Flags().StringVar(&renderOpts.altNames, "api-server-alt-names", "", "List of SANs to use in api-server certificate. Example: 'IP=127.0.0.1,IP=127.0.0.2,DNS=localhost'. If empty, SANs will be extracted from the --api-servers flag.")
+	cmdRender.Flags().StringVar(&renderOpts.podCIDR, "pod-cidr", "10.2.0.0/16", "The CIDR range of cluster pods.")
+	cmdRender.Flags().StringVar(&renderOpts.serviceCIDR, "service-cidr", "10.3.0.0/24", "The CIDR range of cluster services.")
 	cmdRender.Flags().BoolVar(&renderOpts.selfHostKubelet, "self-host-kubelet", false, "Create a self-hosted kubelet daemonset.")
 	cmdRender.Flags().StringVar(&renderOpts.cloudProvider, "cloud-provider", "", "The provider for cloud services.  Empty string for no provider")
 	cmdRender.Flags().BoolVar(&renderOpts.selfHostedEtcd, "experimental-self-hosted-etcd", false, "Create self-hosted etcd assets.")
@@ -111,12 +122,52 @@ func flagsToAssetConfig() (c *asset.Config, err error) {
 			return nil, err
 		}
 	}
+
+	_, podNet, err := net.ParseCIDR(renderOpts.podCIDR)
+	if err != nil {
+		return nil, err
+	}
+
+	_, serviceNet, err := net.ParseCIDR(renderOpts.serviceCIDR)
+	if err != nil {
+		return nil, err
+	}
+
+	if podNet.Contains(serviceNet.IP) || serviceNet.Contains(podNet.IP) {
+		return nil, fmt.Errorf("Pod CIDR %s and service CIDR %s must not overlap", podNet.String(), serviceNet.String())
+	}
+
+	apiServiceIP, err := offsetServiceIP(serviceNet, apiOffset)
+	if err != nil {
+		return nil, err
+	}
+
+	dnsServiceIP, err := offsetServiceIP(serviceNet, dnsOffset)
+	if err != nil {
+		return nil, err
+	}
+
+	etcdServiceIP, err := offsetServiceIP(serviceNet, etcdOffset)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Find better option than asking users to make manual changes
+	if serviceNet.IP.String() != defaultServiceBaseIP {
+		fmt.Printf("You have selected a non-default service CIDR %s - be sure your kubelet service file uses --cluster-dns=%s\n", serviceNet.String(), dnsServiceIP.String())
+	}
+
 	return &asset.Config{
 		EtcdServers:     etcdServers,
 		CACert:          caCert,
 		CAPrivKey:       caPrivKey,
 		APIServers:      apiServers,
 		AltNames:        altNames,
+		PodCIDR:         podNet,
+		ServiceCIDR:     serviceNet,
+		APIServiceIP:    apiServiceIP,
+		DNSServiceIP:    dnsServiceIP,
+		ETCDServiceIP:   etcdServiceIP,
 		SelfHostKubelet: renderOpts.selfHostKubelet,
 		CloudProvider:   renderOpts.cloudProvider,
 		SelfHostedEtcd:  renderOpts.selfHostedEtcd,
@@ -194,4 +245,27 @@ func altNamesFromURLs(urls []*url.URL) *tlsutil.AltNames {
 		}
 	}
 	return &an
+}
+
+// offsetServiceIP returns an IP offset by up to 255.
+// TODO: do numeric conversion to generalize this utility.
+func offsetServiceIP(ipnet *net.IPNet, offset int) (net.IP, error) {
+	ip := make(net.IP, len(ipnet.IP))
+	copy(ip, ipnet.IP)
+	for i := 0; i < offset; i++ {
+		incIPv4(ip)
+	}
+	if ipnet.Contains(ip) {
+		return ip, nil
+	}
+	return net.IP([]byte("")), fmt.Errorf("Service IP %v is not in %s", ip, ipnet)
+}
+
+func incIPv4(ip net.IP) {
+	for j := len(ip) - 1; j >= 0; j-- {
+		ip[j]++
+		if ip[j] > 0 {
+			break
+		}
+	}
 }

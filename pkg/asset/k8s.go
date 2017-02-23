@@ -17,37 +17,37 @@ const (
 	secretCMName        = "kube-controller-manager"
 )
 
-func newStaticAssets(selfHostKubelet, selfHostedEtcd bool) Assets {
+func newStaticAssets() Assets {
 	var noData interface{}
 	assets := Assets{
 		mustCreateAssetFromTemplate(AssetPathScheduler, internal.SchedulerTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathSchedulerDisruption, internal.SchedulerDisruptionTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathControllerManagerDisruption, internal.ControllerManagerDisruptionTemplate, noData),
-		mustCreateAssetFromTemplate(AssetPathProxy, internal.ProxyTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathKubeDNSDeployment, internal.DNSDeploymentTemplate, noData),
-		mustCreateAssetFromTemplate(AssetPathKubeDNSSvc, internal.DNSSvcTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathCheckpointer, internal.CheckpointerTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathKubeFlannel, internal.KubeFlannelTemplate, noData),
-		mustCreateAssetFromTemplate(AssetPathKubeFlannelCfg, internal.KubeFlannelCfgTemplate, noData),
 	}
-	if selfHostKubelet {
-		assets = append(assets, mustCreateAssetFromTemplate(AssetPathKubelet, internal.KubeletTemplate, noData))
-	}
-	if selfHostedEtcd {
-		assets = append(assets,
-			mustCreateAssetFromTemplate(AssetPathEtcdOperator, internal.EtcdOperatorTemplate, noData),
-			mustCreateAssetFromTemplate(AssetPathEtcdSvc, internal.EtcdSvcTemplate, noData),
-		)
-	}
-
 	return assets
 }
 
 func newDynamicAssets(conf Config) Assets {
-	return Assets{
+	assets := Assets{
 		mustCreateAssetFromTemplate(AssetPathControllerManager, internal.ControllerManagerTemplate, conf),
 		mustCreateAssetFromTemplate(AssetPathAPIServer, internal.APIServerTemplate, conf),
+		mustCreateAssetFromTemplate(AssetPathProxy, internal.ProxyTemplate, conf),
+		mustCreateAssetFromTemplate(AssetPathKubeFlannelCfg, internal.KubeFlannelCfgTemplate, conf),
+		mustCreateAssetFromTemplate(AssetPathKubeDNSSvc, internal.DNSSvcTemplate, conf),
 	}
+	if conf.SelfHostKubelet {
+		assets = append(assets, mustCreateAssetFromTemplate(AssetPathKubelet, internal.KubeletTemplate, conf))
+	}
+	if conf.SelfHostedEtcd {
+		assets = append(assets,
+			mustCreateAssetFromTemplate(AssetPathEtcdOperator, internal.EtcdOperatorTemplate, conf),
+			mustCreateAssetFromTemplate(AssetPathEtcdSvc, internal.EtcdSvcTemplate, conf),
+		)
+	}
+	return assets
 }
 
 func newKubeConfigAsset(assets Assets, conf Config) (Asset, error) {
