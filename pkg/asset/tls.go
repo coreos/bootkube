@@ -62,7 +62,7 @@ func newCACert() (*rsa.PrivateKey, *x509.Certificate, error) {
 
 	config := tlsutil.CertConfig{
 		CommonName:   "kube-ca",
-		Organization: []string{"kube-aws"},
+		Organization: []string{"bootkube"},
 	}
 
 	cert, err := tlsutil.NewSelfSignedCACertificate(config, key)
