@@ -15,6 +15,7 @@ import (
 	scheduler "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 
 	"github.com/kubernetes-incubator/bootkube/pkg/asset"
+	"github.com/kubernetes-incubator/bootkube/pkg/util/etcdutil"
 )
 
 const (
@@ -129,11 +130,23 @@ func (b *bootkube) Run() error {
 			errch <- err
 		}
 	}()
-	if b.selfHostedEtcd {
-		requiredPods = append(requiredPods, "etcd-operator")
-	}
-	go func() { errch <- WaitUntilPodsRunning(requiredPods, assetTimeout, b.selfHostedEtcd) }()
-
+	go func() {
+		if b.selfHostedEtcd {
+			requiredPods = append(requiredPods, "etcd-operator")
+			etcdServiceIP, err := detectEtcdIP(b.assetDir)
+			if err != nil {
+				errch <- err
+				return
+			}
+			if err := WaitUntilPodsRunning(requiredPods, assetTimeout); err != nil {
+				errch <- err
+				return
+			}
+			errch <- etcdutil.Migrate(etcdServiceIP)
+		} else {
+			errch <- WaitUntilPodsRunning(requiredPods, assetTimeout)
+		}
+	}()
 	// If any of the bootkube services exit, it means it is unrecoverable and we should exit.
 	err := <-errch
 	if err != nil {

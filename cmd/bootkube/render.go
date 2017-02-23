@@ -17,10 +17,10 @@ import (
 )
 
 const (
-	apiOffset           = 1
-	dnsOffset           = 10
-	etcdOffset          = 15
-	defaultDNSServiceIP = "10.3.0.10"
+	apiOffset            = 1
+	dnsOffset            = 10
+	etcdOffset           = 15
+	defaultServiceBaseIP = "10.3.0.0"
 )
 
 var (
@@ -152,7 +152,8 @@ func flagsToAssetConfig() (c *asset.Config, err error) {
 		return nil, err
 	}
 
-	if dnsServiceIP.String() != defaultDNSServiceIP {
+	// TODO: Find better option than asking users to make manual changes
+	if serviceNet.IP.String() != defaultServiceBaseIP {
 		fmt.Printf("You have selected a non-default service CIDR %s - be sure your kubelet service file uses --cluster-dns=%s\n", serviceNet.String(), dnsServiceIP.String())
 	}
 
