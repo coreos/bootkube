@@ -81,7 +81,7 @@ func NewBootkube(config Config) (*bootkube, error) {
 }
 
 func makeAPIServerFlags(config Config) ([]string, error) {
-	serviceCIDR, err := detectServiceCIDR(config)
+	serviceCIDR, err := detectServiceCIDR(config.AssetDir)
 	if err != nil {
 		return []string{}, err
 	}
@@ -103,7 +103,7 @@ func makeAPIServerFlags(config Config) ([]string, error) {
 }
 
 func makeControllerManagerFlags(config Config) ([]string, error) {
-	podCIDR, err := detectPodCIDR(config)
+	podCIDR, err := detectPodCIDR(config.AssetDir)
 	if err != nil {
 		return []string{}, err
 	}
