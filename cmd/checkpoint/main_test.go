@@ -25,84 +25,84 @@ func TestProcess(t *testing.T) {
 	cases := []testCase{
 		{
 			desc:                "Inactive checkpoint and no local running: should start",
-			inactiveCheckpoints: map[string]*v1.Pod{"AA": &v1.Pod{}},
+			inactiveCheckpoints: map[string]*v1.Pod{"AA": {}},
 			expectStart:         []string{"AA"},
 		},
 		{
 			desc:                "Inactive checkpoint and local running: no change",
-			inactiveCheckpoints: map[string]*v1.Pod{"AA": &v1.Pod{}},
-			localRunning:        map[string]*v1.Pod{"AA": &v1.Pod{}},
+			inactiveCheckpoints: map[string]*v1.Pod{"AA": {}},
+			localRunning:        map[string]*v1.Pod{"AA": {}},
 		},
 		{
 			desc:                "Inactive checkpoint and no api parent: should remove",
-			inactiveCheckpoints: map[string]*v1.Pod{"AA": &v1.Pod{}},
-			apiParents:          map[string]*v1.Pod{"BB": &v1.Pod{}},
+			inactiveCheckpoints: map[string]*v1.Pod{"AA": {}},
+			apiParents:          map[string]*v1.Pod{"BB": {}},
 			expectRemove:        []string{"AA"},
 		},
 		{
 			desc:                "Inactive checkpoint and both api & local running: no change",
-			inactiveCheckpoints: map[string]*v1.Pod{"AA": &v1.Pod{}},
-			localRunning:        map[string]*v1.Pod{"AA": &v1.Pod{}},
-			apiParents:          map[string]*v1.Pod{"AA": &v1.Pod{}},
+			inactiveCheckpoints: map[string]*v1.Pod{"AA": {}},
+			localRunning:        map[string]*v1.Pod{"AA": {}},
+			apiParents:          map[string]*v1.Pod{"AA": {}},
 		},
 		{
 			desc:                "Inactive checkpoint and only api parent: should start",
-			inactiveCheckpoints: map[string]*v1.Pod{"AA": &v1.Pod{}},
-			apiParents:          map[string]*v1.Pod{"AA": &v1.Pod{}},
+			inactiveCheckpoints: map[string]*v1.Pod{"AA": {}},
+			apiParents:          map[string]*v1.Pod{"AA": {}},
 			expectStart:         []string{"AA"},
 		},
 		{
 			desc:              "Active checkpoint and no local running: no change",
-			activeCheckpoints: map[string]*v1.Pod{"AA": &v1.Pod{}},
+			activeCheckpoints: map[string]*v1.Pod{"AA": {}},
 		},
 		{
 			desc:              "Active checkpoint and local running: should stop",
-			activeCheckpoints: map[string]*v1.Pod{"AA": &v1.Pod{}},
-			localRunning:      map[string]*v1.Pod{"AA": &v1.Pod{}},
+			activeCheckpoints: map[string]*v1.Pod{"AA": {}},
+			localRunning:      map[string]*v1.Pod{"AA": {}},
 			expectStop:        []string{"AA"},
 		},
 		{
 			desc:              "Active checkpoint and api parent: no change",
-			activeCheckpoints: map[string]*v1.Pod{"AA": &v1.Pod{}},
-			apiParents:        map[string]*v1.Pod{"AA": &v1.Pod{}},
+			activeCheckpoints: map[string]*v1.Pod{"AA": {}},
+			apiParents:        map[string]*v1.Pod{"AA": {}},
 		},
 		{
 			desc:              "Active checkpoint and no api parent: remove",
-			activeCheckpoints: map[string]*v1.Pod{"AA": &v1.Pod{}},
-			apiParents:        map[string]*v1.Pod{"BB": &v1.Pod{}},
+			activeCheckpoints: map[string]*v1.Pod{"AA": {}},
+			apiParents:        map[string]*v1.Pod{"BB": {}},
 			expectRemove:      []string{"AA"},
 		},
 		{
 			desc:              "Active checkpoint with local running, and api parent: should stop",
-			activeCheckpoints: map[string]*v1.Pod{"AA": &v1.Pod{}},
-			localRunning:      map[string]*v1.Pod{"AA": &v1.Pod{}},
-			apiParents:        map[string]*v1.Pod{"AA": &v1.Pod{}},
+			activeCheckpoints: map[string]*v1.Pod{"AA": {}},
+			localRunning:      map[string]*v1.Pod{"AA": {}},
+			apiParents:        map[string]*v1.Pod{"AA": {}},
 			expectStop:        []string{"AA"},
 		},
 		{
 			desc:              "Active checkpoint with local parent, and no api parent: should remove",
-			activeCheckpoints: map[string]*v1.Pod{"AA": &v1.Pod{}},
-			localParents:      map[string]*v1.Pod{"AA": &v1.Pod{}},
-			apiParents:        map[string]*v1.Pod{"BB": &v1.Pod{}},
+			activeCheckpoints: map[string]*v1.Pod{"AA": {}},
+			localParents:      map[string]*v1.Pod{"AA": {}},
+			apiParents:        map[string]*v1.Pod{"BB": {}},
 			expectRemove:      []string{"AA"},
 		},
 		{
 			desc:                "Both active and inactive checkpoints, with no api parent: remove both",
-			activeCheckpoints:   map[string]*v1.Pod{"AA": &v1.Pod{}},
-			inactiveCheckpoints: map[string]*v1.Pod{"AA": &v1.Pod{}},
-			apiParents:          map[string]*v1.Pod{"BB": &v1.Pod{}},
+			activeCheckpoints:   map[string]*v1.Pod{"AA": {}},
+			inactiveCheckpoints: map[string]*v1.Pod{"AA": {}},
+			apiParents:          map[string]*v1.Pod{"BB": {}},
 			expectRemove:        []string{"AA"}, // Only need single remove, we should clean up both active/inactive
 		},
 		{
 			desc:                "Inactive checkpoint, local parent, local running, no api parent: no change", // Safety check - don't GC if local parent still exists (even if possibly stale)
-			inactiveCheckpoints: map[string]*v1.Pod{"AA": &v1.Pod{}},
-			localRunning:        map[string]*v1.Pod{"AA": &v1.Pod{}},
-			localParents:        map[string]*v1.Pod{"AA": &v1.Pod{}},
+			inactiveCheckpoints: map[string]*v1.Pod{"AA": {}},
+			localRunning:        map[string]*v1.Pod{"AA": {}},
+			localParents:        map[string]*v1.Pod{"AA": {}},
 		},
 		{
 			desc:              "Active checkpoint, local parent, no local running, no api parent: no change", // Safety check - don't GC if local parent still exists (even if possibly stale)
-			activeCheckpoints: map[string]*v1.Pod{"AA": &v1.Pod{}},
-			localParents:      map[string]*v1.Pod{"AA": &v1.Pod{}},
+			activeCheckpoints: map[string]*v1.Pod{"AA": {}},
+			localParents:      map[string]*v1.Pod{"AA": {}},
 		},
 	}
 
@@ -231,12 +231,12 @@ func TestPodListToParentPods(t *testing.T) {
 		{
 			desc:     "One parent and one regular pod: Should return only parent",
 			podList:  &v1.PodList{Items: []v1.Pod{parentAPod, regularPod}},
-			expected: map[string]*v1.Pod{"A/A": &v1.Pod{}},
+			expected: map[string]*v1.Pod{"A/A": {}},
 		},
 		{
 			desc:     "Two parent pods, should return both",
 			podList:  &v1.PodList{Items: []v1.Pod{parentAPod, parentBPod}},
-			expected: map[string]*v1.Pod{"A/A": &v1.Pod{}, "B/B": &v1.Pod{}},
+			expected: map[string]*v1.Pod{"A/A": {}, "B/B": {}},
 		},
 	}
 
