@@ -539,12 +539,16 @@ spec:
     spec:
       containers:
       - name: etcd-operator
-        image: quay.io/coreos/etcd-operator:c391d8b7638deb81aa877773a0acce389f602415
+        image: quay.io/coreos/etcd-operator:v0.2.1
         env:
         - name: MY_POD_NAMESPACE
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: MY_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
 `)
 
 	EtcdSvcTemplate = []byte(`apiVersion: v1
