@@ -20,15 +20,16 @@ const (
 
 // detectServiceCIDR deserializes the '--service-cluster-ip-range' from the
 // kube-apiserver manifest
-func detectServiceCIDR(config Config) (string, error) {
-	b, err := ioutil.ReadFile(filepath.Join(config.AssetDir, asset.AssetPathAPIServer))
+func detectServiceCIDR(assetDir string) (string, error) {
+	path := filepath.Join(assetDir, asset.AssetPathAPIServer)
+	b, err := ioutil.ReadFile(path)
 	if err != nil {
-		return "", fmt.Errorf("can't read file %s: %v", asset.AssetPathAPIServer, err)
+		return "", fmt.Errorf("can't read file %s: %v", path, err)
 	}
 	var apiServer v1beta1.DaemonSet
 	err = yaml.Unmarshal(b, &apiServer)
 	if err != nil {
-		return "", fmt.Errorf("cant unmarshal %s: %v", asset.AssetPathAPIServer, err)
+		return "", fmt.Errorf("cant unmarshal %s: %v", path, err)
 	}
 
 	containers := map[string]v1.Container{}
@@ -43,20 +44,21 @@ func detectServiceCIDR(config Config) (string, error) {
 		}
 		return cidr, nil
 	}
-	return "", fmt.Errorf("can't detect --service-cluster-ip-range in %s", asset.AssetPathAPIServer)
+	return "", fmt.Errorf("can't detect --service-cluster-ip-range in %s", path)
 }
 
 // detectPodCIDR deserializes the '--cluster-cidr' from the
 // kube-controller-manager manifest.
-func detectPodCIDR(config Config) (string, error) {
-	b, err := ioutil.ReadFile(filepath.Join(config.AssetDir, asset.AssetPathControllerManager))
+func detectPodCIDR(assetDir string) (string, error) {
+	path := filepath.Join(assetDir, asset.AssetPathControllerManager)
+	b, err := ioutil.ReadFile(path)
 	if err != nil {
-		return "", fmt.Errorf("can't read file %s: %v", asset.AssetPathControllerManager, err)
+		return "", fmt.Errorf("can't read file %s: %v", path, err)
 	}
 	var manager v1beta1.Deployment
 	err = yaml.Unmarshal(b, &manager)
 	if err != nil {
-		return "", fmt.Errorf("can't unmarshal %s: %v", asset.AssetPathControllerManager, err)
+		return "", fmt.Errorf("can't unmarshal %s: %v", path, err)
 	}
 
 	containers := map[string]v1.Container{}
@@ -71,19 +73,20 @@ func detectPodCIDR(config Config) (string, error) {
 		}
 		return cidr, nil
 	}
-	return "", fmt.Errorf("can't detect --cluster-cidr flag in %s", asset.AssetPathControllerManager)
+	return "", fmt.Errorf("can't detect --cluster-cidr flag in %s", path)
 }
 
 // detectEtcdIP deserializes the etcd-service ClusterIP.
 func detectEtcdIP(assetDir string) (string, error) {
-	b, err := ioutil.ReadFile(filepath.Join(assetDir, asset.AssetPathEtcdSvc))
+	path := filepath.Join(assetDir, asset.AssetPathEtcdSvc)
+	b, err := ioutil.ReadFile(path)
 	if err != nil {
-		return "", fmt.Errorf("can't read file %s: %v", asset.AssetPathEtcdSvc, err)
+		return "", fmt.Errorf("can't read file %s: %v", path, err)
 	}
 	var service v1.Service
 	err = yaml.Unmarshal(b, &service)
 	if err != nil {
-		return "", fmt.Errorf("can't unmarshal %s: %v", asset.AssetPathEtcdSvc, err)
+		return "", fmt.Errorf("can't unmarshal %s: %v", path, err)
 	}
 	return service.Spec.ClusterIP, nil
 }
