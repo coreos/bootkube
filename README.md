@@ -110,6 +110,12 @@ make conformance-multi
 - Prove out the self-hosted model on all new releases of k8s and different platforms
 - Document best-practices for upgrades and upstream the idea of a upgradable daemonset
 
+## Getting Involved
+
+Want to contribute to bootkube? Have Questions? We are looking for active participation from the community
+
+You can find us at the bootkube channel on [Kubernetes slack](https://github.com/kubernetes/community#slack-chat)
+
 ## License
 
 bootkube is under the Apache 2.0 license. See the [LICENSE](LICENSE) file for details.
