@@ -56,7 +56,7 @@ func NewBootkube(config Config) (*bootkube, error) {
 
 	cmServer := controller.NewCMServer()
 	fs = pflag.NewFlagSet("controllermanager", pflag.ExitOnError)
-	cmServer.AddFlags(fs)
+	cmServer.AddFlags(fs, cmapp.KnownControllers(), cmapp.ControllersDisabledByDefault.List())
 	flags, err = makeControllerManagerFlags(config)
 	if err != nil {
 		return nil, err

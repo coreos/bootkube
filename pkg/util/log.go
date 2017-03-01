@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 type GlogWriter struct{}

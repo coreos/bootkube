@@ -12,12 +12,12 @@ import (
 	"github.com/coreos/etcd-operator/pkg/spec"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/glog"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 const (
