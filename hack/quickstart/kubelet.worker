@@ -11,8 +11,8 @@ ExecStartPre=/bin/mkdir -p /etc/kubernetes/cni/net.d
 ExecStartPre=/bin/mkdir -p /var/lib/cni
 ExecStartPre=-/usr/bin/rkt rm --uuid-file=/var/run/kubelet-pod.uuid
 ExecStart=/usr/lib/coreos/kubelet-wrapper \
-  --api-servers=https://{{apiserver}}:443 \
   --kubeconfig=/etc/kubernetes/kubeconfig \
+  --require-kubeconfig \
   --client-ca-file=/etc/kubernetes/ca.crt \
   --anonymous-auth=false \
   --cni-conf-dir=/etc/kubernetes/cni/net.d \
