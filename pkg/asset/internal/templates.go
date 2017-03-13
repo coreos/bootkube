@@ -163,6 +163,7 @@ spec:
         - --bind-address=0.0.0.0
         - --client-ca-file=/etc/kubernetes/secrets/ca.crt
         - --cloud-provider={{ .CloudProvider  }}
+        - --enable-garbage-collector=false
         - --etcd-servers={{ range $i, $e := .EtcdServers }}{{ if $i }},{{end}}{{ $e }}{{end}}
         - --insecure-port=8080
         - --kubelet-client-certificate=/etc/kubernetes/secrets/apiserver.crt
@@ -299,6 +300,7 @@ spec:
         - --cloud-provider={{ .CloudProvider  }}
         - --cluster-cidr={{ .PodCIDR }}
         - --configure-cloud-routes=false
+        - --enable-garbage-collector=false
         - --leader-elect=true
         - --root-ca-file=/etc/kubernetes/secrets/ca.crt
         - --service-account-private-key-file=/etc/kubernetes/secrets/service-account.key
