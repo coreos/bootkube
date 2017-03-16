@@ -54,18 +54,18 @@ spec:
         command:
         - ./hyperkube
         - kubelet
-        - --network-plugin=cni
-        - --cni-conf-dir=/etc/kubernetes/cni/net.d
-        - --cni-bin-dir=/opt/cni/bin
-        - --pod-manifest-path=/etc/kubernetes/manifests
         - --allow-privileged
-        - --hostname-override=$(NODE_NAME)
         - --cluster-dns={{ .DNSServiceIP }}
         - --cluster-domain=cluster.local
-        - --kubeconfig=/etc/kubernetes/kubeconfig
-        - --require-kubeconfig
-        - --lock-file=/var/run/lock/kubelet.lock
+        - --cni-conf-dir=/etc/kubernetes/cni/net.d
+        - --cni-bin-dir=/opt/cni/bin
         - --containerized
+        - --hostname-override=$(NODE_NAME)
+        - --kubeconfig=/etc/kubernetes/kubeconfig
+        - --lock-file=/var/run/lock/kubelet.lock
+        - --network-plugin=cni
+        - --pod-manifest-path=/etc/kubernetes/manifests
+        - --require-kubeconfig
         env:
           - name: NODE_NAME
             valueFrom:
@@ -155,25 +155,26 @@ spec:
         - /var/lock/api-server.lock
         - /hyperkube
         - apiserver
-        - --bind-address=0.0.0.0
-        - --secure-port=443
-        - --insecure-port=8080
-        - --advertise-address=$(POD_IP)
-        - --etcd-servers={{ range $i, $e := .EtcdServers }}{{ if $i }},{{end}}{{ $e }}{{end}}
-        - --storage-backend=etcd3
-        - --allow-privileged=true
-        - --service-cluster-ip-range={{ .ServiceCIDR }}
         - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota
-        - --runtime-config=api/all=true
-        - --tls-cert-file=/etc/kubernetes/secrets/apiserver.crt
-        - --tls-private-key-file=/etc/kubernetes/secrets/apiserver.key
+        - --advertise-address=$(POD_IP)
+        - --allow-privileged=true
+        - --anonymous-auth=false
+        - --authorization-mode=RBAC
+        - --bind-address=0.0.0.0
+        - --client-ca-file=/etc/kubernetes/secrets/ca.crt
+        - --cloud-provider={{ .CloudProvider  }}
+        - --enable-garbage-collector=false
+        - --etcd-servers={{ range $i, $e := .EtcdServers }}{{ if $i }},{{end}}{{ $e }}{{end}}
+        - --insecure-port=8080
         - --kubelet-client-certificate=/etc/kubernetes/secrets/apiserver.crt
         - --kubelet-client-key=/etc/kubernetes/secrets/apiserver.key
+        - --runtime-config=api/all=true
+        - --secure-port=443
         - --service-account-key-file=/etc/kubernetes/secrets/service-account.pub
-        - --client-ca-file=/etc/kubernetes/secrets/ca.crt
-        - --authorization-mode=RBAC
-        - --cloud-provider={{ .CloudProvider  }}
-        - --anonymous-auth=false
+        - --service-cluster-ip-range={{ .ServiceCIDR }}
+        - --storage-backend=etcd3
+        - --tls-cert-file=/etc/kubernetes/secrets/apiserver.crt
+        - --tls-private-key-file=/etc/kubernetes/secrets/apiserver.key
         env:
         - name: POD_IP
           valueFrom:
@@ -297,12 +298,13 @@ spec:
         - ./hyperkube
         - controller-manager
         - --allocate-node-cidrs=true
-        - --configure-cloud-routes=false
+        - --cloud-provider={{ .CloudProvider  }}
         - --cluster-cidr={{ .PodCIDR }}
+        - --configure-cloud-routes=false
+        - --enable-garbage-collector=false
+        - --leader-elect=true
         - --root-ca-file=/etc/kubernetes/secrets/ca.crt
         - --service-account-private-key-file=/etc/kubernetes/secrets/service-account.key
-        - --leader-elect=true
-        - --cloud-provider={{ .CloudProvider  }}
         volumeMounts:
         - name: secrets
           mountPath: /etc/kubernetes/secrets
@@ -385,10 +387,10 @@ spec:
         command:
         - /hyperkube
         - proxy
+        - --cluster-cidr={{ .PodCIDR }}
+        - --hostname-override=$(NODE_NAME)
         - --kubeconfig=/etc/kubernetes/kubeconfig
         - --proxy-mode=iptables
-        - --hostname-override=$(NODE_NAME)
-        - --cluster-cidr={{ .PodCIDR }}
         env:
           - name: NODE_NAME
             valueFrom:
