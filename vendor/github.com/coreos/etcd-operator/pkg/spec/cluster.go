@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	defaultVersion = "3.1.0"
+	defaultVersion = "3.1.2"
 
 	TPRKind        = "cluster"
 	TPRKindPlural  = "clusters"
@@ -75,8 +75,10 @@ type ClusterSpec struct {
 	// The etcd-operator will eventually make the etcd cluster version
 	// equal to the expected version.
 	//
-	// The version must follow the [semver]( http://semver.org) format, for example "3.1.0".
+	// The version must follow the [semver]( http://semver.org) format, for example "3.1.2".
 	// Only etcd released versions are supported: https://github.com/coreos/etcd/releases
+	//
+	// If version is not set, default is "3.1.2".
 	Version string `json:"version"`
 
 	// Paused is to pause the control of the operator for the etcd cluster.
@@ -97,6 +99,9 @@ type ClusterSpec struct {
 	// SelfHosted determines if the etcd cluster is used for a self-hosted
 	// Kubernetes cluster.
 	SelfHosted *SelfHostedPolicy `json:"selfHosted,omitempty"`
+
+	// etcd cluster TLS configuration
+	TLS *TLSPolicy `json:"TLS"`
 }
 
 // RestorePolicy defines the policy to restore cluster form existing backup if not nil.
@@ -120,9 +125,9 @@ type PodPolicy struct {
 	// the etcd members in the same cluster onto the same node.
 	AntiAffinity bool `json:"antiAffinity"`
 
-	// ResourceRequirements is the resource requirements for the etcd container.
+	// Resources is the resource requirements for the etcd container.
 	// This field cannot be updated once the cluster is created.
-	ResourceRequirements v1.ResourceRequirements `json:"resourceRequirements"`
+	Resources v1.ResourceRequirements `json:"resources"`
 }
 
 func (c *ClusterSpec) Validate() error {
@@ -191,6 +196,8 @@ type ClusterStatus struct {
 
 	// Size is the current size of the cluster
 	Size int `json:"size"`
+	// Members are the etcd members in the cluster
+	Members MembersStatus `json:"members"`
 	// CurrentVersion is the current cluster version
 	CurrentVersion string `json:"currentVersion"`
 	// TargetVersion is the version the cluster upgrading to.
@@ -201,6 +208,14 @@ type ClusterStatus struct {
 	// BackupServiceStatus only exists when backup is enabled in the
 	// cluster spec.
 	BackupServiceStatus *BackupServiceStatus `json:"backupServiceStatus,omitempty"`
+}
+
+type MembersStatus struct {
+	// Ready are the etcd members that are ready to serve requests
+	// The member names are the same as the etcd pod names
+	Ready []string `json:"ready,omitempty"`
+	// Unready are the etcd members not ready to serve requests
+	Unready []string `json:"unready,omitempty"`
 }
 
 func (cs ClusterStatus) Copy() ClusterStatus {
