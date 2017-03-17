@@ -192,6 +192,28 @@ func TestSanitizeCheckpointPod(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc: "Labels are preserved and OwnerReferences are deleted",
+			pod: &v1.Pod{
+				ObjectMeta: v1.ObjectMeta{
+					Name:      "podname",
+					Namespace: "podnamespace",
+					Labels:    map[string]string{"foo": "bar"},
+					OwnerReferences: []v1.OwnerReference{
+						v1.OwnerReference{APIVersion: "v1", Kind: "replicaset", Name: "foo", UID: "bar"},
+					},
+				},
+			},
+			expected: &v1.Pod{
+				ObjectMeta: v1.ObjectMeta{
+					Name:            "podname",
+					Namespace:       "podnamespace",
+					Labels:          map[string]string{"foo": "bar"},
+					Annotations:     map[string]string{checkpointParentAnnotation: "podname"},
+					OwnerReferences: []v1.OwnerReference{},
+				},
+			},
+		},
 	}
 
 	for _, tc := range cases {
