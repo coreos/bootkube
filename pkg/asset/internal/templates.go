@@ -303,6 +303,12 @@ spec:
         - --service-account-private-key-file=/etc/kubernetes/secrets/service-account.key
         - --leader-elect=true
         - --cloud-provider={{ .CloudProvider  }}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 10252  # Note: Using default port. Update if --port option is set differently.
+          initialDelaySeconds: 15
+          timeoutSeconds: 15
         volumeMounts:
         - name: secrets
           mountPath: /etc/kubernetes/secrets
@@ -353,6 +359,13 @@ spec:
         - ./hyperkube
         - scheduler
         - --leader-elect=true
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 10251  # Note: Using default port. Update if --port option is set differently.
+          initialDelaySeconds: 15
+          timeoutSeconds: 15
+
 `)
 	SchedulerDisruptionTemplate = []byte(`apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
