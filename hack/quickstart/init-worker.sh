@@ -13,33 +13,17 @@ function usage() {
     exit 1
 }
 
-function extract_master_endpoint (){
-    grep 'certificate-authority-data' ${KUBECONFIG} | awk '{print $2}' | base64 -d > /home/core/ca.crt
-    grep 'client-certificate-data' ${KUBECONFIG} | awk '{print $2}'| base64 -d > /home/core/client.crt
-    grep 'client-key-data' ${KUBECONFIG} | awk '{print $2}'| base64 -d > /home/core/client.key
-
-    MASTER_PUB="$(awk '/server:/ {print $2}' ${KUBECONFIG} | awk -F/ '{print $3}' | awk -F: '{print $1}')"
-    # TODO (aaron): The -k was added with the gce conformance tests - figure out why it's needed here.
-    #     The certs are seemingly signed correctly, but says no SAN for MASTER_PUB
-    MASTER_PRIV=$(curl -k https://${MASTER_PUB}:443/api/v1/namespaces/default/endpoints/kubernetes \
-        --cacert /home/core/ca.crt --cert /home/core/client.crt --key /home/core/client.key \
-        | jq -r '.subsets[0].addresses[0].ip')
-    rm -f /home/core/client.crt /home/core/client.key
-}
-
 # Initialize a worker node
 function init_worker_node() {
-    extract_master_endpoint
 
     # Setup kubeconfig
     mkdir -p /etc/kubernetes
     cp ${KUBECONFIG} /etc/kubernetes/kubeconfig
-    # Pulled out of the kubeconfig in extract_master_endpoint. Other installations should
-    # place the root CA here manually.
-    mv /home/core/ca.crt /etc/kubernetes/ca.crt
+    # Pulled out of the kubeconfig. Other installations should place the root
+    # CA here manually.
+    grep 'certificate-authority-data' ${KUBECONFIG} | awk '{print $2}' | base64 -d > /etc/kubernetes/ca.crt
 
-    sed "s/{{apiserver}}/${MASTER_PRIV}/" /home/core/kubelet.worker > /etc/systemd/system/kubelet.service
-    rm /home/core/kubelet.worker
+    mv /home/core/kubelet.worker /etc/systemd/system/kubelet.service
 
     # Start services
     systemctl daemon-reload
