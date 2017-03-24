@@ -16,13 +16,13 @@ import (
 
 	"github.com/golang/glog"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 const (
@@ -300,7 +300,7 @@ func sanitizeCheckpointPod(cp *v1.Pod) (*v1.Pod, error) {
 	// NOTE(aaron): If we want to keep labels, we need to add a new label so the static pod
 	//              will not be adopted by higher-level parent (e.g. daemonset/deployment).
 	//              Otherwise you end up in situations where parent tries deleting mirror pods.
-	cp.ObjectMeta = v1.ObjectMeta{
+	cp.ObjectMeta = metav1.ObjectMeta{
 		Name:        cp.Name,
 		Namespace:   cp.Namespace,
 		Annotations: make(map[string]string),
@@ -354,7 +354,7 @@ func getFileCheckpoints(path string) map[string]*v1.Pod {
 
 // getAPIParentPods will retrieve all pods from apiserver that are parents & should be checkpointed
 func getAPIParentPods(client clientset.Interface, nodeName string) map[string]*v1.Pod {
-	opts := v1.ListOptions{
+	opts := metav1.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(api.PodHostField, nodeName).String(),
 	}
 
@@ -436,7 +436,7 @@ func checkpointSecretVolumes(client clientset.Interface, pod *v1.Pod) (*v1.Pod, 
 // The path to the secret data becomes: checkpointSecretPath/namespace/podname/secretName/secret.file
 // Where each "secret.file" is a key from the secret.Data field.
 func checkpointSecret(client clientset.Interface, namespace, podName, secretName string) (string, error) {
-	secret, err := client.Core().Secrets(namespace).Get(secretName)
+	secret, err := client.Core().Secrets(namespace).Get(secretName, metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve secret %s/%s: %v", namespace, secretName, err)
 	}
@@ -477,7 +477,7 @@ func checkpointConfigMapVolumes(client clientset.Interface, pod *v1.Pod) (*v1.Po
 // The path to the configMap data becomes: checkpointSecretPath/namespace/podname/configMapName/configMap.file
 // Where each "configMap.file" is a key from the configMap.Data field.
 func checkpointConfigMap(client clientset.Interface, namespace, podName, configMapName string) (string, error) {
-	configMap, err := client.Core().ConfigMaps(namespace).Get(configMapName)
+	configMap, err := client.Core().ConfigMaps(namespace).Get(configMapName, metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve configMap %s/%s: %v", namespace, configMapName, err)
 	}
@@ -591,7 +591,7 @@ func podListToMap(pl *v1.PodList, filter filterFn) map[string]*v1.Pod {
 
 		// Pods from Kubelet API do not have TypeMeta populated - set it here either way.
 		pods[id] = pod
-		pods[id].TypeMeta = unversioned.TypeMeta{
+		pods[id].TypeMeta = metav1.TypeMeta{
 			APIVersion: pl.APIVersion,
 			Kind:       "Pod",
 		}

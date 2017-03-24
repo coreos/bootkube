@@ -63,6 +63,22 @@ func init() {
 	flag.Var(&kubeletArgs, "kubelet-flags", "Kubelet flags passed to kubelet, this will override default kubelet flags in the test. Flags specified in multiple kubelet-flags will be concatenate.")
 }
 
+// RunKubelet starts kubelet and waits for termination signal. Once receives the
+// termination signal, it will stop the kubelet gracefully.
+func RunKubelet() {
+	var err error
+	// Enable monitorParent to make sure kubelet will receive termination signal
+	// when test process exits.
+	e := NewE2EServices(true /* monitorParent */)
+	defer e.Stop()
+	e.kubelet, err = e.startKubelet()
+	if err != nil {
+		glog.Fatalf("Failed to start kubelet: %v", err)
+	}
+	// Wait until receiving a termination signal.
+	waitForTerminationSignal()
+}
+
 const (
 	// Ports of different e2e services.
 	kubeletPort         = "10250"
@@ -92,12 +108,16 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		// sense to test it that way
 		isSystemd = true
 		unitName := fmt.Sprintf("kubelet-%d.service", rand.Int31())
-		cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, "--remain-after-exit", builder.GetKubeletServerBin())
+		cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, "--slice=runtime.slice", "--remain-after-exit", builder.GetKubeletServerBin())
 		killCommand = exec.Command("systemctl", "kill", unitName)
 		restartCommand = exec.Command("systemctl", "restart", unitName)
 		e.logFiles["kubelet.log"] = logFileData{
 			journalctlCommand: []string{"-u", unitName},
 		}
+		cmdArgs = append(cmdArgs,
+			"--kubelet-cgroups=/kubelet.slice",
+			"--cgroup-root=/",
+		)
 	} else {
 		cmdArgs = append(cmdArgs, builder.GetKubeletServerBin())
 		cmdArgs = append(cmdArgs,
@@ -115,7 +135,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--volume-stats-agg-period", "10s", // Aggregate volumes frequently so tests don't need to wait as long
 		"--allow-privileged", "true",
 		"--serialize-image-pulls", "false",
-		"--config", manifestPath,
+		"--pod-manifest-path", manifestPath,
 		"--file-check-frequency", "10s", // Check file frequently so tests won't wait too long
 		"--pod-cidr", "10.180.0.0/24", // Assign a fixed CIDR to the node because there is no node controller.
 		"--eviction-pressure-transition-period", "30s",

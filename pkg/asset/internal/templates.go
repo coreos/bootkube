@@ -50,7 +50,7 @@ spec:
     spec:
       containers:
       - name: kubelet
-        image: quay.io/coreos/hyperkube:v1.5.5_coreos.0
+        image: quay.io/coreos/hyperkube:v1.6.0-rc.1_coreos.0
         command:
         - ./hyperkube
         - kubelet
@@ -147,7 +147,7 @@ spec:
       hostNetwork: true
       containers:
       - name: kube-apiserver
-        image: quay.io/coreos/hyperkube:v1.5.5_coreos.0
+        image: quay.io/coreos/hyperkube:v1.6.0-rc.1_coreos.0
         command:
         - /usr/bin/flock
         - --exclusive
@@ -263,7 +263,7 @@ spec:
       hostNetwork: true
       containers:
       - name: checkpoint-installer
-        image: quay.io/coreos/pod-checkpointer:417b8f7552ccf3db192ba1e5472e524848f0eb5f
+        image: quay.io/coreos/pod-checkpointer-dev:1b5130a646a8d17b035828c8e3e1b7bd777ec5b3
         command:
         - /checkpoint-installer.sh
         volumeMounts:
@@ -292,7 +292,7 @@ spec:
         master: "true"
       containers:
       - name: kube-controller-manager
-        image: quay.io/coreos/hyperkube:v1.5.5_coreos.0
+        image: quay.io/coreos/hyperkube:v1.6.0-rc.1_coreos.0
         command:
         - ./hyperkube
         - controller-manager
@@ -354,7 +354,7 @@ spec:
         master: "true"
       containers:
       - name: kube-scheduler
-        image: quay.io/coreos/hyperkube:v1.5.5_coreos.0
+        image: quay.io/coreos/hyperkube:v1.6.0-rc.1_coreos.0
         command:
         - ./hyperkube
         - scheduler
@@ -394,7 +394,7 @@ spec:
       hostNetwork: true
       containers:
       - name: kube-proxy
-        image: quay.io/coreos/hyperkube:v1.5.5_coreos.0
+        image: quay.io/coreos/hyperkube:v1.6.0-rc.1_coreos.0
         command:
         - /hyperkube
         - proxy

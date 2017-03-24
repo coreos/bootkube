@@ -17,13 +17,14 @@ limitations under the License.
 package route53
 
 import (
+	"strings"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
-	"strings"
 )
 
-// Compile time check for interface adeherence
+// Compile time check for interface adherence
 var _ dnsprovider.Zone = &Zone{}
 
 type Zone struct {
@@ -43,4 +44,13 @@ func (zone *Zone) ID() string {
 
 func (zone *Zone) ResourceRecordSets() (dnsprovider.ResourceRecordSets, bool) {
 	return &ResourceRecordSets{zone}, true
+}
+
+// Route53HostedZone returns the route53 HostedZone object for the zone.
+// This is a "back door" that allows for limited access to the HostedZone,
+// without having to requery it, so that we can expose AWS specific functionality.
+// Using this method should be avoided where possible; instead prefer to add functionality
+// to the cross-provider Zone interface.
+func (zone *Zone) Route53HostedZone() *route53.HostedZone {
+	return zone.impl
 }

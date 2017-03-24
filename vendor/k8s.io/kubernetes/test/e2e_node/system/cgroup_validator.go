@@ -25,7 +25,9 @@ import (
 
 var _ Validator = &CgroupsValidator{}
 
-type CgroupsValidator struct{}
+type CgroupsValidator struct {
+	Reporter Reporter
+}
 
 func (c *CgroupsValidator) Name() string {
 	return "cgroups"
@@ -35,12 +37,12 @@ const (
 	cgroupsConfigPrefix = "CGROUPS_"
 )
 
-func (c *CgroupsValidator) Validate(spec SysSpec) error {
+func (c *CgroupsValidator) Validate(spec SysSpec) (error, error) {
 	subsystems, err := c.getCgroupSubsystems()
 	if err != nil {
-		return fmt.Errorf("failed to get cgroup subsystems: %v", err)
+		return nil, fmt.Errorf("failed to get cgroup subsystems: %v", err)
 	}
-	return c.validateCgroupSubsystems(spec.Cgroups, subsystems)
+	return nil, c.validateCgroupSubsystems(spec.Cgroups, subsystems)
 }
 
 func (c *CgroupsValidator) validateCgroupSubsystems(cgroupSpec, subsystems []string) error {
@@ -55,9 +57,9 @@ func (c *CgroupsValidator) validateCgroupSubsystems(cgroupSpec, subsystems []str
 		}
 		item := cgroupsConfigPrefix + strings.ToUpper(cgroup)
 		if found {
-			report(item, "enabled", good)
+			c.Reporter.Report(item, "enabled", good)
 		} else {
-			report(item, "missing", bad)
+			c.Reporter.Report(item, "missing", bad)
 			missing = append(missing, cgroup)
 		}
 	}

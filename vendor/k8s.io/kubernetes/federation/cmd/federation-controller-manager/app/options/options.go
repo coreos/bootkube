@@ -24,8 +24,9 @@ import (
 
 	"github.com/spf13/pflag"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 )
@@ -56,17 +57,21 @@ type ControllerManagerConfiguration struct {
 	// management, but more CPU (and network) load.
 	ConcurrentReplicaSetSyncs int `json:"concurrentReplicaSetSyncs"`
 	// clusterMonitorPeriod is the period for syncing ClusterStatus in cluster controller.
-	ClusterMonitorPeriod unversioned.Duration `json:"clusterMonitorPeriod"`
+	ClusterMonitorPeriod metav1.Duration `json:"clusterMonitorPeriod"`
 	// APIServerQPS is the QPS to use while talking with federation apiserver.
 	APIServerQPS float32 `json:"federatedAPIQPS"`
 	// APIServerBurst is the burst to use while talking with federation apiserver.
 	APIServerBurst int `json:"federatedAPIBurst"`
 	// enableProfiling enables profiling via web interface host:port/debug/pprof/
 	EnableProfiling bool `json:"enableProfiling"`
+	// enableContentionProfiling enables lock contention profiling, if enableProfiling is true.
+	EnableContentionProfiling bool `json:"enableContentionProfiling"`
 	// leaderElection defines the configuration of leader election client.
 	LeaderElection componentconfig.LeaderElectionConfiguration `json:"leaderElection"`
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string `json:"contentType"`
+	// ConfigurationMap determining which controllers should be enabled or disabled
+	Controllers utilflag.ConfigurationMap `json:"controllers"`
 }
 
 // CMServer is the main context object for the controller manager.
@@ -90,10 +95,11 @@ func NewCMServer() *CMServer {
 			Address:                   "0.0.0.0",
 			ConcurrentServiceSyncs:    10,
 			ConcurrentReplicaSetSyncs: 10,
-			ClusterMonitorPeriod:      unversioned.Duration{Duration: 40 * time.Second},
+			ClusterMonitorPeriod:      metav1.Duration{Duration: 40 * time.Second},
 			APIServerQPS:              20.0,
 			APIServerBurst:            30,
 			LeaderElection:            leaderelection.DefaultLeaderElectionConfiguration(),
+			Controllers:               make(utilflag.ConfigurationMap),
 		},
 	}
 	return &s
@@ -111,6 +117,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.ConcurrentReplicaSetSyncs, "concurrent-replicaset-syncs", s.ConcurrentReplicaSetSyncs, "The number of ReplicaSets syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load")
 	fs.DurationVar(&s.ClusterMonitorPeriod.Duration, "cluster-monitor-period", s.ClusterMonitorPeriod.Duration, "The period for syncing ClusterStatus in ClusterController.")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
+	fs.BoolVar(&s.EnableContentionProfiling, "contention-profiling", false, "Enable lock contention profiling, if profiling is enabled")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the federation API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 	fs.StringVar(&s.ContentType, "kube-api-content-type", s.ContentType, "ContentType of requests sent to apiserver. Passing application/vnd.kubernetes.protobuf is an experimental feature now.")
@@ -118,5 +125,9 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.APIServerBurst, "federated-api-burst", s.APIServerBurst, "Burst to use while talking with federation apiserver")
 	fs.StringVar(&s.DnsProvider, "dns-provider", s.DnsProvider, "DNS provider. Valid values are: "+fmt.Sprintf("%q", dnsprovider.RegisteredDnsProviders()))
 	fs.StringVar(&s.DnsConfigFile, "dns-provider-config", s.DnsConfigFile, "Path to config file for configuring DNS provider.")
+	fs.Var(&s.Controllers, "controllers", ""+
+		"A set of key=value pairs that describe controller configuration "+
+		"to enable/disable specific controllers. Key should be the resource name (like services) and value should be true or false. "+
+		"For example: services=false,ingresses=false")
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 }

@@ -8,15 +8,16 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 const (
@@ -61,13 +62,13 @@ func (s *statusController) Run() {
 		panic(err)
 	}
 
-	options := v1.ListOptions{LabelSelector: ls.String()}
+	options := metav1.ListOptions{LabelSelector: ls.String()}
 	podStore, podController := cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(lo api.ListOptions) (runtime.Object, error) {
+			ListFunc: func(lo metav1.ListOptions) (runtime.Object, error) {
 				return s.client.Core().Pods(api.NamespaceSystem).List(options)
 			},
-			WatchFunc: func(lo api.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(lo metav1.ListOptions) (watch.Interface, error) {
 				return s.client.Core().Pods(api.NamespaceSystem).Watch(options)
 			},
 		},

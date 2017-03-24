@@ -19,27 +19,30 @@ limitations under the License.
 package e2e_node
 
 import (
-	"k8s.io/kubernetes/test/e2e/framework"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/test/e2e/framework"
+
 	"fmt"
-	. "github.com/onsi/ginkgo"
-	"k8s.io/kubernetes/pkg/api"
-	testutils "k8s.io/kubernetes/test/utils"
 	"os/exec"
+
+	. "github.com/onsi/ginkgo"
+	"k8s.io/kubernetes/pkg/api/v1"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 // waitForPods waits for timeout duration, for pod_count.
 // If the timeout is hit, it returns the list of currently running pods.
-func waitForPods(f *framework.Framework, pod_count int, timeout time.Duration) (runningPods []*api.Pod) {
+func waitForPods(f *framework.Framework, pod_count int, timeout time.Duration) (runningPods []*v1.Pod) {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(10 * time.Second) {
-		podList, err := f.PodClient().List(api.ListOptions{})
+		podList, err := f.PodClient().List(metav1.ListOptions{})
 		if err != nil {
 			framework.Logf("Failed to list pods on node: %v", err)
 			continue
 		}
 
-		runningPods = []*api.Pod{}
+		runningPods = []*v1.Pod{}
 		for _, pod := range podList.Items {
 			if r, err := testutils.PodRunningReady(&pod); err != nil || !r {
 				continue
@@ -76,7 +79,7 @@ var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 		Context("Network", func() {
 			It("should recover from ip leak", func() {
 
-				pods := newTestPods(podCount, framework.GetPauseImageNameForHostArch(), "restart-docker-test")
+				pods := newTestPods(podCount, false, framework.GetPauseImageNameForHostArch(), "restart-docker-test")
 				By(fmt.Sprintf("Trying to create %d pods on node", len(pods)))
 				createBatchPodWithRateControl(f, pods, podCreationInterval)
 				defer deletePodsSync(f, pods)

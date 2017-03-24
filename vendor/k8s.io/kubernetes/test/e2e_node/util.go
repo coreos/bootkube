@@ -28,14 +28,17 @@ import (
 
 	"github.com/golang/glog"
 
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
-	k8serr "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	// utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 
+	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
@@ -83,9 +86,48 @@ func getCurrentKubeletConfig() (*componentconfig.KubeletConfiguration, error) {
 	return kubeCfg, nil
 }
 
+// Must be called within a Context. Allows the function to modify the KubeletConfiguration during the BeforeEach of the context.
+// The change is reverted in the AfterEach of the context.
+// Returns true on success.
+func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(initialConfig *componentconfig.KubeletConfiguration)) {
+	var oldCfg *componentconfig.KubeletConfiguration
+	BeforeEach(func() {
+		configEnabled, err := isKubeletConfigEnabled(f)
+		framework.ExpectNoError(err)
+		if configEnabled {
+			oldCfg, err = getCurrentKubeletConfig()
+			framework.ExpectNoError(err)
+			clone, err := api.Scheme.DeepCopy(oldCfg)
+			framework.ExpectNoError(err)
+			newCfg := clone.(*componentconfig.KubeletConfiguration)
+			updateFunction(newCfg)
+			framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
+		} else {
+			framework.Logf("The Dynamic Kubelet Configuration feature is not enabled.\n" +
+				"Pass --feature-gates=DynamicKubeletConfig=true to the Kubelet to enable this feature.\n" +
+				"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`.")
+		}
+	})
+	AfterEach(func() {
+		if oldCfg != nil {
+			err := setKubeletConfiguration(f, oldCfg)
+			framework.ExpectNoError(err)
+		}
+	})
+}
+
+// Returns true if kubeletConfig is enabled, false otherwise or if we cannot determine if it is.
+func isKubeletConfigEnabled(f *framework.Framework) (bool, error) {
+	cfgz, err := getCurrentKubeletConfig()
+	if err != nil {
+		return false, fmt.Errorf("could not determine whether 'DynamicKubeletConfig' feature is enabled, err: %v", err)
+	}
+	return strings.Contains(cfgz.FeatureGates, "DynamicKubeletConfig=true"), nil
+}
+
 // Queries the API server for a Kubelet configuration for the node described by framework.TestContext.NodeName
-func getCurrentKubeletConfigMap(f *framework.Framework) (*api.ConfigMap, error) {
-	return f.ClientSet.Core().ConfigMaps("kube-system").Get(fmt.Sprintf("kubelet-%s", framework.TestContext.NodeName))
+func getCurrentKubeletConfigMap(f *framework.Framework) (*v1.ConfigMap, error) {
+	return f.ClientSet.Core().ConfigMaps("kube-system").Get(fmt.Sprintf("kubelet-%s", framework.TestContext.NodeName), metav1.GetOptions{})
 }
 
 // Creates or updates the configmap for KubeletConfiguration, waits for the Kubelet to restart
@@ -97,11 +139,11 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *componentconfig.Ku
 	)
 
 	// Make sure Dynamic Kubelet Configuration feature is enabled on the Kubelet we are about to reconfigure
-	cfgz, err := getCurrentKubeletConfig()
+	configEnabled, err := isKubeletConfigEnabled(f)
 	if err != nil {
 		return fmt.Errorf("could not determine whether 'DynamicKubeletConfig' feature is enabled, err: %v", err)
 	}
-	if !strings.Contains(cfgz.FeatureGates, "DynamicKubeletConfig=true") {
+	if !configEnabled {
 		return fmt.Errorf("The Dynamic Kubelet Configuration feature is not enabled.\n" +
 			"Pass --feature-gates=DynamicKubeletConfig=true to the Kubelet to enable this feature.\n" +
 			"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`.")
@@ -195,15 +237,15 @@ func decodeConfigz(resp *http.Response) (*componentconfig.KubeletConfiguration, 
 }
 
 // Constructs a Kubelet ConfigMap targeting the current node running the node e2e tests
-func makeKubeletConfigMap(nodeName string, kubeCfg *componentconfig.KubeletConfiguration) *api.ConfigMap {
+func makeKubeletConfigMap(nodeName string, kubeCfg *componentconfig.KubeletConfiguration) *v1.ConfigMap {
 	kubeCfgExt := v1alpha1.KubeletConfiguration{}
 	api.Scheme.Convert(kubeCfg, &kubeCfgExt, nil)
 
 	bytes, err := json.Marshal(kubeCfgExt)
 	framework.ExpectNoError(err)
 
-	cmap := &api.ConfigMap{
-		ObjectMeta: api.ObjectMeta{
+	cmap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("kubelet-%s", nodeName),
 		},
 		Data: map[string]string{
@@ -214,7 +256,7 @@ func makeKubeletConfigMap(nodeName string, kubeCfg *componentconfig.KubeletConfi
 }
 
 // Uses KubeletConfiguration to create a `kubelet-<node-name>` ConfigMap in the "kube-system" namespace.
-func createConfigMap(f *framework.Framework, kubeCfg *componentconfig.KubeletConfiguration) (*api.ConfigMap, error) {
+func createConfigMap(f *framework.Framework, kubeCfg *componentconfig.KubeletConfiguration) (*v1.ConfigMap, error) {
 	cmap := makeKubeletConfigMap(framework.TestContext.NodeName, kubeCfg)
 	cmap, err := f.ClientSet.Core().ConfigMaps("kube-system").Create(cmap)
 	if err != nil {
@@ -224,7 +266,7 @@ func createConfigMap(f *framework.Framework, kubeCfg *componentconfig.KubeletCon
 }
 
 // Similar to createConfigMap, except this updates an existing ConfigMap.
-func updateConfigMap(f *framework.Framework, kubeCfg *componentconfig.KubeletConfiguration) (*api.ConfigMap, error) {
+func updateConfigMap(f *framework.Framework, kubeCfg *componentconfig.KubeletConfiguration) (*v1.ConfigMap, error) {
 	cmap := makeKubeletConfigMap(framework.TestContext.NodeName, kubeCfg)
 	cmap, err := f.ClientSet.Core().ConfigMaps("kube-system").Update(cmap)
 	if err != nil {
@@ -243,4 +285,10 @@ func logNodeEvents(f *framework.Framework) {
 	framework.Logf("Summary of node events during the test:")
 	err := framework.ListNamespaceEvents(f.ClientSet, "")
 	framework.ExpectNoError(err)
+}
+
+func getLocalNode(f *framework.Framework) *v1.Node {
+	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+	Expect(len(nodeList.Items)).To(Equal(1), "Unexpected number of node objects for node e2e. Expects only one node.")
+	return &nodeList.Items[0]
 }
