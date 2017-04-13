@@ -239,7 +239,7 @@ spec:
       volumes:
       - name: checkpoint-dir
         hostPath:
-          path: /etc/kubernetes/checkpoint-iptables    
+          path: /etc/kubernetes/checkpoint-iptables
       - name: var-lock
         hostPath:
           path: /var/lock
@@ -287,8 +287,6 @@ spec:
         volumeMounts:
         - mountPath: /etc/kubernetes
           name: etc-kubernetes
-        - mountPath: /srv/kubernetes
-          name: srv-kubernetes
         - mountPath: /var/run
           name: var-run
       hostNetwork: true
@@ -297,9 +295,6 @@ spec:
       - name: etc-kubernetes
         hostPath:
           path: /etc/kubernetes
-      - name: srv-kubernetes
-        hostPath:
-          path: /srv/kubernetes
       - name: var-run
         hostPath:
           path: /var/run

@@ -49,7 +49,7 @@ metadata:
 
 ### Asset Locations
 
-- Inactive checkpoint manifests: /srv/kubernetes/manifests
+- Inactive checkpoint manifests: /etc/kubernetes/inactive-manifests
 - Active checkpoint manifests: /etc/kubernetes/manifests
 - Checkpointed secrets: /etc/kubernetes/checkpoint-secrets
 - Config Maps: /etc/kubernetes/checkpoint-configmaps

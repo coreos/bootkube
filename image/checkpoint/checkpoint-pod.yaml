@@ -21,14 +21,9 @@ spec:
     volumeMounts:
     - mountPath: /etc/kubernetes
       name: etc-kubernetes
-    - mountPath: /srv/kubernetes
-      name: srv-kubernetes
   hostNetwork: true
   restartPolicy: Always
   volumes:
   - name: etc-kubernetes
     hostPath:
       path: /etc/kubernetes
-  - name: srv-kubernetes
-    hostPath:
-      path: /srv/kubernetes

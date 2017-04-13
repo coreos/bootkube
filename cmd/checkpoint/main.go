@@ -38,7 +38,7 @@ const (
 	kubeletAPIRunningPodsURL = "https://127.0.0.1:10250/runningpods/"
 
 	activeCheckpointPath    = "/etc/kubernetes/manifests"
-	inactiveCheckpointPath  = "/srv/kubernetes/manifests"
+	inactiveCheckpointPath  = "/etc/kubernetes/inactive-manifests"
 	checkpointSecretPath    = "/etc/kubernetes/checkpoint-secrets"
 	checkpointConfigMapPath = "/etc/kubernetes/checkpoint-configmaps"
 	kubeconfigPath          = "/etc/kubernetes/kubeconfig"
