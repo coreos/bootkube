@@ -273,7 +273,7 @@ spec:
       hostNetwork: true
       containers:
       - name: checkpoint
-        image: quay.io/coreos/pod-checkpointer:a936ee1149af95c7696a261e739b050ff00c6288
+        image: quay.io/coreos/pod-checkpointer:8a6356146761b512cc18ab77c8a421676f641c88
         command:
         - /checkpoint
         - --v=4
