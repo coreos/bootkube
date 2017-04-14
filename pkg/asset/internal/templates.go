@@ -145,7 +145,11 @@ spec:
         component: kube-apiserver
       annotations:
         checkpointer.alpha.coreos.com/checkpoint: "true"
+        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      tolerations:
+      - key: "CriticalAddonsOnly"
+        operator: "Exists"
       nodeSelector:
         master: "true"
       hostNetwork: true
@@ -377,7 +381,12 @@ spec:
       labels:
         tier: control-plane
         component: kube-controller-manager
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      tolerations:
+      - key: "CriticalAddonsOnly"
+        operator: "Exists"
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -494,7 +503,12 @@ spec:
       labels:
         tier: control-plane
         component: kube-scheduler
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      tolerations:
+      - key: "CriticalAddonsOnly"
+        operator: "Exists"
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -574,6 +588,9 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      tolerations:
+      - key: "CriticalAddonsOnly"
+        operator: "Exists"
       hostNetwork: true
       containers:
       - name: kube-proxy
