@@ -47,7 +47,7 @@ const (
 	AssetPathCheckpointer                = "manifests/pod-checkpointer.yaml"
 	AssetPathEtcdOperator                = "manifests/etcd-operator.yaml"
 	AssetPathEtcdSvc                     = "manifests/etcd-service.yaml"
-	AssetPathKenc                        = "manifests/kenc.yaml"
+	AssetPathKenc                        = "manifests/kube-etcd-network-checkpointer.yaml"
 	AssetPathKubeSystemSARoleBinding     = "manifests/kube-system-rbac-role-binding.yaml"
 	AssetPathBootstrapManifests          = "bootstrap-manifests"
 	AssetPathBootstrapAPIServer          = "bootstrap-manifests/bootstrap-apiserver.yaml"
