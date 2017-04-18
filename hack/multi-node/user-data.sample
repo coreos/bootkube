@@ -32,7 +32,7 @@ coreos:
           --allow-privileged \
           --hostname-override=${COREOS_PUBLIC_IPV4} \
           --node-labels=node-role.kubernetes.io/master \
-          --register-with-taints=node-role.kubernetes.io/master:NoSchedule \
+          --register-with-taints=node-role.kubernetes.io/master=:NoSchedule \
           --cluster_dns=10.3.0.10 \
           --cluster_domain=cluster.local
 
