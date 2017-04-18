@@ -163,7 +163,7 @@ spec:
         - /var/lock/api-server.lock
         - /hyperkube
         - apiserver
-        - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota
+        - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota
         - --advertise-address=$(POD_IP)
         - --allow-privileged=true
         - --anonymous-auth=false
@@ -230,7 +230,7 @@ spec:
     - /var/lock/api-server.lock
     - /hyperkube
     - apiserver
-    - --admission-control=NamespaceLifecycle,ServiceAccount
+    - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota
     - --allow-privileged=true
     - --authorization-mode=RBAC
     - --bind-address=0.0.0.0
