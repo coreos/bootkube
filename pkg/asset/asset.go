@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/kubernetes-incubator/bootkube/pkg/tlsutil"
@@ -60,31 +61,31 @@ const (
 // AssetConfig holds all configuration needed when generating
 // the default set of assets.
 type Config struct {
-	EtcdCACert          *x509.Certificate
-	EtcdClientCert      *x509.Certificate
-	EtcdClientKey       *rsa.PrivateKey
-	EtcdServers         []*url.URL
-	EtcdUseTLS          bool
-	APIServers          []*url.URL
-	CACert              *x509.Certificate
-	CAPrivKey           *rsa.PrivateKey
-	AltNames            *tlsutil.AltNames
-	PodCIDR             *net.IPNet
-	ServiceCIDR         *net.IPNet
-	APIServiceIP        net.IP
-	DNSServiceIP        net.IP
-	EtcdServiceIP       net.IP
-	SelfHostKubelet     bool
-	SelfHostedEtcd      bool
-	CloudProvider       string
-	BootstrapSecretsDir string
+	EtcdCACert             *x509.Certificate
+	EtcdClientCert         *x509.Certificate
+	EtcdClientKey          *rsa.PrivateKey
+	EtcdServers            []*url.URL
+	EtcdUseTLS             bool
+	APIServers             []*url.URL
+	CACert                 *x509.Certificate
+	CAPrivKey              *rsa.PrivateKey
+	AltNames               *tlsutil.AltNames
+	PodCIDR                *net.IPNet
+	ServiceCIDR            *net.IPNet
+	APIServiceIP           net.IP
+	DNSServiceIP           net.IP
+	EtcdServiceIP          net.IP
+	SelfHostKubelet        bool
+	SelfHostedEtcd         bool
+	CloudProvider          string
+	BootstrapSecretsSubdir string
 }
 
 // NewDefaultAssets returns a list of default assets, optionally
 // configured via a user provided AssetConfig. Default assets include
 // TLS assets (certs, keys and secrets), and k8s component manifests.
 func NewDefaultAssets(conf Config) (Assets, error) {
-	conf.BootstrapSecretsDir = BootstrapSecretsDir
+	conf.BootstrapSecretsSubdir = path.Base(BootstrapSecretsDir)
 
 	as := newStaticAssets()
 	as = append(as, newDynamicAssets(conf)...)

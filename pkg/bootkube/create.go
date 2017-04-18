@@ -9,11 +9,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 
@@ -21,7 +19,6 @@ import (
 )
 
 func CreateAssets(manifestDir string, timeout time.Duration) error {
-
 	upFn := func() (bool, error) {
 		if err := apiTest(); err != nil {
 			glog.Warningf("Unable to determine api-server readiness: %v", err)
@@ -65,11 +62,7 @@ func CreateAssets(manifestDir string, timeout time.Duration) error {
 }
 
 func createAssets(manifestDir string) error {
-	config := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: insecureAPIAddr}},
-	)
-	f := cmdutil.NewFactory(config)
+	f := cmdutil.NewFactory(kubeConfig)
 
 	shouldValidate := true
 	schema, err := f.Validator(shouldValidate, fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName))
@@ -135,7 +128,11 @@ func createAssets(manifestDir string) error {
 }
 
 func apiTest() error {
-	client, err := clientset.NewForConfig(&restclient.Config{Host: insecureAPIAddr})
+	config, err := kubeConfig.ClientConfig()
+	if err != nil {
+		return err
+	}
+	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return err
 	}

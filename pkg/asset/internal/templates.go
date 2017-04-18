@@ -168,20 +168,21 @@ spec:
         - --authorization-mode=RBAC
         - --bind-address=0.0.0.0
         - --client-ca-file=/etc/kubernetes/secrets/ca.crt
-        - --cloud-provider={{ .CloudProvider  }}
+        - --cloud-provider={{ .CloudProvider }}
 {{- if .EtcdUseTLS }}
         - --etcd-cafile=/etc/kubernetes/secrets/etcd-ca.crt
         - --etcd-certfile=/etc/kubernetes/secrets/etcd-client.crt
         - --etcd-keyfile=/etc/kubernetes/secrets/etcd-client.key
 {{- end }}
         - --etcd-servers={{ range $i, $e := .EtcdServers }}{{ if $i }},{{end}}{{ $e }}{{end}}
-        - --insecure-port=8080
+        - --insecure-port=0
         - --kubelet-client-certificate=/etc/kubernetes/secrets/apiserver.crt
         - --kubelet-client-key=/etc/kubernetes/secrets/apiserver.key
         - --secure-port=443
         - --service-account-key-file=/etc/kubernetes/secrets/service-account.pub
         - --service-cluster-ip-range={{ .ServiceCIDR }}
         - --storage-backend=etcd3
+        - --tls-ca-file=/etc/kubernetes/secrets/ca.crt
         - --tls-cert-file=/etc/kubernetes/secrets/apiserver.crt
         - --tls-private-key-file=/etc/kubernetes/secrets/apiserver.key
         env:
@@ -247,13 +248,14 @@ spec:
     - --etcd-keyfile=/etc/kubernetes/secrets/etcd-client.key
 {{- end }}
     - --etcd-servers={{ range $i, $e := .EtcdServers }}{{ if $i }},{{end}}{{ $e }}{{end}}{{ if .SelfHostedEtcd }},http://127.0.0.1:12379{{end}}
-    - --insecure-port=8080
+    - --insecure-port=0
     - --kubelet-client-certificate=/etc/kubernetes/secrets/apiserver.crt
     - --kubelet-client-key=/etc/kubernetes/secrets/apiserver.key
     - --secure-port=443
     - --service-account-key-file=/etc/kubernetes/secrets/service-account.pub
     - --service-cluster-ip-range={{ .ServiceCIDR }}
     - --storage-backend=etcd3
+    - --tls-ca-file=/etc/kubernetes/secrets/ca.crt
     - --tls-cert-file=/etc/kubernetes/secrets/apiserver.crt
     - --tls-private-key-file=/etc/kubernetes/secrets/apiserver.key
     volumeMounts:
@@ -270,7 +272,7 @@ spec:
   volumes:
   - name: secrets
     hostPath:
-      path: {{ .BootstrapSecretsDir }}
+      path: /etc/kubernetes/{{ .BootstrapSecretsSubdir }}
   - name: ssl-certs-host
     hostPath:
       path: /usr/share/ca-certificates
@@ -429,7 +431,7 @@ spec:
         - ./hyperkube
         - controller-manager
         - --allocate-node-cidrs=true
-        - --cloud-provider={{ .CloudProvider  }}
+        - --cloud-provider={{ .CloudProvider }}
         - --cluster-cidr={{ .PodCIDR }}
         - --configure-cloud-routes=false
         - --leader-elect=true
@@ -481,22 +483,22 @@ spec:
     - --allocate-node-cidrs=true
     - --cluster-cidr={{ .PodCIDR }}
     - --configure-cloud-routes=false
+    - --kubeconfig=/etc/kubernetes/kubeconfig
     - --leader-elect=true
-    - --master=http://127.0.0.1:8080
-    - --root-ca-file=/etc/kubernetes/secrets/ca.crt
-    - --service-account-private-key-file=/etc/kubernetes/secrets/service-account.key
+    - --root-ca-file=/etc/kubernetes/{{ .BootstrapSecretsSubdir }}/ca.crt
+    - --service-account-private-key-file=/etc/kubernetes/{{ .BootstrapSecretsSubdir }}/service-account.key
     volumeMounts:
-    - name: secrets
-      mountPath: /etc/kubernetes/secrets
+    - name: kubernetes
+      mountPath: /etc/kubernetes
       readOnly: true
     - name: ssl-host
       mountPath: /etc/ssl/certs
       readOnly: true
   hostNetwork: true
   volumes:
-  - name: secrets
+  - name: kubernetes
     hostPath:
-      path: {{ .BootstrapSecretsDir }}
+      path: /etc/kubernetes
   - name: ssl-host
     hostPath:
       path: /usr/share/ca-certificates
@@ -582,9 +584,17 @@ spec:
     command:
     - ./hyperkube
     - scheduler
+    - --kubeconfig=/etc/kubernetes/kubeconfig
     - --leader-elect=true
-    - --master=http://127.0.0.1:8080
+    volumeMounts:
+    - name: kubernetes
+      mountPath: /etc/kubernetes
+      readOnly: true
   hostNetwork: true
+  volumes:
+  - name: kubernetes
+    hostPath:
+      path: /etc/kubernetes
 `)
 	SchedulerDisruptionTemplate = []byte(`apiVersion: policy/v1beta1
 kind: PodDisruptionBudget

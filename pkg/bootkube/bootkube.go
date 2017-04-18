@@ -5,15 +5,16 @@ import (
 	"path/filepath"
 	"time"
 
+	"k8s.io/client-go/tools/clientcmd"
+
 	"github.com/coreos/etcd/pkg/fileutil"
 	"github.com/kubernetes-incubator/bootkube/pkg/asset"
 	"github.com/kubernetes-incubator/bootkube/pkg/util/etcdutil"
 )
 
-const (
-	assetTimeout    = 20 * time.Minute
-	insecureAPIAddr = "http://127.0.0.1:8080"
-)
+const assetTimeout = 20 * time.Minute
+
+var kubeConfig clientcmd.ClientConfig
 
 var requiredPods = []string{
 	"pod-checkpointer",
@@ -49,6 +50,12 @@ func (b *bootkube) Run() error {
 		}
 	}()
 
+	// TODO(diegs): create and share a single client rather than the kubeconfig once all uses of it
+	// are migrated to client-go.
+	kubeConfig = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: filepath.Join(b.assetDir, asset.AssetPathKubeConfig)},
+		&clientcmd.ConfigOverrides{})
+
 	var err error
 	defer func() {
 		// Always report errors.
@@ -80,7 +87,7 @@ func (b *bootkube) Run() error {
 		if err != nil {
 			return err
 		}
-		if err = etcdutil.Migrate(insecureAPIAddr, etcdServiceIP); err != nil {
+		if err = etcdutil.Migrate(kubeConfig, etcdServiceIP); err != nil {
 			return err
 		}
 	}

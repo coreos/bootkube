@@ -12,11 +12,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 const (
@@ -39,14 +38,18 @@ func WaitUntilPodsRunning(pods []string, timeout time.Duration) error {
 }
 
 type statusController struct {
-	client        clientset.Interface
+	client        kubernetes.Interface
 	podStore      cache.Store
 	watchPods     []string
 	lastPodPhases map[string]v1.PodPhase
 }
 
 func NewStatusController(pods []string) (*statusController, error) {
-	client, err := clientset.NewForConfig(&restclient.Config{Host: insecureAPIAddr})
+	config, err := kubeConfig.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}

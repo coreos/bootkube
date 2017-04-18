@@ -14,9 +14,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 const (
@@ -28,10 +29,12 @@ var (
 	waitBootEtcdRemovedTime    = 300 * time.Second
 )
 
-func Migrate(apiserverAddr, etcdServiceIP string) error {
-	kubecli, err := clientset.NewForConfig(&restclient.Config{
-		Host: apiserverAddr,
-	})
+func Migrate(kubeConfig clientcmd.ClientConfig, etcdServiceIP string) error {
+	config, err := kubeConfig.ClientConfig()
+	if err != nil {
+		return fmt.Errorf("fail to create kube client: %v", err)
+	}
+	kubecli, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return fmt.Errorf("fail to create kube client: %v", err)
 	}
@@ -49,7 +52,7 @@ func Migrate(apiserverAddr, etcdServiceIP string) error {
 	}
 	glog.Infof("boot-etcd pod IP is: %s", ip)
 
-	if err := createMigratedEtcdCluster(restClient, apiserverAddr, ip); err != nil {
+	if err := createMigratedEtcdCluster(restClient, ip); err != nil {
 		return fmt.Errorf("fail to create migrated etcd cluster: %v", err)
 	}
 	glog.Infof("etcd cluster for migration is created")
@@ -88,7 +91,7 @@ func waitEtcdTPRReady(restClient restclient.Interface, interval, timeout time.Du
 	return nil
 }
 
-func getBootEtcdPodIP(kubecli clientset.Interface) (string, error) {
+func getBootEtcdPodIP(kubecli kubernetes.Interface) (string, error) {
 	var ip string
 	err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
 		podList, err := kubecli.CoreV1().Pods(api.NamespaceSystem).List(v1.ListOptions{
@@ -113,7 +116,7 @@ func getBootEtcdPodIP(kubecli clientset.Interface) (string, error) {
 	return ip, err
 }
 
-func createMigratedEtcdCluster(restclient restclient.Interface, host, podIP string) error {
+func createMigratedEtcdCluster(restclient restclient.Interface, podIP string) error {
 	b := []byte(fmt.Sprintf(`{
   "apiVersion": "%s/%s",
   "kind": "%s",

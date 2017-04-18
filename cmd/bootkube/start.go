@@ -47,7 +47,11 @@ func runCmdStart(cmd *cobra.Command, args []string) error {
 	util.InitLogs()
 	defer util.FlushLogs()
 
-	return bk.Run()
+	if err := bk.Run(); err != nil {
+		// Always report errors.
+		bootkube.UserOutput("Error: %v\n", err)
+	}
+	return nil
 }
 
 func validateStartOpts(cmd *cobra.Command, args []string) error {
