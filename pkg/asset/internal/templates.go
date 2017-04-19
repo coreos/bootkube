@@ -162,28 +162,29 @@ spec:
         - /hyperkube
         - apiserver
         - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota
+        - --bind-address=0.0.0.0
+        - --secure-port=443
+        - --insecure-port=0
         - --advertise-address=$(POD_IP)
         - --allow-privileged=true
         - --anonymous-auth=false
-        - --authorization-mode=RBAC
-        - --bind-address=0.0.0.0
-        - --client-ca-file=/etc/kubernetes/secrets/ca.crt
-        - --cloud-provider={{ .CloudProvider  }}
 {{- if .EtcdUseTLS }}
         - --etcd-cafile=/etc/kubernetes/secrets/etcd-ca.crt
         - --etcd-certfile=/etc/kubernetes/secrets/etcd-client.crt
         - --etcd-keyfile=/etc/kubernetes/secrets/etcd-client.key
 {{- end }}
         - --etcd-servers={{ range $i, $e := .EtcdServers }}{{ if $i }},{{end}}{{ $e }}{{end}}
-        - --insecure-port=8080
+        - --client-ca-file=/etc/kubernetes/secrets/ca.crt
+        - --tls-ca-file=/etc/kubernetes/secrets/ca.crt
+        - --tls-cert-file=/etc/kubernetes/secrets/apiserver.crt
+        - --tls-private-key-file=/etc/kubernetes/secrets/apiserver.key
         - --kubelet-client-certificate=/etc/kubernetes/secrets/apiserver.crt
         - --kubelet-client-key=/etc/kubernetes/secrets/apiserver.key
-        - --secure-port=443
         - --service-account-key-file=/etc/kubernetes/secrets/service-account.pub
         - --service-cluster-ip-range={{ .ServiceCIDR }}
         - --storage-backend=etcd3
-        - --tls-cert-file=/etc/kubernetes/secrets/apiserver.crt
-        - --tls-private-key-file=/etc/kubernetes/secrets/apiserver.key
+        - --authorization-mode=RBAC
+        - --cloud-provider={{ .CloudProvider }}
         env:
         - name: POD_IP
           valueFrom:
@@ -463,6 +464,9 @@ spec:
       - name: ssl-host
         hostPath:
           path: /usr/share/ca-certificates
+      - name: etc-kubernetes
+        hostPath:
+          path: /etc/kubernetes
       dnsPolicy: Default # Don't use cluster DNS.
 `)
 
