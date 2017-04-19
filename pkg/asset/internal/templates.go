@@ -237,6 +237,7 @@ spec:
     - /hyperkube
     - apiserver
     - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota
+    - --advertise-address=$(POD_IP)
     - --allow-privileged=true
     - --authorization-mode=RBAC
     - --bind-address=0.0.0.0
@@ -256,6 +257,11 @@ spec:
     - --storage-backend=etcd3
     - --tls-cert-file=/etc/kubernetes/secrets/apiserver.crt
     - --tls-private-key-file=/etc/kubernetes/secrets/apiserver.key
+    env:
+    - name: POD_IP
+      valueFrom:
+        fieldRef:
+          fieldPath: status.podIP
     volumeMounts:
     - mountPath: /etc/ssl/certs
       name: ssl-certs-host
