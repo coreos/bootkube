@@ -215,9 +215,8 @@ func (c *Command) UsageFunc() (f func(*Command) error) {
 	if c.usageFunc != nil {
 		return c.usageFunc
 	}
-
 	if c.HasParent() {
-		return c.parent.UsageFunc()
+		return c.Parent().UsageFunc()
 	}
 	return func(c *Command) error {
 		c.mergePersistentFlags()
@@ -239,30 +238,19 @@ func (c *Command) Usage() error {
 // HelpFunc returns either the function set by SetHelpFunc for this command
 // or a parent, or it returns a function with default help behavior.
 func (c *Command) HelpFunc() func(*Command, []string) {
-	if helpFunc := c.checkHelpFunc(); helpFunc != nil {
-		return helpFunc
+	if c.helpFunc != nil {
+		return c.helpFunc
 	}
-	return func(*Command, []string) {
+	if c.HasParent() {
+		return c.Parent().HelpFunc()
+	}
+	return func(c *Command, a []string) {
 		c.mergePersistentFlags()
 		err := tmpl(c.OutOrStdout(), c.HelpTemplate(), c)
 		if err != nil {
 			c.Println(err)
 		}
 	}
-}
-
-// checkHelpFunc checks if there is helpFunc in ancestors of c.
-func (c *Command) checkHelpFunc() func(*Command, []string) {
-	if c == nil {
-		return nil
-	}
-	if c.helpFunc != nil {
-		return c.helpFunc
-	}
-	if c.HasParent() {
-		return c.parent.checkHelpFunc()
-	}
-	return nil
 }
 
 // Help puts out the help for the command.
@@ -378,64 +366,62 @@ func (c *Command) HelpTemplate() string {
 {{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}`
 }
 
-// Really only used when casting a command to a commander.
-func (c *Command) resetChildrensParents() {
-	for _, x := range c.commands {
-		x.parent = c
-	}
-}
-
 func hasNoOptDefVal(name string, f *flag.FlagSet) bool {
 	flag := f.Lookup(name)
 	if flag == nil {
 		return false
 	}
-	return len(flag.NoOptDefVal) > 0
+	return flag.NoOptDefVal != ""
 }
 
 func shortHasNoOptDefVal(name string, fs *flag.FlagSet) bool {
 	result := false
 	fs.VisitAll(func(flag *flag.Flag) {
-		if flag.Shorthand == name && len(flag.NoOptDefVal) > 0 {
+		if flag.Shorthand == name && flag.NoOptDefVal != "" {
 			result = true
+			return
 		}
 	})
 	return result
 }
 
 func stripFlags(args []string, c *Command) []string {
-	if len(args) < 1 {
+	if len(args) == 0 {
 		return args
 	}
 	c.mergePersistentFlags()
 
 	commands := []string{}
-
 	inQuote := false
-	inFlag := false
-	for _, y := range args {
+	flags := c.Flags()
+
+Loop:
+	for len(args) > 0 {
+		s := args[0]
+		args = args[1:]
 		if !inQuote {
 			switch {
-			case strings.HasPrefix(y, "\""):
+			case strings.HasPrefix(s, "\"") || strings.Contains(s, "=\""):
 				inQuote = true
-			case strings.Contains(y, "=\""):
-				inQuote = true
-			case strings.HasPrefix(y, "--") && !strings.Contains(y, "="):
-				// TODO: this isn't quite right, we should really check ahead for 'true' or 'false'
-				inFlag = !hasNoOptDefVal(y[2:], c.Flags())
-			case strings.HasPrefix(y, "-") && !strings.Contains(y, "=") && len(y) == 2 && !shortHasNoOptDefVal(y[1:], c.Flags()):
-				inFlag = true
-			case inFlag:
-				inFlag = false
-			case y == "":
-			// strip empty commands, as the go tests expect this to be ok....
-			case !strings.HasPrefix(y, "-"):
-				commands = append(commands, y)
-				inFlag = false
+			case strings.HasPrefix(s, "--") && !strings.Contains(s, "=") && !hasNoOptDefVal(s[2:], flags):
+				// If '--flag arg' then
+				// delete arg from args.
+				fallthrough // (do the same as below)
+			case strings.HasPrefix(s, "-") && !strings.Contains(s, "=") && len(s) == 2 && !shortHasNoOptDefVal(s[1:], flags):
+				// If '-f arg' then
+				// delete 'arg' from args or break the loop if len(args) <= 1.
+				if len(args) <= 1 {
+					break Loop
+				} else {
+					args = args[1:]
+					continue
+				}
+			case s != "" && !strings.HasPrefix(s, "-"):
+				commands = append(commands, s)
 			}
 		}
 
-		if strings.HasSuffix(y, "\"") && !strings.HasSuffix(y, "\\\"") {
+		if strings.HasSuffix(s, "\"") && !strings.HasSuffix(s, "\\\"") {
 			inQuote = false
 		}
 	}
