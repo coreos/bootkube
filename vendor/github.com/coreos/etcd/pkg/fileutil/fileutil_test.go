@@ -15,7 +15,6 @@
 package fileutil
 
 import (
-	"io"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -134,13 +133,13 @@ func TestZeroToEnd(t *testing.T) {
 	if _, err = f.Write(b); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = f.Seek(512, io.SeekStart); err != nil {
+	if _, err = f.Seek(512, os.SEEK_SET); err != nil {
 		t.Fatal(err)
 	}
 	if err = ZeroToEnd(f); err != nil {
 		t.Fatal(err)
 	}
-	off, serr := f.Seek(0, io.SeekCurrent)
+	off, serr := f.Seek(0, os.SEEK_CUR)
 	if serr != nil {
 		t.Fatal(serr)
 	}

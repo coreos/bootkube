@@ -1,9 +1,11 @@
 package: github.com/kubernetes-incubator/bootkube
 import:
 - package: github.com/coreos/etcd-operator
+  version: v0.2.5
   subpackages:
   - pkg/spec
 - package: github.com/coreos/etcd
+  version: v3.1.6
   subpackages:
   - clientv3
   - pkg/fileutil
