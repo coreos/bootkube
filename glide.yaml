@@ -1,15 +1,20 @@
 package: github.com/kubernetes-incubator/bootkube
 import:
 - package: github.com/coreos/etcd-operator
+  version: v0.2.5
   subpackages:
   - pkg/spec
 - package: github.com/coreos/etcd
+  version: cc198e22d3b8fd7ec98304c95e68ee375be54589
   subpackages:
   - clientv3
   - pkg/fileutil
-- package: github.com/ghodss/yaml
 - package: github.com/golang/glog
+  version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
 - package: github.com/spf13/cobra
+  version: 10f6b9d7e1631a54ad07c5c0fb71c28a1abfd3c2
+- package: github.com/spf13/pflag
+  version: 2300d0f8576fe575f71aaa5b9bbe4e1b0dc2eb51
 - package: k8s.io/apimachinery
   version: 75b8dd260ef0469d96d578705a87cffd0e09dab8
   subpackages:
