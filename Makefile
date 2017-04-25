@@ -54,7 +54,7 @@ conformance-%: clean all
 	@cd hack/$*-node && ./conformance-test.sh
 
 vendor:
-	@glide update --strip-vendor
+	@glide update --delete --update-vendored --strip-vcs --strip-vendor
 	@glide-vc
 
 clean:

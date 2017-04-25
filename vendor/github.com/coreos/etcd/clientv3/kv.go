@@ -32,7 +32,7 @@ type KV interface {
 	// Put puts a key-value pair into etcd.
 	// Note that key,value can be plain bytes array and string is
 	// an immutable representation of that bytes array.
-	// To get a string of bytes, do string([]byte{0x10, 0x20}).
+	// To get a string of bytes, do string([]byte(0x10, 0x20)).
 	Put(ctx context.Context, key, val string, opts ...OpOption) (*PutResponse, error)
 
 	// Get retrieves keys.
@@ -85,10 +85,6 @@ func NewKV(c *Client) KV {
 	return &kv{remote: RetryKVClient(c)}
 }
 
-func NewKVFromKVClient(remote pb.KVClient) KV {
-	return &kv{remote: remote}
-}
-
 func (kv *kv) Put(ctx context.Context, key, val string, opts ...OpOption) (*PutResponse, error) {
 	r, err := kv.Do(ctx, OpPut(key, val, opts...))
 	return r.put, toErr(ctx, err)
@@ -105,7 +101,7 @@ func (kv *kv) Delete(ctx context.Context, key string, opts ...OpOption) (*Delete
 }
 
 func (kv *kv) Compact(ctx context.Context, rev int64, opts ...CompactOption) (*CompactResponse, error) {
-	resp, err := kv.remote.Compact(ctx, OpCompact(rev, opts...).toRequest())
+	resp, err := kv.remote.Compact(ctx, OpCompact(rev, opts...).toRequest(), grpc.FailFast(false))
 	if err != nil {
 		return nil, toErr(ctx, err)
 	}
@@ -125,7 +121,6 @@ func (kv *kv) Do(ctx context.Context, op Op) (OpResponse, error) {
 		if err == nil {
 			return resp, nil
 		}
-
 		if isHaltErr(ctx, err) {
 			return resp, toErr(ctx, err)
 		}
@@ -142,13 +137,27 @@ func (kv *kv) do(ctx context.Context, op Op) (OpResponse, error) {
 	// TODO: handle other ops
 	case tRange:
 		var resp *pb.RangeResponse
-		resp, err = kv.remote.Range(ctx, op.toRangeRequest(), grpc.FailFast(false))
+		r := &pb.RangeRequest{
+			Key:          op.key,
+			RangeEnd:     op.end,
+			Limit:        op.limit,
+			Revision:     op.rev,
+			Serializable: op.serializable,
+			KeysOnly:     op.keysOnly,
+			CountOnly:    op.countOnly,
+		}
+		if op.sort != nil {
+			r.SortOrder = pb.RangeRequest_SortOrder(op.sort.Order)
+			r.SortTarget = pb.RangeRequest_SortTarget(op.sort.Target)
+		}
+
+		resp, err = kv.remote.Range(ctx, r, grpc.FailFast(false))
 		if err == nil {
 			return OpResponse{get: (*GetResponse)(resp)}, nil
 		}
 	case tPut:
 		var resp *pb.PutResponse
-		r := &pb.PutRequest{Key: op.key, Value: op.val, Lease: int64(op.leaseID), PrevKv: op.prevKV, IgnoreValue: op.ignoreValue, IgnoreLease: op.ignoreLease}
+		r := &pb.PutRequest{Key: op.key, Value: op.val, Lease: int64(op.leaseID), PrevKv: op.prevKV}
 		resp, err = kv.remote.Put(ctx, r)
 		if err == nil {
 			return OpResponse{put: (*PutResponse)(resp)}, nil
