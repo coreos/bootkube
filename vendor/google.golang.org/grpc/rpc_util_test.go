@@ -114,7 +114,7 @@ func TestEncode(t *testing.T) {
 	}{
 		{nil, nil, []byte{0, 0, 0, 0, 0}, nil},
 	} {
-		b, err := encode(protoCodec{}, test.msg, nil, nil, nil)
+		b, err := encode(protoCodec{}, test.msg, nil, nil)
 		if err != test.err || !bytes.Equal(b, test.b) {
 			t.Fatalf("encode(_, _, %v, _) = %v, %v\nwant %v, %v", test.cp, b, err, test.b, test.err)
 		}
@@ -152,7 +152,7 @@ func TestToRPCErr(t *testing.T) {
 		// outputs
 		errOut *rpcError
 	}{
-		{transport.StreamError{codes.Unknown, ""}, Errorf(codes.Unknown, "").(*rpcError)},
+		{transport.StreamErrorf(codes.Unknown, ""), Errorf(codes.Unknown, "").(*rpcError)},
 		{transport.ErrConnClosing, Errorf(codes.Internal, transport.ErrConnClosing.Desc).(*rpcError)},
 	} {
 		err := toRPCErr(test.errIn)
@@ -173,8 +173,8 @@ func TestContextErr(t *testing.T) {
 		// outputs
 		errOut transport.StreamError
 	}{
-		{context.DeadlineExceeded, transport.StreamError{codes.DeadlineExceeded, context.DeadlineExceeded.Error()}},
-		{context.Canceled, transport.StreamError{codes.Canceled, context.Canceled.Error()}},
+		{context.DeadlineExceeded, transport.StreamErrorf(codes.DeadlineExceeded, "%v", context.DeadlineExceeded)},
+		{context.Canceled, transport.StreamErrorf(codes.Canceled, "%v", context.Canceled)},
 	} {
 		err := transport.ContextErr(test.errIn)
 		if err != test.errOut {
@@ -199,12 +199,12 @@ func TestErrorsWithSameParameters(t *testing.T) {
 // bytes.
 func bmEncode(b *testing.B, mSize int) {
 	msg := &perfpb.Buffer{Body: make([]byte, mSize)}
-	encoded, _ := encode(protoCodec{}, msg, nil, nil, nil)
+	encoded, _ := encode(protoCodec{}, msg, nil, nil)
 	encodedSz := int64(len(encoded))
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		encode(protoCodec{}, msg, nil, nil, nil)
+		encode(protoCodec{}, msg, nil, nil)
 	}
 	b.SetBytes(encodedSz)
 }

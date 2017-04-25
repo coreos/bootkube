@@ -34,13 +34,13 @@
 package grpc
 
 import (
-	"net"
 	"testing"
 	"time"
 
 	"golang.org/x/net/context"
 
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/oauth"
 )
 
 const tlsDir = "testdata/"
@@ -50,8 +50,8 @@ func TestDialTimeout(t *testing.T) {
 	if err == nil {
 		conn.Close()
 	}
-	if err != context.DeadlineExceeded {
-		t.Fatalf("Dial(_, _) = %v, %v, want %v", conn, err, context.DeadlineExceeded)
+	if err != ErrClientConnTimeout {
+		t.Fatalf("Dial(_, _) = %v, %v, want %v", conn, err, ErrClientConnTimeout)
 	}
 }
 
@@ -64,109 +64,21 @@ func TestTLSDialTimeout(t *testing.T) {
 	if err == nil {
 		conn.Close()
 	}
-	if err != context.DeadlineExceeded {
-		t.Fatalf("Dial(_, _) = %v, %v, want %v", conn, err, context.DeadlineExceeded)
-	}
-}
-
-func TestTLSServerNameOverwrite(t *testing.T) {
-	overwriteServerName := "over.write.server.name"
-	creds, err := credentials.NewClientTLSFromFile(tlsDir+"ca.pem", overwriteServerName)
-	if err != nil {
-		t.Fatalf("Failed to create credentials %v", err)
-	}
-	conn, err := Dial("Non-Existent.Server:80", WithTransportCredentials(creds))
-	if err != nil {
-		t.Fatalf("Dial(_, _) = _, %v, want _, <nil>", err)
-	}
-	conn.Close()
-	if conn.authority != overwriteServerName {
-		t.Fatalf("%v.authority = %v, want %v", conn, conn.authority, overwriteServerName)
-	}
-}
-
-func TestWithAuthority(t *testing.T) {
-	overwriteServerName := "over.write.server.name"
-	conn, err := Dial("Non-Existent.Server:80", WithInsecure(), WithAuthority(overwriteServerName))
-	if err != nil {
-		t.Fatalf("Dial(_, _) = _, %v, want _, <nil>", err)
-	}
-	conn.Close()
-	if conn.authority != overwriteServerName {
-		t.Fatalf("%v.authority = %v, want %v", conn, conn.authority, overwriteServerName)
-	}
-}
-
-func TestWithAuthorityAndTLS(t *testing.T) {
-	overwriteServerName := "over.write.server.name"
-	creds, err := credentials.NewClientTLSFromFile(tlsDir+"ca.pem", overwriteServerName)
-	if err != nil {
-		t.Fatalf("Failed to create credentials %v", err)
-	}
-	conn, err := Dial("Non-Existent.Server:80", WithTransportCredentials(creds), WithAuthority("no.effect.authority"))
-	if err != nil {
-		t.Fatalf("Dial(_, _) = _, %v, want _, <nil>", err)
-	}
-	conn.Close()
-	if conn.authority != overwriteServerName {
-		t.Fatalf("%v.authority = %v, want %v", conn, conn.authority, overwriteServerName)
+	if err != ErrClientConnTimeout {
+		t.Fatalf("grpc.Dial(_, _) = %v, %v, want %v", conn, err, ErrClientConnTimeout)
 	}
 }
 
 func TestDialContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	if _, err := DialContext(ctx, "Non-Existent.Server:80", WithBlock(), WithInsecure()); err != context.Canceled {
-		t.Fatalf("DialContext(%v, _) = _, %v, want _, %v", ctx, err, context.Canceled)
+	go cancel()
+	conn, err := DialContext(ctx, "Non-Existent.Server:80", WithBlock(), WithInsecure())
+	if err == nil {
+		conn.Close()
 	}
-}
-
-// blockingBalancer mimics the behavior of balancers whose initialization takes a long time.
-// In this test, reading from blockingBalancer.Notify() blocks forever.
-type blockingBalancer struct {
-	ch chan []Address
-}
-
-func newBlockingBalancer() Balancer {
-	return &blockingBalancer{ch: make(chan []Address)}
-}
-func (b *blockingBalancer) Start(target string, config BalancerConfig) error {
-	return nil
-}
-func (b *blockingBalancer) Up(addr Address) func(error) {
-	return nil
-}
-func (b *blockingBalancer) Get(ctx context.Context, opts BalancerGetOptions) (addr Address, put func(), err error) {
-	return Address{}, nil, nil
-}
-func (b *blockingBalancer) Notify() <-chan []Address {
-	return b.ch
-}
-func (b *blockingBalancer) Close() error {
-	close(b.ch)
-	return nil
-}
-
-func TestDialWithBlockingBalancer(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	dialDone := make(chan struct{})
-	go func() {
-		DialContext(ctx, "Non-Existent.Server:80", WithBlock(), WithInsecure(), WithBalancer(newBlockingBalancer()))
-		close(dialDone)
-	}()
-	cancel()
-	<-dialDone
-}
-
-// securePerRPCCredentials always requires transport security.
-type securePerRPCCredentials struct{}
-
-func (c securePerRPCCredentials) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
-	return nil, nil
-}
-
-func (c securePerRPCCredentials) RequireTransportSecurity() bool {
-	return true
+	if err != context.Canceled {
+		t.Fatalf("DialContext(_, _) = %v, %v, want %v", conn, err, context.Canceled)
+	}
 }
 
 func TestCredentialsMisuse(t *testing.T) {
@@ -178,8 +90,12 @@ func TestCredentialsMisuse(t *testing.T) {
 	if _, err := Dial("Non-Existent.Server:80", WithTransportCredentials(tlsCreds), WithBlock(), WithInsecure()); err != errCredentialsConflict {
 		t.Fatalf("Dial(_, _) = _, %v, want _, %v", err, errCredentialsConflict)
 	}
+	rpcCreds, err := oauth.NewJWTAccessFromKey(nil)
+	if err != nil {
+		t.Fatalf("Failed to create credentials %v", err)
+	}
 	// security info on insecure connection
-	if _, err := Dial("Non-Existent.Server:80", WithPerRPCCredentials(securePerRPCCredentials{}), WithBlock(), WithInsecure()); err != errTransportCredentialsMissing {
+	if _, err := Dial("Non-Existent.Server:80", WithPerRPCCredentials(rpcCreds), WithBlock(), WithInsecure()); err != errTransportCredentialsMissing {
 		t.Fatalf("Dial(_, _) = _, %v, want _, %v", err, errTransportCredentialsMissing)
 	}
 }
@@ -222,34 +138,4 @@ func testBackoffConfigSet(t *testing.T, expected *BackoffConfig, opts ...DialOpt
 		t.Fatalf("unexpected backoff config on connection: %v, want %v", actual, expected)
 	}
 	conn.Close()
-}
-
-type testErr struct {
-	temp bool
-}
-
-func (e *testErr) Error() string {
-	return "test error"
-}
-
-func (e *testErr) Temporary() bool {
-	return e.temp
-}
-
-var nonTemporaryError = &testErr{false}
-
-func nonTemporaryErrorDialer(addr string, timeout time.Duration) (net.Conn, error) {
-	return nil, nonTemporaryError
-}
-
-func TestDialWithBlockErrorOnNonTemporaryErrorDialer(t *testing.T) {
-	ctx, _ := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	if _, err := DialContext(ctx, "", WithInsecure(), WithDialer(nonTemporaryErrorDialer), WithBlock(), FailOnNonTempDialError(true)); err != nonTemporaryError {
-		t.Fatalf("Dial(%q) = %v, want %v", "", err, nonTemporaryError)
-	}
-
-	// Without FailOnNonTempDialError, gRPC will retry to connect, and dial should exit with time out error.
-	if _, err := DialContext(ctx, "", WithInsecure(), WithDialer(nonTemporaryErrorDialer), WithBlock()); err != context.DeadlineExceeded {
-		t.Fatalf("Dial(%q) = %v, want %v", "", err, context.DeadlineExceeded)
-	}
 }
