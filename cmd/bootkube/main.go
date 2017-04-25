@@ -1,11 +1,13 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
 
+	"github.com/kubernetes-incubator/bootkube/pkg/util"
 	"github.com/kubernetes-incubator/bootkube/pkg/version"
 )
 
@@ -28,6 +30,10 @@ var (
 )
 
 func main() {
+	flag.Parse()
+	util.InitLogs()
+	defer util.FlushLogs()
+
 	cmdRoot.AddCommand(cmdVersion)
 	if err := cmdRoot.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

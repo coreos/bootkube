@@ -2,12 +2,10 @@ package main
 
 import (
 	"errors"
-	"flag"
 
 	"github.com/spf13/cobra"
 
 	"github.com/kubernetes-incubator/bootkube/pkg/bootkube"
-	"github.com/kubernetes-incubator/bootkube/pkg/util"
 )
 
 var (
@@ -37,15 +35,9 @@ func runCmdStart(cmd *cobra.Command, args []string) error {
 		AssetDir:        startOpts.assetDir,
 		PodManifestPath: startOpts.podManifestPath,
 	})
-
 	if err != nil {
 		return err
 	}
-
-	// set in util init() func, but lets not depend on that
-	flag.Set("logtostderr", "true")
-	util.InitLogs()
-	defer util.FlushLogs()
 
 	err = bk.Run()
 	if err != nil {
