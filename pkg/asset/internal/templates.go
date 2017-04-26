@@ -248,7 +248,7 @@ spec:
     - --etcd-certfile=/etc/kubernetes/secrets/etcd-client.crt
     - --etcd-keyfile=/etc/kubernetes/secrets/etcd-client.key
 {{- end }}
-    - --etcd-servers={{ range $i, $e := .EtcdServers }}{{ if $i }},{{end}}{{ $e }}{{end}}{{ if .SelfHostedEtcd }},http://127.0.0.1:12379{{end}}
+    - --etcd-servers={{ range $i, $e := .EtcdServers }}{{ if $i }},{{end}}{{ $e }}{{end}}{{ if .SelfHostedEtcd }},http://127.0.0.1:4001{{end}}
     - --insecure-port=0
     - --kubelet-client-certificate=/etc/kubernetes/secrets/apiserver.crt
     - --kubelet-client-key=/etc/kubernetes/secrets/apiserver.key
@@ -912,9 +912,9 @@ spec:
     command:
     - /usr/local/bin/etcd
     - --name=boot-etcd
-    - --listen-client-urls=http://0.0.0.0:12379
+    - --listen-client-urls=http://0.0.0.0:4001
     - --listen-peer-urls=http://0.0.0.0:12380
-    - --advertise-client-urls=http://$(MY_POD_IP):12379
+    - --advertise-client-urls=http://$(MY_POD_IP):4001
     - --initial-advertise-peer-urls=http://$(MY_POD_IP):12380
     - --initial-cluster=boot-etcd=http://$(MY_POD_IP):12380
     - --initial-cluster-token=bootkube
