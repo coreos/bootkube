@@ -131,6 +131,7 @@ func createMigratedEtcdCluster(restclient restclient.Interface, podIP string) er
       "nodeSelector": {
         "node-role.kubernetes.io/master": ""
       },
+      "antiAffinity": true,
       "tolerations": [
         {
           "key": "node-role.kubernetes.io/master",
