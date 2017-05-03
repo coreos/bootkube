@@ -55,6 +55,8 @@ const (
 	AssetPathBootstrapControllerManager  = "bootstrap-manifests/bootstrap-controller-manager.yaml"
 	AssetPathBootstrapScheduler          = "bootstrap-manifests/bootstrap-scheduler.yaml"
 	AssetPathBootstrapEtcd               = "bootstrap-manifests/bootstrap-etcd.yaml"
+	AssetPathBootstrapEtcdService        = "etcd/bootstrap-etcd-service.json"
+	AssetPathMigrateEtcdCluster          = "etcd/migrate-etcd-cluster.json"
 	BootstrapSecretsDir                  = "/etc/kubernetes/bootstrap-secrets"
 )
 
@@ -73,6 +75,7 @@ type Config struct {
 	PodCIDR                *net.IPNet
 	ServiceCIDR            *net.IPNet
 	APIServiceIP           net.IP
+	BootEtcdServiceIP      net.IP
 	DNSServiceIP           net.IP
 	EtcdServiceIP          net.IP
 	SelfHostKubelet        bool

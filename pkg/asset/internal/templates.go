@@ -913,20 +913,70 @@ spec:
     - --name=boot-etcd
     - --listen-client-urls=http://0.0.0.0:12379
     - --listen-peer-urls=http://0.0.0.0:12380
-    - --advertise-client-urls=http://$(MY_POD_IP):12379
-    - --initial-advertise-peer-urls=http://$(MY_POD_IP):12380
-    - --initial-cluster=boot-etcd=http://$(MY_POD_IP):12380
+    - --advertise-client-urls=http://{{ .BootEtcdServiceIP }}:12379
+    - --initial-advertise-peer-urls=http://{{ .BootEtcdServiceIP }}:12380
+    - --initial-cluster=boot-etcd=http://{{ .BootEtcdServiceIP }}:12380
     - --initial-cluster-token=bootkube
     - --initial-cluster-state=new
     - --data-dir=/var/etcd/data
-    env:
-      - name: MY_POD_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
   hostNetwork: true
   restartPolicy: Never
 `)
+
+	BootstrapEtcdSvcTemplate = []byte(`{
+  "apiVersion": "v1",
+  "kind": "Service",
+  "metadata": {
+    "name": "bootstrap-etcd-service",
+    "namespace": "kube-system"
+  },
+  "spec": {
+    "selector": {
+      "k8s-app": "boot-etcd"
+    },
+    "clusterIP": "{{ .BootEtcdServiceIP }}",
+    "ports": [
+      {
+        "name": "client",
+        "port": 12379,
+        "protocol": "TCP"
+      },
+      {
+        "name": "peers",
+        "port": 12380,
+        "protocol": "TCP"
+      }
+    ]
+  }
+}`)
+
+	EtcdTPRTemplate = []byte(`{
+  "apiVersion": "etcd.coreos.com/v1beta1",
+  "kind": "Cluster",
+  "metadata": {
+    "name": "kube-etcd",
+    "namespace": "kube-system"
+  },
+  "spec": {
+    "size": 1,
+    "version": "v3.1.6",
+    "pod": {
+      "nodeSelector": {
+        "node-role.kubernetes.io/master": ""
+      },
+      "tolerations": [
+        {
+          "key": "node-role.kubernetes.io/master",
+          "operator": "Exists",
+          "effect": "NoSchedule"
+        }
+      ]
+    },
+    "selfHosted": {
+      "bootMemberClientEndpoint": "http://{{ .BootEtcdServiceIP }}:12379"
+    }
+  }
+}`)
 
 	KubeFlannelCfgTemplate = []byte(`apiVersion: v1
 kind: ConfigMap

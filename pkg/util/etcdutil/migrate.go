@@ -5,14 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
+	"io/ioutil"
 	"time"
 
 	"github.com/coreos/etcd-operator/pkg/spec"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/glog"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
@@ -29,7 +28,7 @@ var (
 	waitBootEtcdRemovedTime    = 300 * time.Second
 )
 
-func Migrate(kubeConfig clientcmd.ClientConfig, etcdServiceIP string) error {
+func Migrate(kubeConfig clientcmd.ClientConfig, svcPath, tprPath, etcdServiceIP string) error {
 	config, err := kubeConfig.ClientConfig()
 	if err != nil {
 		return fmt.Errorf("failed to create kube client config: %v", err)
@@ -46,19 +45,18 @@ func Migrate(kubeConfig clientcmd.ClientConfig, etcdServiceIP string) error {
 	}
 	glog.Infof("created etcd cluster TPR")
 
-	ip, err := getBootEtcdPodIP(kubecli)
-	if err != nil {
-		return err
+	if err := createBootstrapEtcdService(restClient, svcPath); err != nil {
+		return fmt.Errorf("failed to create bootstrap-etcd-service: %v", err)
 	}
-	glog.Infof("boot-etcd pod IP is: %s", ip)
+	defer cleanupBootstrapEtcdService(restClient)
 
-	if err := createMigratedEtcdCluster(restClient, ip); err != nil {
+	if err := createMigratedEtcdCluster(restClient, tprPath); err != nil {
 		return fmt.Errorf("failed to create etcd cluster for migration: %v", err)
 	}
 	glog.Infof("created etcd cluster for migration")
 
 	if err := waitEtcdClusterRunning(restClient); err != nil {
-		return fmt.Errorf("failed to wait for etcd cluster's status to be running: %v", err)
+		return err
 	}
 	glog.Info("etcd cluster for migration is now running")
 
@@ -69,14 +67,14 @@ func Migrate(kubeConfig clientcmd.ClientConfig, etcdServiceIP string) error {
 	return nil
 }
 
-func listETCDCluster(ns string, restClient restclient.Interface) restclient.Result {
+func listEtcdCluster(ns string, restClient restclient.Interface) restclient.Result {
 	uri := fmt.Sprintf("/apis/%s/%s/namespaces/%s/%s", spec.TPRGroup, spec.TPRVersion, ns, spec.TPRKindPlural)
 	return restClient.Get().RequestURI(uri).Do()
 }
 
 func waitEtcdTPRReady(restClient restclient.Interface, interval, timeout time.Duration, ns string) error {
 	err := wait.Poll(interval, timeout, func() (bool, error) {
-		res := listETCDCluster(ns, restClient)
+		res := listEtcdCluster(ns, restClient)
 		if err := res.Error(); err != nil {
 			if apierrors.IsNotFound(err) {
 				return false, nil
@@ -91,72 +89,29 @@ func waitEtcdTPRReady(restClient restclient.Interface, interval, timeout time.Du
 	return nil
 }
 
-func getBootEtcdPodIP(kubecli kubernetes.Interface) (string, error) {
-	var ip string
-	err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
-		podList, err := kubecli.CoreV1().Pods(api.NamespaceSystem).List(v1.ListOptions{
-			LabelSelector: "k8s-app=boot-etcd",
-		})
-		if err != nil {
-			glog.Errorf("failed to list 'boot-etcd' pod: %v", err)
-			return false, err
-		}
-		if len(podList.Items) < 1 {
-			glog.Warningf("no 'boot-etcd' pod found, retrying after 5s...")
-			return false, nil
-		}
-
-		pod := podList.Items[0]
-		ip = pod.Status.PodIP
-		if len(ip) == 0 {
-			return false, nil
-		}
-		return true, nil
-	})
-	return ip, err
+func createBootstrapEtcdService(restclient restclient.Interface, svcPath string) error {
+	svc, err := ioutil.ReadFile(svcPath)
+	if err != nil {
+		return err
+	}
+	return restclient.Post().RequestURI("/api/v1/namespaces/kube-system/services").SetHeader("Content-Type", "application/json").Body(svc).Do().Error()
 }
 
-func createMigratedEtcdCluster(restclient restclient.Interface, podIP string) error {
-	b := []byte(fmt.Sprintf(`{
-  "apiVersion": "%s/%s",
-  "kind": "%s",
-  "metadata": {
-    "name": "%s",
-    "namespace": "kube-system"
-  },
-  "spec": {
-    "size": 1,
-    "version": "v3.1.6",
-    "pod": {
-      "nodeSelector": {
-        "node-role.kubernetes.io/master": ""
-      },
-      "tolerations": [
-        {
-          "key": "node-role.kubernetes.io/master",
-          "operator": "Exists",
-          "effect": "NoSchedule"
-        }
-      ]
-    },
-    "selfHosted": {
-      "bootMemberClientEndpoint": "http://%s:12379"
-    }
-  }
-}`, spec.TPRGroup, spec.TPRVersion, strings.Title(spec.TPRKind), etcdClusterName, podIP))
-
+func createMigratedEtcdCluster(restclient restclient.Interface, tprPath string) error {
+	tpr, err := ioutil.ReadFile(tprPath)
+	if err != nil {
+		return err
+	}
 	uri := fmt.Sprintf("/apis/%s/%s/namespaces/kube-system/%s", spec.TPRGroup, spec.TPRVersion, spec.TPRKindPlural)
-	res := restclient.Post().RequestURI(uri).SetHeader("Content-Type", "application/json").Body(b).Do()
-
-	return res.Error()
+	return restclient.Post().RequestURI(uri).SetHeader("Content-Type", "application/json").Body(tpr).Do().Error()
 }
 
 func waitEtcdClusterRunning(restclient restclient.Interface) error {
 	glog.Infof("initial delaying (30s)...")
 	time.Sleep(30 * time.Second)
-
+	uri := fmt.Sprintf("/apis/%s/%s/namespaces/kube-system/%s/%s", spec.TPRGroup, spec.TPRVersion, spec.TPRKindPlural, etcdClusterName)
 	err := wait.Poll(10*time.Second, waitEtcdClusterRunningTime, func() (bool, error) {
-		b, err := restclient.Get().RequestURI(makeEtcdClusterURI(etcdClusterName)).DoRaw()
+		b, err := restclient.Get().RequestURI(uri).DoRaw()
 		if err != nil {
 			return false, fmt.Errorf("failed to get etcd cluster TPR: %v", err)
 		}
@@ -208,6 +163,9 @@ func waitBootEtcdRemoved(etcdServiceIP string) error {
 	return err
 }
 
-func makeEtcdClusterURI(name string) string {
-	return fmt.Sprintf("/apis/%s/%s/namespaces/kube-system/%s/%s", spec.TPRGroup, spec.TPRVersion, spec.TPRKindPlural, name)
+func cleanupBootstrapEtcdService(restclient restclient.Interface) {
+	err := restclient.Delete().RequestURI("/api/v1/namespaces/kube-system/services/bootstrap-etcd-service").Do().Error()
+	if err != nil {
+		glog.Errorf("failed to remove bootstrap-etcd-service: %v", err)
+	}
 }

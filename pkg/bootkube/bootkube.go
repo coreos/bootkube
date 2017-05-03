@@ -90,7 +90,7 @@ func (b *bootkube) Run() error {
 		if err != nil {
 			return err
 		}
-		if err = etcdutil.Migrate(kubeConfig, etcdServiceIP); err != nil {
+		if err = etcdutil.Migrate(kubeConfig, filepath.Join(b.assetDir, asset.AssetPathBootstrapEtcdService), filepath.Join(b.assetDir, asset.AssetPathMigrateEtcdCluster), etcdServiceIP); err != nil {
 			return err
 		}
 	}

@@ -55,7 +55,8 @@ func newDynamicAssets(conf Config) Assets {
 			mustCreateAssetFromTemplate(AssetPathEtcdSvc, internal.EtcdSvcTemplate, conf),
 			mustCreateAssetFromTemplate(AssetPathKenc, internal.KencTemplate, conf),
 			mustCreateAssetFromTemplate(AssetPathBootstrapEtcd, internal.BootstrapEtcdTemplate, conf),
-		)
+			mustCreateAssetFromTemplate(AssetPathBootstrapEtcdService, internal.BootstrapEtcdSvcTemplate, conf),
+			mustCreateAssetFromTemplate(AssetPathMigrateEtcdCluster, internal.EtcdTPRTemplate, conf))
 	}
 	return assets
 }
