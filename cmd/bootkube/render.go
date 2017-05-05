@@ -52,6 +52,19 @@ var (
 		cloudProvider       string
 		selfHostedEtcd      bool
 	}
+
+	imageVersions = asset.ImageVersions{
+		Busybox:         "busybox",
+		Etcd:            "quay.io/coreos/etcd:v3.1.6",
+		EtcdOperator:    "quay.io/coreos/etcd-operator:v0.2.6",
+		Flannel:         "quay.io/coreos/flannel:v0.7.1-amd64",
+		Hyperkube:       "quay.io/coreos/hyperkube:v1.6.2_coreos.0",
+		Kenc:            "quay.io/coreos/kenc:48b6feceeee56c657ea9263f47b6ea091e8d3035",
+		KubeDNS:         "gcr.io/google_containers/k8s-dns-kube-dns-amd64:1.14.1",
+		KubeDNSMasq:     "gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64:1.14.1",
+		KubeDNSSidecar:  "gcr.io/google_containers/k8s-dns-sidecar-amd64:1.14.1",
+		PodCheckpointer: "quay.io/coreos/pod-checkpointer:2cad4cac4186611a79de1969e3ea4924f02f459e",
+	}
 )
 
 func init() {
@@ -230,6 +243,7 @@ func flagsToAssetConfig() (c *asset.Config, err error) {
 		SelfHostKubelet: renderOpts.selfHostKubelet,
 		CloudProvider:   renderOpts.cloudProvider,
 		SelfHostedEtcd:  renderOpts.selfHostedEtcd,
+		Images:          imageVersions,
 	}, nil
 }
 

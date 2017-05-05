@@ -79,6 +79,21 @@ type Config struct {
 	SelfHostedEtcd         bool
 	CloudProvider          string
 	BootstrapSecretsSubdir string
+	Images                 ImageVersions
+}
+
+// ImageVersions holds all the images (and their versions) that are rendered into the templates.
+type ImageVersions struct {
+	Busybox         string
+	Etcd            string
+	EtcdOperator    string
+	Flannel         string
+	Hyperkube       string
+	Kenc            string
+	KubeDNS         string
+	KubeDNSMasq     string
+	KubeDNSSidecar  string
+	PodCheckpointer string
 }
 
 // NewDefaultAssets returns a list of default assets, optionally
@@ -87,7 +102,7 @@ type Config struct {
 func NewDefaultAssets(conf Config) (Assets, error) {
 	conf.BootstrapSecretsSubdir = path.Base(BootstrapSecretsDir)
 
-	as := newStaticAssets()
+	as := newStaticAssets(conf.Images)
 	as = append(as, newDynamicAssets(conf)...)
 
 	// Add kube-apiserver service IP

@@ -51,7 +51,7 @@ spec:
     spec:
       containers:
       - name: kubelet
-        image: quay.io/coreos/hyperkube:v1.6.2_coreos.0
+        image: {{ .Images.Hyperkube }}
         command:
         - ./hyperkube
         - kubelet
@@ -152,7 +152,7 @@ spec:
     spec:
       containers:
       - name: kube-apiserver
-        image: quay.io/coreos/hyperkube:v1.6.2_coreos.0
+        image: {{ .Images.Hyperkube }}
         command:
         - /usr/bin/flock
         - --exclusive
@@ -228,7 +228,7 @@ metadata:
 spec:
   containers:
   - name: kube-apiserver
-    image: quay.io/coreos/hyperkube:v1.6.2_coreos.0
+    image: {{ .Images.Hyperkube }}
     command:
     - /usr/bin/flock
     - --exclusive
@@ -305,7 +305,7 @@ spec:
         checkpointer.alpha.coreos.com/checkpoint: "true"
     spec:
       containers:
-      - image: quay.io/coreos/kenc:48b6feceeee56c657ea9263f47b6ea091e8d3035
+      - image: {{ .Images.Kenc }}
         name: kube-etcd-network-checkpointer
         securityContext:
           privileged: true
@@ -356,7 +356,7 @@ spec:
     spec:
       containers:
       - name: checkpoint
-        image: quay.io/coreos/pod-checkpointer:2cad4cac4186611a79de1969e3ea4924f02f459e
+        image: {{ .Images.PodCheckpointer }}
         command:
         - /checkpoint
         - --v=4
@@ -432,7 +432,7 @@ spec:
               topologyKey: kubernetes.io/hostname
       containers:
       - name: kube-controller-manager
-        image: quay.io/coreos/hyperkube:v1.6.2_coreos.0
+        image: {{ .Images.Hyperkube }}
         command:
         - ./hyperkube
         - controller-manager
@@ -482,7 +482,7 @@ metadata:
 spec:
   containers:
   - name: kube-controller-manager
-    image: quay.io/coreos/hyperkube:v1.6.2_coreos.0
+    image: {{ .Images.Hyperkube }}
     command:
     - ./hyperkube
     - controller-manager
@@ -558,7 +558,7 @@ spec:
               topologyKey: kubernetes.io/hostname
       containers:
       - name: kube-scheduler
-        image: quay.io/coreos/hyperkube:v1.6.2_coreos.0
+        image: {{ .Images.Hyperkube }}
         command:
         - ./hyperkube
         - scheduler
@@ -587,7 +587,7 @@ metadata:
 spec:
   containers:
   - name: kube-scheduler
-    image: quay.io/coreos/hyperkube:v1.6.2_coreos.0
+    image: {{ .Images.Hyperkube }}
     command:
     - ./hyperkube
     - scheduler
@@ -634,7 +634,7 @@ spec:
     spec:
       containers:
       - name: kube-proxy
-        image: quay.io/coreos/hyperkube:v1.6.2_coreos.0
+        image: {{ .Images.Hyperkube }}
         command:
         - /hyperkube
         - proxy
@@ -700,7 +700,7 @@ spec:
     spec:
       containers:
       - name: kubedns
-        image: gcr.io/google_containers/k8s-dns-kube-dns-amd64:1.14.1
+        image: {{ .Images.KubeDNS }}
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
@@ -751,7 +751,7 @@ spec:
         - name: kube-dns-config
           mountPath: /kube-dns-config
       - name: dnsmasq
-        image: gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64:1.14.1
+        image: {{ .Images.KubeDNSMasq }}
         livenessProbe:
           httpGet:
             path: /healthcheck/dnsmasq
@@ -789,7 +789,7 @@ spec:
         - name: kube-dns-config
           mountPath: /etc/k8s/dns/dnsmasq-nanny
       - name: sidecar
-        image: gcr.io/google_containers/k8s-dns-sidecar-amd64:1.14.1
+        image: {{ .Images.KubeDNSSidecar }}
         livenessProbe:
           httpGet:
             path: /metrics
@@ -865,7 +865,7 @@ spec:
     spec:
       containers:
       - name: etcd-operator
-        image: quay.io/coreos/etcd-operator:v0.2.6
+        image: {{ .Images.EtcdOperator }}
         env:
         - name: MY_POD_NAMESPACE
           valueFrom:
@@ -907,7 +907,7 @@ metadata:
 spec:
   containers:
   - name: etcd
-    image: quay.io/coreos/etcd:v3.1.6
+    image: {{ .Images.Etcd }}
     command:
     - /usr/local/bin/etcd
     - --name=boot-etcd
@@ -971,7 +971,7 @@ spec:
     spec:
       containers:
       - name: kube-flannel
-        image: quay.io/coreos/flannel:v0.7.1-amd64
+        image: {{ .Images.Flannel }}
         command: [ "/opt/bin/flanneld", "--ip-masq", "--kube-subnet-mgr", "--iface=$(POD_IP)"]
         securityContext:
           privileged: true
@@ -996,7 +996,7 @@ spec:
         - name: flannel-cfg
           mountPath: /etc/kube-flannel/
       - name: install-cni
-        image: busybox
+        image: {{ .Images.Busybox }}
         command: [ "/bin/sh", "-c", "set -e -x; TMP=/etc/cni/net.d/.tmp-flannel-cfg; cp /etc/kube-flannel/cni-conf.json ${TMP}; mv ${TMP} /etc/cni/net.d/10-flannel.conf; while :; do sleep 3600; done" ]
         volumeMounts:
         - name: cni

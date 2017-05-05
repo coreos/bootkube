@@ -17,16 +17,20 @@ const (
 	secretCMName        = "kube-controller-manager"
 )
 
-func newStaticAssets() Assets {
-	var noData interface{}
+type staticConfig struct {
+	Images ImageVersions
+}
+
+func newStaticAssets(imageVersions ImageVersions) Assets {
+	conf := staticConfig{Images: imageVersions}
 	assets := Assets{
-		mustCreateAssetFromTemplate(AssetPathScheduler, internal.SchedulerTemplate, noData),
-		mustCreateAssetFromTemplate(AssetPathSchedulerDisruption, internal.SchedulerDisruptionTemplate, noData),
-		mustCreateAssetFromTemplate(AssetPathControllerManagerDisruption, internal.ControllerManagerDisruptionTemplate, noData),
-		mustCreateAssetFromTemplate(AssetPathKubeDNSDeployment, internal.DNSDeploymentTemplate, noData),
-		mustCreateAssetFromTemplate(AssetPathCheckpointer, internal.CheckpointerTemplate, noData),
-		mustCreateAssetFromTemplate(AssetPathKubeFlannel, internal.KubeFlannelTemplate, noData),
-		mustCreateAssetFromTemplate(AssetPathKubeSystemSARoleBinding, internal.KubeSystemSARoleBindingTemplate, noData),
+		mustCreateAssetFromTemplate(AssetPathScheduler, internal.SchedulerTemplate, conf),
+		mustCreateAssetFromTemplate(AssetPathSchedulerDisruption, internal.SchedulerDisruptionTemplate, conf),
+		mustCreateAssetFromTemplate(AssetPathControllerManagerDisruption, internal.ControllerManagerDisruptionTemplate, conf),
+		mustCreateAssetFromTemplate(AssetPathKubeDNSDeployment, internal.DNSDeploymentTemplate, conf),
+		mustCreateAssetFromTemplate(AssetPathCheckpointer, internal.CheckpointerTemplate, conf),
+		mustCreateAssetFromTemplate(AssetPathKubeFlannel, internal.KubeFlannelTemplate, conf),
+		mustCreateAssetFromTemplate(AssetPathKubeSystemSARoleBinding, internal.KubeSystemSARoleBindingTemplate, conf),
 	}
 	return assets
 }

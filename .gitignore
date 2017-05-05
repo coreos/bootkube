@@ -1,4 +1,5 @@
 _output
+_pluton_temp
 vendor-v[0-9].[0-9].[0-9]/
 
 hack/*/.vagrant/
