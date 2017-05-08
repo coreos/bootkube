@@ -54,6 +54,10 @@ function init_master_node() {
         etcd_render_flags="--etcd-servers=https://${COREOS_PRIVATE_IPV4}:2379"
     fi
 
+    # Some systems may not have one or the other variable set
+    COREOS_PUBLIC_IPV4=${COREOS_PUBLIC_IPV4:-${COREOS_PRIVATE_IPV4:-127.0.0.1}}
+    COREOS_PRIVATE_IPV4=${COREOS_PRIVATE_IPV4:-${COREOS_PUBLIC_IPV4}}
+
     # Render cluster assets
     /home/core/bootkube render --asset-dir=/home/core/assets ${etcd_render_flags} \
       --api-servers=https://${COREOS_PUBLIC_IPV4}:443,https://${COREOS_PRIVATE_IPV4}:443

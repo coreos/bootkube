@@ -1,1 +1,2 @@
 cluster/
+terraform.tfstate*
