@@ -16,7 +16,15 @@ var (
 	secretData = []byte("this is very secret")
 
 	cp = &controlPlane{
-		configMaps: v1.ConfigMapList{},
+		configMaps: v1.ConfigMapList{
+			Items: []v1.ConfigMap{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kube-apiserver",
+					Namespace: "kube-system",
+				},
+				Data: map[string]string{"key": "value"},
+			}},
+		},
 		daemonSets: v1beta1.DaemonSetList{
 			Items: []v1beta1.DaemonSet{{
 				ObjectMeta: metav1.ObjectMeta{
@@ -169,6 +177,10 @@ func TestFixUpBootstrapPods(t *testing.T) {
 					MountPath: "/etc/ssl/certs",
 					ReadOnly:  true,
 				}, {
+					Name:      "configs",
+					MountPath: "/etc/kubernetes/config-maps",
+					ReadOnly:  true,
+				}, {
 					Name:      "secrets",
 					MountPath: "/etc/kubernetes/secrets",
 					ReadOnly:  true,
@@ -177,6 +189,9 @@ func TestFixUpBootstrapPods(t *testing.T) {
 			Volumes: []v1.Volume{{
 				Name:         "ssl-certs-host",
 				VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/usr/share/ca-certificates"}},
+			}, {
+				Name:         "configs",
+				VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "kube-apiserver"}}},
 			}, {
 				Name:         "secrets",
 				VolumeSource: v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: "kube-apiserver"}},
@@ -218,6 +233,10 @@ func TestFixUpBootstrapPods(t *testing.T) {
 					MountPath: "/etc/ssl/certs",
 					ReadOnly:  true,
 				}, {
+					Name:      "configs",
+					MountPath: "/etc/kubernetes/config-maps",
+					ReadOnly:  true,
+				}, {
 					Name:      "secrets",
 					MountPath: "/etc/kubernetes/secrets",
 					ReadOnly:  true,
@@ -227,8 +246,11 @@ func TestFixUpBootstrapPods(t *testing.T) {
 				Name:         "ssl-certs-host",
 				VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/usr/share/ca-certificates"}},
 			}, {
+				Name:         "configs",
+				VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/etc/kubernetes/bootstrap-secrets/config-maps/kube-apiserver"}},
+			}, {
 				Name:         "secrets",
-				VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/etc/kubernetes/bootstrap-secrets/kube-apiserver"}},
+				VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/etc/kubernetes/bootstrap-secrets/secrets/kube-apiserver"}},
 			}, {
 				Name:         "kubeconfig",
 				VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/etc/kubernetes/kubeconfig"}},
@@ -260,32 +282,47 @@ func TestFixUpBootstrapPods(t *testing.T) {
 			}},
 		},
 	}}
-	wantSecrets := map[string]struct{}{"kube-apiserver": {}}
-	gotSecrets, err := fixUpBootstrapPods(pods)
-	if err != nil || !reflect.DeepEqual(gotSecrets, wantSecrets) {
-		t.Errorf("fixUpBootstrapPods(%v) = %v, %v, want: %v, %v", pods, gotSecrets, err, wantSecrets, nil)
+	wantConfigMaps := map[string]string{"kube-apiserver": "/etc/kubernetes/bootstrap-secrets/config-maps/kube-apiserver"}
+	wantSecrets := map[string]string{"kube-apiserver": "/etc/kubernetes/bootstrap-secrets/secrets/kube-apiserver"}
+	gotConfigMaps, gotSecrets := fixUpBootstrapPods(pods)
+	if !reflect.DeepEqual(gotSecrets, wantSecrets) || !reflect.DeepEqual(gotConfigMaps, wantConfigMaps) {
+		t.Errorf("fixUpBootstrapPods(%v) = %v, %v, want: %v, %v", pods, gotConfigMaps, gotSecrets, wantConfigMaps, wantSecrets)
 	} else if !reflect.DeepEqual(pods, wantPods) {
 		t.Errorf("fixUpBootstrapPods(%v) = %v, want: %v", pods, pods, wantPods)
 	}
 }
 
-func TestOutputBootstrapSecrets(t *testing.T) {
-	requiredSecrets := map[string]struct{}{"kube-apiserver": {}}
+func TestOutputConfigMaps(t *testing.T) {
+	requiredSecrets := map[string]string{"kube-apiserver": "tls/kube-apiserver"}
 	want := asset.Assets{{
 		Name: "tls/kube-apiserver/apiserver.crt",
 		Data: secretData,
 	}}
-	if got, err := outputBootstrapSecrets(cp.secrets.Items, requiredSecrets); err != nil {
+	if got, err := outputBootstrapSecrets(cp.secrets, requiredSecrets); err != nil {
 		t.Errorf("outputBootstrapSecrets(%v, %v) = %v, want: nil", cp.secrets.Items, requiredSecrets, err)
 	} else if !reflect.DeepEqual(got, want) {
 		t.Errorf("outputBootstrapSecrets(%v, %v) = %v, want: %v", cp.secrets.Items, requiredSecrets, got, want)
 	}
 }
 
-func TestOutputBootstrapSecretsMissing(t *testing.T) {
-	requiredSecrets := map[string]struct{}{"missing-secret": {}}
-	if as, err := outputBootstrapSecrets(cp.secrets.Items, requiredSecrets); err == nil {
-		t.Errorf("outputBootstrapSecrets(%v, %v) = %v, %v, want: nil, non-nil", cp.secrets.Items, requiredSecrets, as, err)
+func TestOutputBootstrapSecrets(t *testing.T) {
+	requiredSecrets := map[string]string{"kube-apiserver": "tls/kube-apiserver"}
+	want := asset.Assets{{
+		Name: "tls/kube-apiserver/apiserver.crt",
+		Data: secretData,
+	}}
+	if got, err := outputBootstrapSecrets(cp.secrets, requiredSecrets); err != nil {
+		t.Errorf("outputBootstrapSecrets(%v, %v) = %v, want: nil", cp.secrets.Items, requiredSecrets, err)
+	} else if !reflect.DeepEqual(got, want) {
+		t.Errorf("outputBootstrapSecrets(%v, %v) = %v, want: %v", cp.secrets.Items, requiredSecrets, got, want)
+	}
+}
+
+func TestOutputKeyValueDataKeyMissing(t *testing.T) {
+	objList := &v1.SecretList{}
+	requiredObjs := map[string]string{"missing-key": "some-path"}
+	if as, err := outputKeyValueData(objList, requiredObjs, func(obj runtime.Object) map[string][]byte { return obj.(*v1.Secret).Data }); err == nil {
+		t.Errorf("outputKeyValueData(%v, %v) = %v, %v, want: nil, non-nil", objList, requiredObjs, as, err)
 	}
 }
 

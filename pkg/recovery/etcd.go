@@ -36,23 +36,18 @@ func (s *etcdBackend) read(ctx context.Context) (*controlPlane, error) {
 	cp := &controlPlane{}
 	for _, r := range []struct {
 		etcdKeyName string
-		yamlName    string
 		obj         runtime.Object
 	}{{
 		etcdKeyName: "configmaps",
-		yamlName:    "config-map",
 		obj:         &cp.configMaps,
 	}, {
 		etcdKeyName: "daemonsets",
-		yamlName:    "daemonset",
 		obj:         &cp.daemonSets,
 	}, {
 		etcdKeyName: "deployments",
-		yamlName:    "deployment",
 		obj:         &cp.deployments,
 	}, {
 		etcdKeyName: "secrets",
-		yamlName:    "secret",
 		obj:         &cp.secrets,
 	}} {
 		if err := s.list(ctx, r.etcdKeyName, r.obj); err != nil {

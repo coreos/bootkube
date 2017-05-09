@@ -111,15 +111,17 @@ func (cp *controlPlane) renderBootstrap() (asset.Assets, error) {
 	if err != nil {
 		return nil, err
 	}
-	requiredSecrets, err := fixUpBootstrapPods(pods)
-	if err != nil {
-		return nil, err
-	}
+	requiredConfigMaps, requiredSecrets := fixUpBootstrapPods(pods)
 	as, err := outputBootstrapPods(pods)
 	if err != nil {
 		return nil, err
 	}
-	secrets, err := outputBootstrapSecrets(cp.secrets.Items, requiredSecrets)
+	configMaps, err := outputBootstrapConfigMaps(cp.configMaps, requiredConfigMaps)
+	if err != nil {
+		return nil, err
+	}
+	as = append(as, configMaps...)
+	secrets, err := outputBootstrapSecrets(cp.secrets, requiredSecrets)
 	if err != nil {
 		return nil, err
 	}
@@ -176,12 +178,11 @@ func setBootstrapPodMetadata(pod *v1.Pod, parent metav1.ObjectMeta) error {
 	return nil
 }
 
-// fixUpBootstrapPods modifies extracted bootstrap pod specs to have correct metadata and
-// point to filesystem-mount-based secrets. It returns a set of secrets that must also be rendered
-// in order for the bootstrap pods to be functional.
-// TODO(diegs): also output the set of reqiured configMaps.
-func fixUpBootstrapPods(pods []v1.Pod) (map[string]struct{}, error) {
-	requiredSecrets := make(map[string]struct{})
+// fixUpBootstrapPods modifies extracted bootstrap pod specs to have correct metadata and point to
+// filesystem-mount-based secrets. It returns mappings from configMap and secret names to output
+// paths that must also be rendered in order for the bootstrap pods to be functional.
+func fixUpBootstrapPods(pods []v1.Pod) (requiredConfigMaps, requiredSecrets map[string]string) {
+	requiredConfigMaps, requiredSecrets = make(map[string]string), make(map[string]string)
 	for i := range pods {
 		pod := &pods[i]
 
@@ -189,10 +190,15 @@ func fixUpBootstrapPods(pods []v1.Pod) (map[string]struct{}, error) {
 		for i := range pod.Spec.Volumes {
 			vol := &pod.Spec.Volumes[i]
 			if vol.Secret != nil {
-				requiredSecrets[vol.Secret.SecretName] = struct{}{}
-				secretPath := path.Join(asset.BootstrapSecretsDir, vol.Secret.SecretName)
-				vol.HostPath = &v1.HostPathVolumeSource{Path: secretPath}
+				pathPrefix := path.Join(asset.BootstrapSecretsDir, "secrets", vol.Secret.SecretName)
+				requiredSecrets[vol.Secret.SecretName] = pathPrefix
+				vol.HostPath = &v1.HostPathVolumeSource{Path: pathPrefix}
 				vol.Secret = nil
+			} else if vol.ConfigMap != nil {
+				pathPrefix := path.Join(asset.BootstrapSecretsDir, "config-maps", vol.ConfigMap.Name)
+				requiredConfigMaps[vol.ConfigMap.Name] = pathPrefix
+				vol.HostPath = &v1.HostPathVolumeSource{Path: pathPrefix}
+				vol.ConfigMap = nil
 			}
 		}
 
@@ -216,7 +222,7 @@ func fixUpBootstrapPods(pods []v1.Pod) (map[string]struct{}, error) {
 			Name:         "kubeconfig",
 		})
 	}
-	return requiredSecrets, nil
+	return
 }
 
 // outputBootstrapPods outputs the bootstrap pod definitions.
@@ -232,27 +238,62 @@ func outputBootstrapPods(pods []v1.Pod) (asset.Assets, error) {
 	return as, nil
 }
 
+// outputBootstrapConfigMaps creates assets for all the configMap names in the requiredConfigMaps
+// set. It returns an error if any configMap cannot be found in the provided configMaps list.
+func outputBootstrapConfigMaps(configMaps v1.ConfigMapList, requiredConfigMaps map[string]string) (asset.Assets, error) {
+	return outputKeyValueData(&configMaps, requiredConfigMaps, func(obj runtime.Object) map[string][]byte {
+		configMap, ok := obj.(*v1.ConfigMap)
+		if !ok || configMap == nil {
+			return nil
+		}
+		output := make(map[string][]byte)
+		for k, v := range configMap.Data {
+			output[k] = []byte(v)
+		}
+		return output
+	})
+}
+
 // outputBootstrapSecrets creates assets for all the secret names in the requiredSecrets set. It
 // returns an error if any secret cannot be found in the provided secrets list.
-func outputBootstrapSecrets(secrets []v1.Secret, requiredSecrets map[string]struct{}) (asset.Assets, error) {
+func outputBootstrapSecrets(secrets v1.SecretList, requiredSecrets map[string]string) (asset.Assets, error) {
+	return outputKeyValueData(&secrets, requiredSecrets, func(obj runtime.Object) map[string][]byte {
+		if secret, ok := obj.(*v1.Secret); ok && secret != nil {
+			return secret.Data
+		}
+		return nil
+	})
+}
+
+// outputKeyValueData takes a key-value object (such as a Secret or ConfigMap) and outputs assets
+// for each key-value pair. See outputBootstrapConfigMaps or outputBootstrapSecrets for usage.
+func outputKeyValueData(objList runtime.Object, requiredObjs map[string]string, extractData func(runtime.Object) map[string][]byte) (asset.Assets, error) {
 	var as asset.Assets
-	for _, secret := range secrets {
-		if _, ok := requiredSecrets[secret.Name]; ok {
-			for key, data := range secret.Data {
+	objs, err := meta.ExtractList(objList)
+	if err != nil {
+		return nil, err
+	}
+	for _, obj := range objs {
+		name, err := metaAccessor.Name(obj)
+		if err != nil {
+			return nil, err
+		}
+		if namePrefix, ok := requiredObjs[name]; ok {
+			for key, data := range extractData(obj) {
 				as = append(as, asset.Asset{
-					Name: path.Join(asset.AssetPathSecrets, secret.Name, key),
+					Name: path.Join(namePrefix, key),
 					Data: data,
 				})
 			}
-			delete(requiredSecrets, secret.Name)
+			delete(requiredObjs, name)
 		}
 	}
-	if len(requiredSecrets) > 0 {
-		var missingSecrets []string
-		for secret := range requiredSecrets {
-			missingSecrets = append(missingSecrets, secret)
+	if len(requiredObjs) > 0 {
+		var missingObjs []string
+		for obj := range requiredObjs {
+			missingObjs = append(missingObjs, obj)
 		}
-		return nil, fmt.Errorf("failed to extract some required bootstrap secrets: %v", missingSecrets)
+		return nil, fmt.Errorf("failed to extract some required objects: %v", missingObjs)
 	}
 	return as, nil
 }
