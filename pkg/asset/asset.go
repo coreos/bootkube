@@ -55,7 +55,10 @@ const (
 	AssetPathBootstrapControllerManager  = "bootstrap-manifests/bootstrap-controller-manager.yaml"
 	AssetPathBootstrapScheduler          = "bootstrap-manifests/bootstrap-scheduler.yaml"
 	AssetPathBootstrapEtcd               = "bootstrap-manifests/bootstrap-etcd.yaml"
-	BootstrapSecretsDir                  = "/etc/kubernetes/bootstrap-secrets"
+)
+
+var (
+	BootstrapSecretsDir = "/etc/kubernetes/bootstrap-secrets" // Overridden for testing.
 )
 
 // AssetConfig holds all configuration needed when generating
