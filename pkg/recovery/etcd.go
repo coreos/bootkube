@@ -51,23 +51,10 @@ func (s *etcdBackend) read(ctx context.Context) (*controlPlane, error) {
 		yamlName:    "deployment",
 		obj:         &cp.deployments,
 	}, {
-		etcdKeyName: "poddisruptionbudgets",
-		yamlName:    "pod-disruption-budget",
-		obj:         &cp.podDisruptionBudgets,
-	}, {
 		etcdKeyName: "secrets",
 		yamlName:    "secret",
 		obj:         &cp.secrets,
-	}, {
-		etcdKeyName: "services/specs",
-		yamlName:    "service",
-		obj:         &cp.services,
-	}, {
-		etcdKeyName: "serviceaccounts",
-		yamlName:    "service-account",
-		obj:         &cp.serviceAccounts,
-	},
-	} {
+	}} {
 		if err := s.list(ctx, r.etcdKeyName, r.obj); err != nil {
 			return nil, err
 		}

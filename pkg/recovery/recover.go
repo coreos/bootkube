@@ -14,7 +14,6 @@ import (
 	"io/ioutil"
 	"path"
 	"reflect"
-	"strings"
 
 	"github.com/ghodss/yaml"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -23,30 +22,29 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	policyv1beta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 
 	"github.com/kubernetes-incubator/bootkube/pkg/asset"
 )
 
 const (
+	k8sAppLabel           = "k8s-app"   // The label used in versions > v0.4.2
+	componentAppLabel     = "component" // The label used in versions <= v0.4.2
 	kubeletKubeConfigPath = "/etc/kubernetes/kubeconfig"
 )
 
-type stringSet map[string]bool
-
 var (
-	// bootstrapComponents contains the names of the components that we will extract to construct the
-	// temporary bootstrap control plane.
-	bootstrapComponents = stringSet{
-		"kube-apiserver":          true,
-		"kube-controller-manager": true,
-		"kube-scheduler":          true,
+	// bootstrapK8sApps contains the components (as identified by the the label "k8s-app") that we
+	// will extract to construct the temporary bootstrap control plane.
+	bootstrapK8sApps = map[string]struct{}{
+		"kube-apiserver":          {},
+		"kube-controller-manager": {},
+		"kube-scheduler":          {},
 	}
-	// kubeConfigComponents contains the names of the bootstrap pods that need to add a --kubeconfig
-	// flag to run in non-self-hosted mode.
-	kubeConfigComponents = stringSet{
-		"kube-controller-manager": true,
-		"kube-scheduler":          true,
+	// kubeConfigK8sContainers contains the names of the bootstrap container specs that need to add a
+	// --kubeconfig flag to run in non-self-hosted mode.
+	kubeConfigK8sContainers = map[string]struct{}{
+		"kube-controller-manager": {},
+		"kube-scheduler":          {},
 	}
 	// typeMetas contains a mapping from API object types to the TypeMeta struct that should be
 	// populated for them when they are serialized.
@@ -65,11 +63,8 @@ func init() {
 	addTypeMeta(&v1.ConfigMap{}, v1.SchemeGroupVersion)
 	addTypeMeta(&v1beta1.DaemonSet{}, v1beta1.SchemeGroupVersion)
 	addTypeMeta(&v1beta1.Deployment{}, v1beta1.SchemeGroupVersion)
-	addTypeMeta(&policyv1beta1.PodDisruptionBudget{}, policyv1beta1.SchemeGroupVersion)
 	addTypeMeta(&v1.Pod{}, v1.SchemeGroupVersion)
 	addTypeMeta(&v1.Secret{}, v1.SchemeGroupVersion)
-	addTypeMeta(&v1.Service{}, v1.SchemeGroupVersion)
-	addTypeMeta(&v1.ServiceAccount{}, v1.SchemeGroupVersion)
 }
 
 // Backend defines an interface for any backend that can populate a controlPlane struct.
@@ -79,13 +74,10 @@ type Backend interface {
 
 // controlPlane holds the control plane objects that are recovered from a backend.
 type controlPlane struct {
-	configMaps           v1.ConfigMapList
-	daemonSets           v1beta1.DaemonSetList
-	deployments          v1beta1.DeploymentList
-	podDisruptionBudgets policyv1beta1.PodDisruptionBudgetList
-	secrets              v1.SecretList
-	services             v1.ServiceList
-	serviceAccounts      v1.ServiceAccountList
+	configMaps  v1.ConfigMapList
+	daemonSets  v1beta1.DaemonSetList
+	deployments v1beta1.DeploymentList
+	secrets     v1.SecretList
 }
 
 // Recover recovers a control plane using the provided backend and kubeConfigPath, returning assets
@@ -97,72 +89,24 @@ func Recover(ctx context.Context, backend Backend, kubeConfigPath string) (asset
 		return nil, err
 	}
 
-	as, err := cp.renderSelfHosted()
+	as, err := cp.renderBootstrap()
 	if err != nil {
 		return nil, err
 	}
 
-	bs, err := cp.renderBootstrap(kubeConfigPath)
+	kc, err := renderKubeConfig(kubeConfigPath)
 	if err != nil {
 		return nil, err
 	}
-	as = append(as, bs...)
+	as = append(as, kc)
 
-	ks, err := renderKubeConfig(kubeConfigPath)
-	if err != nil {
-		return nil, err
-	}
-	as = append(as, ks...)
-
-	return as, nil
-}
-
-// renderSelfHosted returns assets for the self-hosted control plane objects. These are output
-// without modification from what the backend recovered.
-func (cp *controlPlane) renderSelfHosted() (asset.Assets, error) {
-	var as asset.Assets
-	if objAs, err := serializeListObjToYAML(&cp.configMaps); err != nil {
-		return nil, err
-	} else {
-		as = append(as, objAs...)
-	}
-	if objAs, err := serializeListObjToYAML(&cp.daemonSets); err != nil {
-		return nil, err
-	} else {
-		as = append(as, objAs...)
-	}
-	if objAs, err := serializeListObjToYAML(&cp.deployments); err != nil {
-		return nil, err
-	} else {
-		as = append(as, objAs...)
-	}
-	if objAs, err := serializeListObjToYAML(&cp.podDisruptionBudgets); err != nil {
-		return nil, err
-	} else {
-		as = append(as, objAs...)
-	}
-	if objAs, err := serializeListObjToYAML(&cp.secrets); err != nil {
-		return nil, err
-	} else {
-		as = append(as, objAs...)
-	}
-	if objAs, err := serializeListObjToYAML(&cp.services); err != nil {
-		return nil, err
-	} else {
-		as = append(as, objAs...)
-	}
-	if objAs, err := serializeListObjToYAML(&cp.serviceAccounts); err != nil {
-		return nil, err
-	} else {
-		as = append(as, objAs...)
-	}
 	return as, nil
 }
 
 // renderBootstrap returns assets for a bootstrap control plane that can be used with `bootkube
 // start` to re-bootstrap a control plane. These assets are derived from the self-hosted control
 // plane that was recovered by the backend, but modified for direct injection into a kubelet.
-func (cp *controlPlane) renderBootstrap(kubeConfigPath string) (asset.Assets, error) {
+func (cp *controlPlane) renderBootstrap() (asset.Assets, error) {
 	pods, err := extractBootstrapPods(cp.daemonSets.Items, cp.deployments.Items)
 	if err != nil {
 		return nil, err
@@ -187,7 +131,7 @@ func (cp *controlPlane) renderBootstrap(kubeConfigPath string) (asset.Assets, er
 func extractBootstrapPods(daemonSets []v1beta1.DaemonSet, deployments []v1beta1.Deployment) ([]v1.Pod, error) {
 	var pods []v1.Pod
 	for _, ds := range daemonSets {
-		if componentName := ds.Labels["component"]; bootstrapComponents[componentName] {
+		if isBootstrapApp(ds.Labels) {
 			pod := v1.Pod{Spec: ds.Spec.Template.Spec}
 			if err := setBootstrapPodMetadata(&pod, ds.ObjectMeta); err != nil {
 				return nil, err
@@ -196,7 +140,7 @@ func extractBootstrapPods(daemonSets []v1beta1.DaemonSet, deployments []v1beta1.
 		}
 	}
 	for _, ds := range deployments {
-		if componentName := ds.Labels["component"]; bootstrapComponents[componentName] {
+		if isBootstrapApp(ds.Labels) {
 			pod := v1.Pod{Spec: ds.Spec.Template.Spec}
 			if err := setBootstrapPodMetadata(&pod, ds.ObjectMeta); err != nil {
 				return nil, err
@@ -205,6 +149,17 @@ func extractBootstrapPods(daemonSets []v1beta1.DaemonSet, deployments []v1beta1.
 		}
 	}
 	return pods, nil
+}
+
+// isBootstrapApp returns true if this app belongs to the bootstrap control plane, based on its
+// labels.
+func isBootstrapApp(labels map[string]string) bool {
+	k8sApp := labels[k8sAppLabel]
+	if k8sApp == "" {
+		k8sApp = labels[componentAppLabel]
+	}
+	_, ok := bootstrapK8sApps[k8sApp]
+	return ok
 }
 
 // setBootstrapPodMetadata creates valid metadata for a bootstrap pod. Currently it sets the
@@ -225,8 +180,8 @@ func setBootstrapPodMetadata(pod *v1.Pod, parent metav1.ObjectMeta) error {
 // point to filesystem-mount-based secrets. It returns a set of secrets that must also be rendered
 // in order for the bootstrap pods to be functional.
 // TODO(diegs): also output the set of reqiured configMaps.
-func fixUpBootstrapPods(pods []v1.Pod) (stringSet, error) {
-	requiredSecrets := make(stringSet)
+func fixUpBootstrapPods(pods []v1.Pod) (map[string]struct{}, error) {
+	requiredSecrets := make(map[string]struct{})
 	for i := range pods {
 		pod := &pods[i]
 
@@ -234,7 +189,7 @@ func fixUpBootstrapPods(pods []v1.Pod) (stringSet, error) {
 		for i := range pod.Spec.Volumes {
 			vol := &pod.Spec.Volumes[i]
 			if vol.Secret != nil {
-				requiredSecrets[vol.Secret.SecretName] = true
+				requiredSecrets[vol.Secret.SecretName] = struct{}{}
 				secretPath := path.Join(asset.BootstrapSecretsDir, vol.Secret.SecretName)
 				vol.HostPath = &v1.HostPathVolumeSource{Path: secretPath}
 				vol.Secret = nil
@@ -245,7 +200,7 @@ func fixUpBootstrapPods(pods []v1.Pod) (stringSet, error) {
 		for i := range pod.Spec.Containers {
 			cn := &pod.Spec.Containers[i]
 			// Assumes the bootkube naming convention is used. Could also just make sure the image uses hyperkube.
-			if kubeConfigComponents[cn.Name] {
+			if _, ok := kubeConfigK8sContainers[cn.Name]; ok {
 				cn.Command = append(cn.Command, "--kubeconfig=/kubeconfig/kubeconfig")
 				cn.VolumeMounts = append(cn.VolumeMounts, v1.VolumeMount{
 					MountPath: "/kubeconfig",
@@ -260,7 +215,6 @@ func fixUpBootstrapPods(pods []v1.Pod) (stringSet, error) {
 			VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: kubeletKubeConfigPath}},
 			Name:         "kubeconfig",
 		})
-
 	}
 	return requiredSecrets, nil
 }
@@ -280,10 +234,10 @@ func outputBootstrapPods(pods []v1.Pod) (asset.Assets, error) {
 
 // outputBootstrapSecrets creates assets for all the secret names in the requiredSecrets set. It
 // returns an error if any secret cannot be found in the provided secrets list.
-func outputBootstrapSecrets(secrets []v1.Secret, requiredSecrets stringSet) (asset.Assets, error) {
+func outputBootstrapSecrets(secrets []v1.Secret, requiredSecrets map[string]struct{}) (asset.Assets, error) {
 	var as asset.Assets
 	for _, secret := range secrets {
-		if requiredSecrets[secret.Name] {
+		if _, ok := requiredSecrets[secret.Name]; ok {
 			for key, data := range secret.Data {
 				as = append(as, asset.Asset{
 					Name: path.Join(asset.AssetPathSecrets, secret.Name, key),
@@ -305,15 +259,15 @@ func outputBootstrapSecrets(secrets []v1.Secret, requiredSecrets stringSet) (ass
 
 // renderKubeConfig outputs kubeconfig assets to ensure that the kubeconfig will be rendered to the
 // assetDir for use by `bootkube start`.
-func renderKubeConfig(kubeConfigPath string) (asset.Assets, error) {
+func renderKubeConfig(kubeConfigPath string) (asset.Asset, error) {
 	kubeConfig, err := ioutil.ReadFile(kubeConfigPath)
 	if err != nil {
-		return nil, err
+		return asset.Asset{}, err
 	}
-	return []asset.Asset{{
+	return asset.Asset{
 		Name: asset.AssetPathKubeConfig, // used by `bootkube start`.
 		Data: kubeConfig,
-	}}, nil
+	}, nil
 }
 
 // setTypeMeta sets the TypeMeta for a runtime.Object.
@@ -326,35 +280,6 @@ func setTypeMeta(obj runtime.Object) error {
 	metaAccessor.SetAPIVersion(obj, typeMeta.APIVersion)
 	metaAccessor.SetKind(obj, typeMeta.Kind)
 	return nil
-}
-
-// serializeListObjToYAML takes a runtime.Object of type 'list', fixes up the metadata of each
-// element, and serializes them to YAML assets using the naming convention `name-kind.yaml`.
-func serializeListObjToYAML(outerObj runtime.Object) (asset.Assets, error) {
-	objList, err := meta.ExtractList(outerObj)
-	if err != nil {
-		return nil, err
-	}
-	var as asset.Assets
-	for _, obj := range objList {
-		if err := setTypeMeta(obj); err != nil {
-			return nil, err
-		}
-		name, err := metaAccessor.Name(obj)
-		if err != nil {
-			return nil, err
-		}
-		kind, err := metaAccessor.Kind(obj)
-		if err != nil {
-			return nil, err
-		}
-		a, err := serializeObjToYAML(path.Join(asset.AssetPathManifests, name+"-"+strings.ToLower(kind)+".yaml"), obj)
-		if err != nil {
-			return nil, err
-		}
-		as = append(as, a)
-	}
-	return as, nil
 }
 
 // serializeObjToYAML serializes a runtime.Object into a YAML asset.

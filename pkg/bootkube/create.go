@@ -2,6 +2,7 @@ package bootkube
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -19,6 +20,11 @@ import (
 )
 
 func CreateAssets(manifestDir string, timeout time.Duration) error {
+	if _, err := os.Stat(manifestDir); os.IsNotExist(err) {
+		UserOutput(fmt.Sprintf("WARNING: %v does not exist, not creating any self-hosted assets.\n", manifestDir))
+		return nil
+	}
+
 	upFn := func() (bool, error) {
 		if err := apiTest(); err != nil {
 			glog.Warningf("Unable to determine api-server readiness: %v", err)
