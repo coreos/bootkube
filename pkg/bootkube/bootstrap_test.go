@@ -101,7 +101,7 @@ func TestBootstrapControlPlane(t *testing.T) {
 	}
 }
 
-func TestBootstrapControlPlane_NoOverwrite(t *testing.T) {
+func TestBootstrapControlPlaneNoOverwrite(t *testing.T) {
 	assetDir, podManifestPath := setUp(t)
 	defer tearDown(assetDir, podManifestPath, t)
 	existingManifest := manifests[1]
