@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path"
+	"path/filepath"
 	"reflect"
 
 	"github.com/ghodss/yaml"
@@ -29,7 +30,7 @@ import (
 const (
 	k8sAppLabel           = "k8s-app"   // The label used in versions > v0.4.2
 	componentAppLabel     = "component" // The label used in versions <= v0.4.2
-	kubeletKubeConfigPath = "/etc/kubernetes/kubeconfig"
+	kubeletKubeConfigPath = "/etc/kubernetes"
 )
 
 var (
@@ -190,14 +191,14 @@ func fixUpBootstrapPods(pods []v1.Pod) (requiredConfigMaps, requiredSecrets map[
 		for i := range pod.Spec.Volumes {
 			vol := &pod.Spec.Volumes[i]
 			if vol.Secret != nil {
-				pathPrefix := path.Join(asset.BootstrapSecretsDir, "secrets", vol.Secret.SecretName)
-				requiredSecrets[vol.Secret.SecretName] = pathPrefix
-				vol.HostPath = &v1.HostPathVolumeSource{Path: pathPrefix}
+				pathSuffix := filepath.Join("secrets", vol.Secret.SecretName)
+				requiredSecrets[vol.Secret.SecretName] = filepath.Join(asset.AssetPathSecrets, pathSuffix)
+				vol.HostPath = &v1.HostPathVolumeSource{Path: filepath.Join(asset.BootstrapSecretsDir, pathSuffix)}
 				vol.Secret = nil
 			} else if vol.ConfigMap != nil {
-				pathPrefix := path.Join(asset.BootstrapSecretsDir, "config-maps", vol.ConfigMap.Name)
-				requiredConfigMaps[vol.ConfigMap.Name] = pathPrefix
-				vol.HostPath = &v1.HostPathVolumeSource{Path: pathPrefix}
+				pathSuffix := filepath.Join("config-maps", vol.ConfigMap.Name)
+				requiredConfigMaps[vol.ConfigMap.Name] = filepath.Join(asset.AssetPathSecrets, pathSuffix)
+				vol.HostPath = &v1.HostPathVolumeSource{Path: path.Join(asset.BootstrapSecretsDir, pathSuffix)}
 				vol.ConfigMap = nil
 			}
 		}

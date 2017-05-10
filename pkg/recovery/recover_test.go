@@ -253,7 +253,7 @@ func TestFixUpBootstrapPods(t *testing.T) {
 				VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/etc/kubernetes/bootstrap-secrets/secrets/kube-apiserver"}},
 			}, {
 				Name:         "kubeconfig",
-				VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/etc/kubernetes/kubeconfig"}},
+				VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/etc/kubernetes"}},
 			}},
 		},
 	}, {
@@ -278,12 +278,12 @@ func TestFixUpBootstrapPods(t *testing.T) {
 			}},
 			Volumes: []v1.Volume{{
 				Name:         "kubeconfig",
-				VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/etc/kubernetes/kubeconfig"}},
+				VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/etc/kubernetes"}},
 			}},
 		},
 	}}
-	wantConfigMaps := map[string]string{"kube-apiserver": "/etc/kubernetes/bootstrap-secrets/config-maps/kube-apiserver"}
-	wantSecrets := map[string]string{"kube-apiserver": "/etc/kubernetes/bootstrap-secrets/secrets/kube-apiserver"}
+	wantConfigMaps := map[string]string{"kube-apiserver": "tls/config-maps/kube-apiserver"}
+	wantSecrets := map[string]string{"kube-apiserver": "tls/secrets/kube-apiserver"}
 	gotConfigMaps, gotSecrets := fixUpBootstrapPods(pods)
 	if !reflect.DeepEqual(gotSecrets, wantSecrets) || !reflect.DeepEqual(gotConfigMaps, wantConfigMaps) {
 		t.Errorf("fixUpBootstrapPods(%v) = %v, %v, want: %v, %v", pods, gotConfigMaps, gotSecrets, wantConfigMaps, wantSecrets)

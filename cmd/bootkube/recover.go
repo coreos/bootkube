@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubernetes-incubator/bootkube/pkg/bootkube"
 	"github.com/kubernetes-incubator/bootkube/pkg/recovery"
 
 	"github.com/coreos/etcd/clientv3"
@@ -20,8 +21,8 @@ import (
 var (
 	cmdRecover = &cobra.Command{
 		Use:          "recover",
-		Short:        "Recover a control plane from state stored in etcd.",
-		Long:         "",
+		Short:        "Recover a self-hosted control plane",
+		Long:         "This command reads control plane manifests from a running apiserver or etcd and writes them to asset-dir. Users can then use `bootkube start` pointed at this asset-dir to re-the a self-hosted cluster. Please see the project README for more details and examples.",
 		PreRunE:      validateRecoverOpts,
 		RunE:         runCmdRecover,
 		SilenceUsage: true,
@@ -44,7 +45,7 @@ func init() {
 	cmdRecover.Flags().StringVar(&recoverOpts.etcdCAPath, "etcd-ca-path", "", "Path to an existing PEM encoded CA that will be used for TLS-enabled communication between the apiserver and etcd. Must be used in conjunction with --etcd-certificate-path and --etcd-private-key-path, and must have etcd configured to use TLS with matching secrets.")
 	cmdRecover.Flags().StringVar(&recoverOpts.etcdCertificatePath, "etcd-certificate-path", "", "Path to an existing certificate that will be used for TLS-enabled communication between the apiserver and etcd. Must be used in conjunction with --etcd-ca-path and --etcd-private-key-path, and must have etcd configured to use TLS with matching secrets.")
 	cmdRecover.Flags().StringVar(&recoverOpts.etcdPrivateKeyPath, "etcd-private-key-path", "", "Path to an existing private key that will be used for TLS-enabled communication between the apiserver and etcd. Must be used in conjunction with --etcd-ca-path and --etcd-certificate-path, and must have etcd configured to use TLS with matching secrets.")
-	cmdRecover.Flags().StringVar(&recoverOpts.etcdServers, "etcd-servers", "", "List of etcd servers URLs including host:port, comma separated.")
+	cmdRecover.Flags().StringVar(&recoverOpts.etcdServers, "etcd-servers", "", "List of etcd server URLs including host:port, comma separated.")
 	cmdRecover.Flags().StringVar(&recoverOpts.etcdPrefix, "etcd-prefix", "/registry", "Path prefix to Kubernetes cluster data in etcd.")
 	cmdRecover.Flags().StringVar(&recoverOpts.kubeConfigPath, "kubeconfig", "", "Path to kubeconfig for communicating with the cluster.")
 }
@@ -55,11 +56,25 @@ func runCmdRecover(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	etcdClient, err := createEtcdClient()
-	if err != nil {
-		return err
+
+	var backend recovery.Backend
+	switch {
+	case recoverOpts.etcdServers != "":
+		bootkube.UserOutput("Attempting recovery using etcd cluster at %q...\n", recoverOpts.etcdServers)
+		etcdClient, err := createEtcdClient()
+		if err != nil {
+			return err
+		}
+		backend = recovery.NewEtcdBackend(etcdClient, recoverOpts.etcdPrefix)
+	default:
+		bootkube.UserOutput("Attempting recovery using apiserver at %q...\n", recoverOpts.kubeConfigPath)
+		backend, err = recovery.NewAPIServerBackend(recoverOpts.kubeConfigPath)
+		if err != nil {
+			return err
+		}
 	}
-	as, err := recovery.Recover(context.Background(), recovery.NewEtcdBackend(etcdClient, recoverOpts.etcdPrefix), recoverOpts.kubeConfigPath)
+
+	as, err := recovery.Recover(context.Background(), backend, recoverOpts.kubeConfigPath)
 	if err != nil {
 		return err
 	}
