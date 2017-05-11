@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -45,6 +46,11 @@ func Migrate(kubeConfig clientcmd.ClientConfig, etcdServiceIP string) error {
 		return err
 	}
 	glog.Infof("created etcd cluster TPR")
+
+	err = deleteExistingCluster(restClient)
+	if err != nil {
+		return fmt.Errorf("failed to delete the existing etcd cluster: %v", err)
+	}
 
 	ip, err := getBootEtcdPodIP(kubecli)
 	if err != nil {
@@ -176,6 +182,20 @@ func waitEtcdClusterRunning(restclient restclient.Interface) error {
 		}
 	})
 	return err
+}
+
+func deleteExistingCluster(restclient restclient.Interface) error {
+	r := restclient.Delete().RequestURI(makeEtcdClusterURI(etcdClusterName)).Do()
+	if r.Error() != nil {
+		var code int
+		r.StatusCode(&code)
+		if code == http.StatusNotFound {
+			return nil
+		}
+		return r.Error()
+	}
+	glog.Infof("deleted the existing etcd cluster: %s", etcdClusterName)
+	return nil
 }
 
 func waitBootEtcdRemoved(etcdServiceIP string) error {
