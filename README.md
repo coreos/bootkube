@@ -89,6 +89,28 @@ go get -u github.com/kubernetes-incubator/bootkube
 cd $GOPATH/src/github.com/kubernetes-incubator/bootkube
 ```
 
+Install Golang 1.7.x, seems to be issues with 1.6.3 on ubuntu 16.04
+
+```
+sudo apt-get update
+sudo apt-get -y upgrade
+sudo wget https://storage.googleapis.com/golang/go1.7.4.linux-amd64.tar.gz
+tar -xvf go1.7.4.linux-amd64.tar.gz
+sudo mv go /usr/local
+
+export GOROOT=/usr/local/go
+export GOPATH=$HOME/gocode
+export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
+
+Add export line abobe to ~./profile to survive reboot
+```
+Verify go version
+
+```
+# go version
+go version go1.7.4 linux/amd64
+```
+
 Then, to build:
 
 ```
