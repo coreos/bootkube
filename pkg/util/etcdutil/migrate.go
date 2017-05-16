@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"time"
 
 	"github.com/kubernetes-incubator/bootkube/pkg/asset"
@@ -48,7 +49,7 @@ func Migrate(kubeConfig clientcmd.ClientConfig, svcPath, tprPath string) error {
 	}
 	glog.Infof("created etcd cluster TPR")
 
-	if err := createBootstrapEtcdService(restClient, svcPath); err != nil {
+	if err := createBootstrapEtcdService(kubecli, svcPath); err != nil {
 		return fmt.Errorf("failed to create bootstrap-etcd-service: %v", err)
 	}
 	defer cleanupBootstrapEtcdService(kubecli)
@@ -98,12 +99,39 @@ func waitEtcdTPRReady(restClient restclient.Interface, interval, timeout time.Du
 	return nil
 }
 
-func createBootstrapEtcdService(restclient restclient.Interface, svcPath string) error {
+func createBootstrapEtcdService(kubecli kubernetes.Interface, svcPath string) error {
+	// Create the service.
 	svc, err := ioutil.ReadFile(svcPath)
 	if err != nil {
 		return err
 	}
-	return restclient.Post().RequestURI("/api/v1/namespaces/kube-system/services").SetHeader("Content-Type", "application/json").Body(svc).Do().Error()
+	if err := kubecli.CoreV1().RESTClient().Post().RequestURI("/api/v1/namespaces/kube-system/services").SetHeader("Content-Type", "application/json").Body(svc).Do().Error(); err != nil {
+		return err
+	}
+
+	// Wait for the service to come up. Sometimes this takes a little while.
+	if err := wait.Poll(3*time.Second, 30*time.Second, func() (bool, error) {
+		svc, err := kubecli.CoreV1().Services("kube-system").Get("bootstrap-etcd-service", v1.GetOptions{})
+		if err != nil {
+			glog.Errorf("failed to get bootstrap etcd service: %v", err)
+			return false, nil
+		}
+		resp, err := http.Get(fmt.Sprintf("http://%s:12379/version", svc.Spec.ClusterIP))
+		if err != nil {
+			glog.Infof("could not read bootstrap etcd version: %v", err)
+			return false, nil
+		}
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		if len(body) == 0 || err != nil {
+			glog.Infof("could not read boot-etcd version: %v", err)
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		return fmt.Errorf("timed out waiting for etcd service: %s", err)
+	}
+	return nil
 }
 
 func createMigratedEtcdCluster(restclient restclient.Interface, tprPath string) error {
@@ -116,13 +144,12 @@ func createMigratedEtcdCluster(restclient restclient.Interface, tprPath string) 
 }
 
 func waitEtcdClusterRunning(restclient restclient.Interface) error {
-	glog.Infof("initial delaying (30s)...")
-	time.Sleep(30 * time.Second)
 	uri := fmt.Sprintf("/apis/%s/%s/namespaces/kube-system/%s/%s", spec.TPRGroup, spec.TPRVersion, spec.TPRKindPlural, etcdClusterName)
 	err := wait.Poll(10*time.Second, waitEtcdClusterRunningTime, func() (bool, error) {
 		b, err := restclient.Get().RequestURI(uri).DoRaw()
 		if err != nil {
-			return false, fmt.Errorf("failed to get etcd cluster TPR: %v", err)
+			glog.Errorf("failed to get etcd cluster TPR: %v", err)
+			return false, nil
 		}
 
 		e := &spec.Cluster{}
