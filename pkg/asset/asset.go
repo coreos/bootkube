@@ -57,7 +57,10 @@ const (
 	AssetPathBootstrapEtcd               = "bootstrap-manifests/bootstrap-etcd.yaml"
 	AssetPathBootstrapEtcdService        = "etcd/bootstrap-etcd-service.json"
 	AssetPathMigrateEtcdCluster          = "etcd/migrate-etcd-cluster.json"
-	BootstrapSecretsDir                  = "/etc/kubernetes/bootstrap-secrets"
+)
+
+var (
+	BootstrapSecretsDir = "/etc/kubernetes/bootstrap-secrets" // Overridden for testing.
 )
 
 // AssetConfig holds all configuration needed when generating
@@ -78,6 +81,7 @@ type Config struct {
 	BootEtcdServiceIP      net.IP
 	DNSServiceIP           net.IP
 	EtcdServiceIP          net.IP
+	EtcdServiceName        string
 	SelfHostKubelet        bool
 	SelfHostedEtcd         bool
 	CloudProvider          string

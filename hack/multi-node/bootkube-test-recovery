@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+GLOG_v=${GLOG_v:-1}
+HOST=${HOST:-c1}
+SELF_HOST_ETCD=${SELF_HOST_ETCD:-false}
+
+if [ ! -d "cluster" ]; then
+  echo "Need some cluster assets to perform recovery; try running bootkube-up."
+fi
+
+if [ -f cluster/bootstrap-manifests/bootstrap-etcd.yaml ]; then
+  echo "ERROR: $(basename $0) does not currently support self-hosted etcd."
+  exit 1
+fi
+
+echo
+echo "Destroying and re-creating the master node..."
+echo
+
+vagrant destroy -f $HOST
+vagrant up $HOST
+
+echo
+echo "As you can see, the cluster is now dead:"
+echo
+
+set -x
+! kubectl --kubeconfig=cluster/auth/kubeconfig get nodes
+{ set +x; } 2>/dev/null
+
+echo
+echo "Recovering the control plane from etcd..."
+echo
+
+scp -q -F ssh_config ../../_output/bin/linux/bootkube cluster/auth/kubeconfig cluster/tls/etcd-* core@$HOST:/home/core
+ssh -q -F ssh_config core@$HOST "GLOG_v=${GLOG_v} /home/core/bootkube recover \
+  --asset-dir=/home/core/recovered \
+  --etcd-ca-path=/home/core/etcd-ca.crt \
+  --etcd-certificate-path=/home/core/etcd-client.crt \
+  --etcd-private-key-path=/home/core/etcd-client.key \
+  --etcd-servers=https://172.17.4.51:2379 \
+  --kubeconfig=/home/core/kubeconfig 2>> /home/core/recovery.log"
+
+echo
+echo "Running bootkube start..."
+echo
+
+ssh -q -F ssh_config core@$HOST "sudo GLOG_v=${GLOG_v} /home/core/bootkube start --asset-dir=/home/core/recovered 2>> /home/core/recovery.log"
+
+echo
+echo "The cluster should now be recovered. You should be able to access the cluster again using:"
+echo "kubectl --kubeconfig=cluster/auth/kubeconfig get nodes"
+echo

@@ -8,10 +8,13 @@ import (
 	"io/ioutil"
 	"time"
 
+	"github.com/kubernetes-incubator/bootkube/pkg/asset"
+
 	"github.com/coreos/etcd-operator/pkg/spec"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/glog"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
@@ -28,7 +31,7 @@ var (
 	waitBootEtcdRemovedTime    = 300 * time.Second
 )
 
-func Migrate(kubeConfig clientcmd.ClientConfig, svcPath, tprPath, etcdServiceIP string) error {
+func Migrate(kubeConfig clientcmd.ClientConfig, svcPath, tprPath string) error {
 	config, err := kubeConfig.ClientConfig()
 	if err != nil {
 		return fmt.Errorf("failed to create kube client config: %v", err)
@@ -48,7 +51,13 @@ func Migrate(kubeConfig clientcmd.ClientConfig, svcPath, tprPath, etcdServiceIP 
 	if err := createBootstrapEtcdService(restClient, svcPath); err != nil {
 		return fmt.Errorf("failed to create bootstrap-etcd-service: %v", err)
 	}
-	defer cleanupBootstrapEtcdService(restClient)
+	defer cleanupBootstrapEtcdService(kubecli)
+
+	etcdServiceIP, err := getServiceIP(kubecli, api.NamespaceSystem, asset.EtcdServiceName)
+	if err != nil {
+		return err
+	}
+	glog.Infof("etcd-service IP is %s", etcdServiceIP)
 
 	if err := createMigratedEtcdCluster(restClient, tprPath); err != nil {
 		return fmt.Errorf("failed to create etcd cluster for migration: %v", err)
@@ -133,6 +142,14 @@ func waitEtcdClusterRunning(restclient restclient.Interface) error {
 	return err
 }
 
+func getServiceIP(kubecli kubernetes.Interface, ns, svcName string) (string, error) {
+	svc, err := kubecli.CoreV1().Services(ns).Get(svcName, v1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	return svc.Spec.ClusterIP, nil
+}
+
 func waitBootEtcdRemoved(etcdServiceIP string) error {
 	err := wait.Poll(10*time.Second, waitBootEtcdRemovedTime, func() (bool, error) {
 		cfg := clientv3.Config{
@@ -163,9 +180,8 @@ func waitBootEtcdRemoved(etcdServiceIP string) error {
 	return err
 }
 
-func cleanupBootstrapEtcdService(restclient restclient.Interface) {
-	err := restclient.Delete().RequestURI("/api/v1/namespaces/kube-system/services/bootstrap-etcd-service").Do().Error()
-	if err != nil {
+func cleanupBootstrapEtcdService(kubecli kubernetes.Interface) {
+	if err := kubecli.CoreV1().Services("kube-system").Delete("bootstrap-etcd-service", &v1.DeleteOptions{}); err != nil {
 		glog.Errorf("failed to remove bootstrap-etcd-service: %v", err)
 	}
 }

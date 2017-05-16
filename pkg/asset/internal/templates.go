@@ -875,6 +875,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
       tolerations:
       - key: node-role.kubernetes.io/master
         operator: Exists
@@ -884,7 +886,7 @@ spec:
 	EtcdSvcTemplate = []byte(`apiVersion: v1
 kind: Service
 metadata:
-  name: etcd-service
+  name: {{ .EtcdServiceName }}
   namespace: kube-system
 spec:
   selector:

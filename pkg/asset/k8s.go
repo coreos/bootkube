@@ -12,6 +12,9 @@ import (
 )
 
 const (
+	// The name of the k8s service that selects self-hosted etcd pods
+	EtcdServiceName = "etcd-service"
+
 	secretNamespace     = "kube-system"
 	secretAPIServerName = "kube-apiserver"
 	secretCMName        = "kube-controller-manager"
@@ -50,6 +53,7 @@ func newDynamicAssets(conf Config) Assets {
 		assets = append(assets, mustCreateAssetFromTemplate(AssetPathKubelet, internal.KubeletTemplate, conf))
 	}
 	if conf.SelfHostedEtcd {
+		conf.EtcdServiceName = EtcdServiceName
 		assets = append(assets,
 			mustCreateAssetFromTemplate(AssetPathEtcdOperator, internal.EtcdOperatorTemplate, conf),
 			mustCreateAssetFromTemplate(AssetPathEtcdSvc, internal.EtcdSvcTemplate, conf),
