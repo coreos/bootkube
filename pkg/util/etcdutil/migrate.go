@@ -110,7 +110,7 @@ func createBootstrapEtcdService(kubecli kubernetes.Interface, svcPath string) er
 	}
 
 	// Wait for the service to come up. Sometimes this takes a little while.
-	if err := wait.Poll(3*time.Second, 30*time.Second, func() (bool, error) {
+	if err := wait.Poll(3*time.Second, 300*time.Second, func() (bool, error) {
 		svc, err := kubecli.CoreV1().Services("kube-system").Get("bootstrap-etcd-service", v1.GetOptions{})
 		if err != nil {
 			glog.Errorf("failed to get bootstrap etcd service: %v", err)
@@ -129,7 +129,7 @@ func createBootstrapEtcdService(kubecli kubernetes.Interface, svcPath string) er
 		}
 		return true, nil
 	}); err != nil {
-		return fmt.Errorf("timed out waiting for etcd service: %s", err)
+		return fmt.Errorf("timed out waiting for bootstrap etcd service: %s", err)
 	}
 	return nil
 }
