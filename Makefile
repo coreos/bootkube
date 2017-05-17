@@ -20,7 +20,7 @@ release: \
 check:
 	@find . -name vendor -prune -o -name '*.go' -exec gofmt -s -d {} +
 	@go vet $(shell go list ./... | grep -v '/vendor/')
-	@go test -v $(shell go list ./... | grep -v '/vendor/')
+	@go test -v $(shell go list ./... | grep -v '/vendor/\|/e2e')
 
 install: _output/bin/$(LOCAL_OS)/bootkube
 	cp $< $(GOPATH_BIN)
