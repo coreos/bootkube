@@ -24,12 +24,13 @@ import (
 )
 
 const (
-	etcdClusterName = "kube-etcd"
+	bootstrapEtcdServiceName = "bootstrap-etcd-service"
+	etcdClusterName          = "kube-etcd"
 )
 
 var (
-	waitEtcdClusterRunningTime = 300 * time.Second
-	waitBootEtcdRemovedTime    = 300 * time.Second
+	pollInterval = 5 * time.Second
+	pollTimeout  = 300 * time.Second
 )
 
 func Migrate(kubeConfig clientcmd.ClientConfig, svcPath, tprPath string) error {
@@ -43,7 +44,7 @@ func Migrate(kubeConfig clientcmd.ClientConfig, svcPath, tprPath string) error {
 	}
 	restClient := kubecli.CoreV1().RESTClient()
 
-	err = waitEtcdTPRReady(restClient, 5*time.Second, 60*time.Second, api.NamespaceSystem)
+	err = waitEtcdTPRReady(restClient, api.NamespaceSystem)
 	if err != nil {
 		return err
 	}
@@ -82,8 +83,8 @@ func listEtcdCluster(ns string, restClient restclient.Interface) restclient.Resu
 	return restClient.Get().RequestURI(uri).Do()
 }
 
-func waitEtcdTPRReady(restClient restclient.Interface, interval, timeout time.Duration, ns string) error {
-	err := wait.Poll(interval, timeout, func() (bool, error) {
+func waitEtcdTPRReady(restClient restclient.Interface, ns string) error {
+	err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		res := listEtcdCluster(ns, restClient)
 		if err := res.Error(); err != nil {
 			if apierrors.IsNotFound(err) {
@@ -105,13 +106,13 @@ func createBootstrapEtcdService(kubecli kubernetes.Interface, svcPath string) er
 	if err != nil {
 		return err
 	}
-	if err := kubecli.CoreV1().RESTClient().Post().RequestURI("/api/v1/namespaces/kube-system/services").SetHeader("Content-Type", "application/json").Body(svc).Do().Error(); err != nil {
+	if err := kubecli.CoreV1().RESTClient().Post().RequestURI(fmt.Sprintf("/api/v1/namespaces/%s/services", api.NamespaceSystem)).SetHeader("Content-Type", "application/json").Body(svc).Do().Error(); err != nil {
 		return err
 	}
 
-	// Wait for the service to come up. Sometimes this takes a little while.
-	if err := wait.Poll(3*time.Second, 300*time.Second, func() (bool, error) {
-		svc, err := kubecli.CoreV1().Services("kube-system").Get("bootstrap-etcd-service", v1.GetOptions{})
+	// Wait for the service to be reachable (sometimes this takes a little while).
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
+		svc, err := kubecli.CoreV1().Services(api.NamespaceSystem).Get(bootstrapEtcdServiceName, v1.GetOptions{})
 		if err != nil {
 			glog.Errorf("failed to get bootstrap etcd service: %v", err)
 			return false, nil
@@ -139,13 +140,13 @@ func createMigratedEtcdCluster(restclient restclient.Interface, tprPath string) 
 	if err != nil {
 		return err
 	}
-	uri := fmt.Sprintf("/apis/%s/%s/namespaces/kube-system/%s", spec.TPRGroup, spec.TPRVersion, spec.TPRKindPlural)
+	uri := fmt.Sprintf("/apis/%s/%s/namespaces/%s/%s", spec.TPRGroup, spec.TPRVersion, api.NamespaceSystem, spec.TPRKindPlural)
 	return restclient.Post().RequestURI(uri).SetHeader("Content-Type", "application/json").Body(tpr).Do().Error()
 }
 
 func waitEtcdClusterRunning(restclient restclient.Interface) error {
-	uri := fmt.Sprintf("/apis/%s/%s/namespaces/kube-system/%s/%s", spec.TPRGroup, spec.TPRVersion, spec.TPRKindPlural, etcdClusterName)
-	err := wait.Poll(10*time.Second, waitEtcdClusterRunningTime, func() (bool, error) {
+	uri := fmt.Sprintf("/apis/%s/%s/namespaces/%s/%s/%s", spec.TPRGroup, spec.TPRVersion, api.NamespaceSystem, spec.TPRKindPlural, etcdClusterName)
+	err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		b, err := restclient.Get().RequestURI(uri).DoRaw()
 		if err != nil {
 			glog.Errorf("failed to get etcd cluster TPR: %v", err)
@@ -178,7 +179,7 @@ func getServiceIP(kubecli kubernetes.Interface, ns, svcName string) (string, err
 }
 
 func waitBootEtcdRemoved(etcdServiceIP string) error {
-	err := wait.Poll(10*time.Second, waitBootEtcdRemovedTime, func() (bool, error) {
+	err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		cfg := clientv3.Config{
 			Endpoints:   []string{fmt.Sprintf("http://%s:2379", etcdServiceIP)},
 			DialTimeout: 5 * time.Second,
@@ -208,7 +209,7 @@ func waitBootEtcdRemoved(etcdServiceIP string) error {
 }
 
 func cleanupBootstrapEtcdService(kubecli kubernetes.Interface) {
-	if err := kubecli.CoreV1().Services("kube-system").Delete("bootstrap-etcd-service", &v1.DeleteOptions{}); err != nil {
+	if err := kubecli.CoreV1().Services(api.NamespaceSystem).Delete(bootstrapEtcdServiceName, &v1.DeleteOptions{}); err != nil {
 		glog.Errorf("failed to remove bootstrap-etcd-service: %v", err)
 	}
 }
