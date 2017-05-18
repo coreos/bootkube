@@ -146,7 +146,7 @@ func createMigratedEtcdCluster(restclient restclient.Interface, podIP string) er
       ]
     },
     "selfHosted": {
-      "bootMemberClientEndpoint": "http://%s:12379"
+      "bootMemberClientEndpoint": "http://%s:4001"
     }
   }
 }`, spec.TPRGroup, spec.TPRVersion, strings.Title(spec.TPRKind), etcdClusterName, podIP))
