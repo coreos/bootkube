@@ -40,7 +40,7 @@ var (
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{{
 								Name:    "kube-apiserver",
-								Image:   "quay.io/coreos/hyperkube:v1.6.2_coreos.0",
+								Image:   "quay.io/coreos/hyperkube:v1.6.2_coreos.1",
 								Command: []string{"/usr/bin/flock", "/hyperkube", "apiserver", "--secure-port=443"},
 								VolumeMounts: []v1.VolumeMount{{
 									Name:      "ssl-certs-host",
@@ -79,7 +79,7 @@ var (
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{{
 								Name:    "kube-scheduler",
-								Image:   "quay.io/coreos/hyperkube:v1.6.2_coreos.0",
+								Image:   "quay.io/coreos/hyperkube:v1.6.2_coreos.1",
 								Command: []string{"/hyperkube", "scheduler"},
 							}},
 						},
@@ -113,7 +113,7 @@ func TestExtractBootstrapPods(t *testing.T) {
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{{
 				Name:    "kube-apiserver",
-				Image:   "quay.io/coreos/hyperkube:v1.6.2_coreos.0",
+				Image:   "quay.io/coreos/hyperkube:v1.6.2_coreos.1",
 				Command: []string{"/usr/bin/flock", "/hyperkube", "apiserver", "--secure-port=443"},
 				VolumeMounts: []v1.VolumeMount{{
 					Name:      "ssl-certs-host",
@@ -145,7 +145,7 @@ func TestExtractBootstrapPods(t *testing.T) {
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{{
 				Name:    "kube-scheduler",
-				Image:   "quay.io/coreos/hyperkube:v1.6.2_coreos.0",
+				Image:   "quay.io/coreos/hyperkube:v1.6.2_coreos.1",
 				Command: []string{"/hyperkube", "scheduler"},
 			}},
 		},
@@ -170,7 +170,7 @@ func TestFixUpBootstrapPods(t *testing.T) {
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{{
 				Name:    "kube-apiserver",
-				Image:   "quay.io/coreos/hyperkube:v1.6.2_coreos.0",
+				Image:   "quay.io/coreos/hyperkube:v1.6.2_coreos.1",
 				Command: []string{"/usr/bin/flock", "/hyperkube", "apiserver", "--secure-port=443"},
 				VolumeMounts: []v1.VolumeMount{{
 					Name:      "ssl-certs-host",
@@ -209,7 +209,7 @@ func TestFixUpBootstrapPods(t *testing.T) {
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{{
 				Name:    "kube-scheduler",
-				Image:   "quay.io/coreos/hyperkube:v1.6.2_coreos.0",
+				Image:   "quay.io/coreos/hyperkube:v1.6.2_coreos.1",
 				Command: []string{"/hyperkube", "scheduler"},
 			}},
 		},
@@ -226,7 +226,7 @@ func TestFixUpBootstrapPods(t *testing.T) {
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{{
 				Name:    "kube-apiserver",
-				Image:   "quay.io/coreos/hyperkube:v1.6.2_coreos.0",
+				Image:   "quay.io/coreos/hyperkube:v1.6.2_coreos.1",
 				Command: []string{"/usr/bin/flock", "/hyperkube", "apiserver", "--secure-port=443"},
 				VolumeMounts: []v1.VolumeMount{{
 					Name:      "ssl-certs-host",
@@ -268,7 +268,7 @@ func TestFixUpBootstrapPods(t *testing.T) {
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{{
 				Name:    "kube-scheduler",
-				Image:   "quay.io/coreos/hyperkube:v1.6.2_coreos.0",
+				Image:   "quay.io/coreos/hyperkube:v1.6.2_coreos.1",
 				Command: []string{"/hyperkube", "scheduler", "--kubeconfig=/kubeconfig/kubeconfig"},
 				VolumeMounts: []v1.VolumeMount{{
 					Name:      "kubeconfig",
