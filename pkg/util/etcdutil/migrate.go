@@ -211,6 +211,10 @@ func waitBootEtcdRemoved(etcdServiceIP string) error {
 func cleanupBootstrapEtcdService(kubecli kubernetes.Interface) {
 	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		if err := kubecli.CoreV1().Services(api.NamespaceSystem).Delete(bootstrapEtcdServiceName, &v1.DeleteOptions{}); err != nil {
+			if apierrors.IsNotFound(err) {
+				glog.Info("bootstrap-etcd-service already removed")
+				return true, nil
+			}
 			glog.Errorf("failed to remove bootstrap-etcd-service: %v", err)
 			return false, nil
 		}
