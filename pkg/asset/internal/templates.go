@@ -1,8 +1,7 @@
 // Package internal holds asset templates used by bootkube.
 package internal
 
-var (
-	KubeConfigTemplate = []byte(`apiVersion: v1
+var KubeConfigTemplate = []byte(`apiVersion: v1
 kind: Config
 clusters:
 - name: local
@@ -20,7 +19,7 @@ contexts:
     user: kubelet
 `)
 
-	KubeSystemSARoleBindingTemplate = []byte(`apiVersion: rbac.authorization.k8s.io/v1alpha1
+var KubeSystemSARoleBindingTemplate = []byte(`apiVersion: rbac.authorization.k8s.io/v1alpha1
 kind: ClusterRoleBinding
 metadata:
   name: system:default-sa
@@ -34,7 +33,7 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 `)
 
-	KubeletTemplate = []byte(`apiVersion: extensions/v1beta1
+var KubeletTemplate = []byte(`apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
   name: kubelet
@@ -132,7 +131,7 @@ spec:
           path: /
 `)
 
-	APIServerTemplate = []byte(`apiVersion: "extensions/v1beta1"
+var APIServerTemplate = []byte(`apiVersion: "extensions/v1beta1"
 kind: DaemonSet
 metadata:
   name: kube-apiserver
@@ -154,11 +153,7 @@ spec:
       - name: kube-apiserver
         image: {{ .Images.Hyperkube }}
         command:
-        - /usr/bin/flock
-        - --exclusive
-        - --timeout=30
-        - /var/lock/api-server.lock
-        - /hyperkube
+        - ./hyperkube
         - apiserver
         - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota
         - --advertise-address=$(POD_IP)
@@ -189,6 +184,9 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.podIP
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65534
         volumeMounts:
         - mountPath: /etc/ssl/certs
           name: ssl-certs-host
@@ -220,7 +218,7 @@ spec:
           path: /var/lock
 `)
 
-	BootstrapAPIServerTemplate = []byte(`apiVersion: v1
+var BootstrapAPIServerTemplate = []byte(`apiVersion: v1
 kind: Pod
 metadata:
   name: bootstrap-kube-apiserver
@@ -230,11 +228,7 @@ spec:
   - name: kube-apiserver
     image: {{ .Images.Hyperkube }}
     command:
-    - /usr/bin/flock
-    - --exclusive
-    - --timeout=30
-    - /var/lock/api-server.lock
-    - /hyperkube
+    - ./hyperkube
     - apiserver
     - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota
     - --advertise-address=$(POD_IP)
@@ -287,7 +281,7 @@ spec:
       path: /var/lock
 `)
 
-	KencTemplate = []byte(`apiVersion: "extensions/v1beta1"
+var KencTemplate = []byte(`apiVersion: "extensions/v1beta1"
 kind: DaemonSet
 metadata:
   name: kube-etcd-network-checkpointer
@@ -337,7 +331,7 @@ spec:
           path: /var/lock
 `)
 
-	CheckpointerTemplate = []byte(`apiVersion: "extensions/v1beta1"
+var CheckpointerTemplate = []byte(`apiVersion: "extensions/v1beta1"
 kind: DaemonSet
 metadata:
   name: pod-checkpointer
@@ -396,7 +390,8 @@ spec:
         hostPath:
           path: /var/run
 `)
-	ControllerManagerTemplate = []byte(`apiVersion: extensions/v1beta1
+
+var ControllerManagerTemplate = []byte(`apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
   name: kube-controller-manager
@@ -458,6 +453,9 @@ spec:
           readOnly: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
@@ -474,7 +472,7 @@ spec:
       dnsPolicy: Default # Don't use cluster DNS.
 `)
 
-	BootstrapControllerManagerTemplate = []byte(`apiVersion: v1
+var BootstrapControllerManagerTemplate = []byte(`apiVersion: v1
 kind: Pod
 metadata:
   name: bootstrap-kube-controller-manager
@@ -510,7 +508,8 @@ spec:
     hostPath:
       path: /usr/share/ca-certificates
 `)
-	ControllerManagerDisruptionTemplate = []byte(`apiVersion: policy/v1beta1
+
+var ControllerManagerDisruptionTemplate = []byte(`apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
   name: kube-controller-manager
@@ -522,7 +521,8 @@ spec:
       tier: control-plane
       k8s-app: kube-controller-manager
 `)
-	SchedulerTemplate = []byte(`apiVersion: extensions/v1beta1
+
+var SchedulerTemplate = []byte(`apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
   name: kube-scheduler
@@ -571,6 +571,9 @@ spec:
           timeoutSeconds: 15
       nodeSelector:
         node-role.kubernetes.io/master: ""
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
@@ -579,7 +582,7 @@ spec:
         effect: NoSchedule
 `)
 
-	BootstrapSchedulerTemplate = []byte(`apiVersion: v1
+var BootstrapSchedulerTemplate = []byte(`apiVersion: v1
 kind: Pod
 metadata:
   name: bootstrap-kube-scheduler
@@ -603,7 +606,8 @@ spec:
     hostPath:
       path: /etc/kubernetes
 `)
-	SchedulerDisruptionTemplate = []byte(`apiVersion: policy/v1beta1
+
+var SchedulerDisruptionTemplate = []byte(`apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
   name: kube-scheduler
@@ -615,7 +619,8 @@ spec:
       tier: control-plane
       k8s-app: kube-scheduler
 `)
-	ProxyTemplate = []byte(`apiVersion: "extensions/v1beta1"
+
+var ProxyTemplate = []byte(`apiVersion: "extensions/v1beta1"
 kind: DaemonSet
 metadata:
   name: kube-proxy
@@ -636,7 +641,7 @@ spec:
       - name: kube-proxy
         image: {{ .Images.Hyperkube }}
         command:
-        - /hyperkube
+        - ./hyperkube
         - proxy
         - --cluster-cidr={{ .PodCIDR }}
         - --hostname-override=$(NODE_NAME)
@@ -671,7 +676,8 @@ spec:
         hostPath:
           path: /etc/kubernetes
 `)
-	DNSDeploymentTemplate = []byte(`apiVersion: extensions/v1beta1
+
+var DNSDeploymentTemplate = []byte(`apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
   name: kube-dns
@@ -827,7 +833,8 @@ spec:
           name: kube-dns
           optional: true
 `)
-	DNSSvcTemplate = []byte(`apiVersion: v1
+
+var DNSSvcTemplate = []byte(`apiVersion: v1
 kind: Service
 metadata:
   name: kube-dns
@@ -849,7 +856,7 @@ spec:
     protocol: TCP
 `)
 
-	EtcdOperatorTemplate = []byte(`apiVersion: extensions/v1beta1
+var EtcdOperatorTemplate = []byte(`apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
   name: etcd-operator
@@ -877,13 +884,16 @@ spec:
               fieldPath: metadata.name
       nodeSelector:
         node-role.kubernetes.io/master: ""
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
       tolerations:
       - key: node-role.kubernetes.io/master
         operator: Exists
         effect: NoSchedule
 `)
 
-	EtcdSvcTemplate = []byte(`apiVersion: v1
+var EtcdSvcTemplate = []byte(`apiVersion: v1
 kind: Service
 metadata:
   name: {{ .EtcdServiceName }}
@@ -899,7 +909,7 @@ spec:
     protocol: TCP
 `)
 
-	BootstrapEtcdTemplate = []byte(`apiVersion: v1
+var BootstrapEtcdTemplate = []byte(`apiVersion: v1
 kind: Pod
 metadata:
   name: bootstrap-etcd
@@ -925,7 +935,7 @@ spec:
   restartPolicy: Never
 `)
 
-	BootstrapEtcdSvcTemplate = []byte(`{
+var BootstrapEtcdSvcTemplate = []byte(`{
   "apiVersion": "v1",
   "kind": "Service",
   "metadata": {
@@ -952,7 +962,7 @@ spec:
   }
 }`)
 
-	EtcdTPRTemplate = []byte(`{
+var EtcdTPRTemplate = []byte(`{
   "apiVersion": "etcd.coreos.com/v1beta1",
   "kind": "Cluster",
   "metadata": {
@@ -980,7 +990,7 @@ spec:
   }
 }`)
 
-	KubeFlannelCfgTemplate = []byte(`apiVersion: v1
+var KubeFlannelCfgTemplate = []byte(`apiVersion: v1
 kind: ConfigMap
 metadata:
   name: kube-flannel-cfg
@@ -1006,7 +1016,7 @@ data:
     }
 `)
 
-	KubeFlannelTemplate = []byte(`apiVersion: extensions/v1beta1
+var KubeFlannelTemplate = []byte(`apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
   name: kube-flannel
@@ -1071,4 +1081,5 @@ spec:
           configMap:
             name: kube-flannel-cfg
 `)
-)
+
+// vim: set expandtab:tabstop=2

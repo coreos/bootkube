@@ -9,7 +9,7 @@ coreos:
         [Service]
         EnvironmentFile=/etc/environment
         Environment=KUBELET_IMAGE_URL=quay.io/coreos/hyperkube
-        Environment=KUBELET_IMAGE_TAG=v1.6.2_coreos.0
+        Environment=KUBELET_IMAGE_TAG=v1.6.2_coreos.1
         Environment="RKT_RUN_ARGS=--uuid-file-save=/var/run/kubelet-pod.uuid \
           --volume var-lib-cni,kind=host,source=/var/lib/cni \
           --mount volume=var-lib-cni,target=/var/lib/cni"
