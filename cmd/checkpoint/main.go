@@ -331,9 +331,9 @@ func createCheckpointsForValidParents(client kubernetes.Interface, pods map[stri
 		//
 		// We do not use the `localPodRunning` state, because while the runtime may think the pod/containers are running -
 		// they may actually be in a failing state - and we've not successfully sent that podStatus to any api-server.
-		if !isRunning(pod) {
-			continue
-		}
+		// if !isRunning(pod) {
+		// 	continue
+		// }
 		id := PodFullName(pod)
 
 		cp, err := copyPod(pod)
