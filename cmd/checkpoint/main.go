@@ -680,7 +680,7 @@ func handleStart(start []string) {
 		}
 
 		dst := PodFullNameToActiveCheckpointPath(id)
-		if err := ioutil.WriteFile(dst, data, 0644); err != nil {
+		if err := writeAndAtomicRename(dst, data, 0644); err != nil {
 			glog.Errorf("Failed to write active checkpoint manifest: %v", err)
 		}
 	}
