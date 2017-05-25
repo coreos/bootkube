@@ -379,17 +379,22 @@ func writeCheckpointManifest(pod *v1.Pod) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0600); err != nil {
 		return err
 	}
+	return writeManifestIfDifferent(path, PodFullName(pod), b)
+}
 
-	oldb, err := ioutil.ReadFile(path)
+// writeManifestIfDifferent writes `data` to `path` if data is different from the existing content.
+// The `name` parameter is used for debug output.
+func writeManifestIfDifferent(path, name string, data []byte) error {
+	existing, err := ioutil.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	if bytes.Compare(oldb, b) == 0 {
-		glog.V(4).Infof("Checkpoint manifest for %s already exists. Skipping", PodFullName(pod))
+	if bytes.Equal(existing, data) {
+		glog.V(4).Infof("Checkpoint manifest for %q already exists. Skipping", name)
 		return nil
 	}
-	glog.Infof("Checkpointing manifest for %s", PodFullName(pod))
-	return writeAndAtomicRename(path, b, 0644)
+	glog.Infof("Writing manifest for %q to %q", name, path)
+	return writeAndAtomicRename(path, data, 0644)
 }
 
 // isPodCheckpointer returns true if the manifest is the pod checkpointer (has the same name as the parent).
@@ -680,7 +685,7 @@ func handleStart(start []string) {
 		}
 
 		dst := PodFullNameToActiveCheckpointPath(id)
-		if err := writeAndAtomicRename(dst, data, 0644); err != nil {
+		if err := writeManifestIfDifferent(dst, id, data); err != nil {
 			glog.Errorf("Failed to write active checkpoint manifest: %v", err)
 		}
 	}
