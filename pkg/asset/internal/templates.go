@@ -158,8 +158,6 @@ spec:
         image: {{ .Images.Hyperkube }}
         command:
         - /usr/bin/flock
-        - --exclusive
-        - --timeout=30
         - /var/lock/api-server.lock
         - /hyperkube
         - apiserver
@@ -238,8 +236,6 @@ spec:
     image: {{ .Images.Hyperkube }}
     command:
     - /usr/bin/flock
-    - --exclusive
-    - --timeout=30
     - /var/lock/api-server.lock
     - /hyperkube
     - apiserver
