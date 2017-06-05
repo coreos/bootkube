@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+set -e
+
+cd $(dirname $0)
+
+source ./env
+
+if [[ $# -eq 0 ]]; then
+	set -- cmd/*
+fi
+
+version=$(git describe --dirty)
+version="${version#v}"
+version="${version/-/+}"
+ldflags="-X ${REPO_PATH}/version.Version=${version}"
+
+host_build() {
+	echo "Building $1"
+	go build -i -ldflags "${ldflags}" -o "bin/$1" "${REPO_PATH}/cmd/$1"
+}
+
+for cmd in "$@"; do
+	cmd=$(basename "${cmd}")
+	host_build "${cmd}"
+done

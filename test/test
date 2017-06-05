@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+#
+# Run all tests
+#   ./test
+#   ./test -v
+#
+# Run tests for one package
+#   PKG=./foo ./test
+#
+
+set -e
+
+cd $(dirname $0)
+
+# A replacement for `go fmt` that calls gofmt without -w
+gofmt-l() {
+    pushd "${GOPATH}/src" >/dev/null
+    c=$(gofmt -l "$@" | tee /dev/stderr | wc -c)
+    popd >/dev/null
+    if [[ $c -ne 0 ]]; then
+        echo "gofmt check failed" >&2
+        return 1
+    fi
+}
+
+source ./env
+# Use an alternate bin to avoid clobbering output from ./build
+export GOBIN="${GOPATH}/_testbin"
+# cd via the symlink so ./... and so on resolves correctly.
+cd gopath/src/${REPO_PATH}
+
+# PKG may be passed in from ./cover
+[[ -z "$PKG" ]] && PKG="./..."
+
+# Expand PKG, excluding the vendor directory.
+pkgs=$(go list $PKG | grep -v /vendor/)
+
+echo "Building tests..."
+go test -i "$@" $pkgs
+go install $pkgs
+
+echo "Running tests..."
+go test -cover "$@" $pkgs
+
+echo "Checking gofmt..."
+if [[ "$@" == "-v" ]]; then
+	gofmt-l -d $pkgs
+else
+	gofmt-l $pkgs
+fi
+
+echo "Checking govet..."
+go vet $pkgs
+
+echo "Running commands..."
+for cmd in ${GOBIN}/*; do
+	echo " Running $(basename ${cmd})..."
+	${cmd} --help > /dev/null
+done
+
+echo "Success"
