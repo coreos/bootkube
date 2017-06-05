@@ -21,7 +21,7 @@ const (
 	apiOffset                    = 1
 	dnsOffset                    = 10
 	etcdOffset                   = 15
-	bootEtcdOffset               = 200
+	bootEtcdOffset               = 20
 	defaultServiceBaseIP         = "10.3.0.0"
 	defaultEtcdServers           = "https://127.0.0.1:2379"
 	defaultSelfHostedEtcdServers = "http://127.0.0.1:2379"
