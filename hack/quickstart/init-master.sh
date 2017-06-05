@@ -9,6 +9,8 @@ IDENT=${IDENT:-${HOME}/.ssh/id_rsa}
 SSH_OPTS=${SSH_OPTS:-}
 SELF_HOST_ETCD=${SELF_HOST_ETCD:-false}
 CLOUD_PROVIDER=${CLOUD_PROVIDER:-}
+ENABLE_BOOTSTRAP_LOGS=${ENABLE_BOOTSTRAP_LOGS:-false}
+
 
 function usage() {
     echo "USAGE:"
@@ -59,7 +61,7 @@ function init_master_node() {
     # Render cluster assets
     /home/${REMOTE_USER}/bootkube render --asset-dir=/home/${REMOTE_USER}/assets ${etcd_render_flags} \
       --api-servers=https://${COREOS_PUBLIC_IPV4}:443,https://${COREOS_PRIVATE_IPV4}:443
-
+    
     # Move the local kubeconfig into expected location
     chown -R ${REMOTE_USER}:${REMOTE_USER} /home/${REMOTE_USER}/assets
     mkdir -p /etc/kubernetes
@@ -70,6 +72,12 @@ function init_master_node() {
     if [ "$SELF_HOST_ETCD" = false ] ; then
         configure_etcd
         systemctl enable etcd-member; sudo systemctl start etcd-member
+    fi
+
+    # Add fluentd static pod
+    if [ ${ENABLE_BOOTSTRAP_LOGS} = "true" ]; then
+        echo "Writing asset: /home/${REMOTE_USER}/assets/bootstrap-manifests/bootstrap-fluentd.yaml"
+        cp /home/${REMOTE_USER}/bootstrap-fluentd.sample /home/${REMOTE_USER}/assets/bootstrap-manifests/bootstrap-fluentd.yaml
     fi
 
     # Set cloud provider
@@ -99,9 +107,14 @@ if [ "${REMOTE_HOST}" != "local" ]; then
     # Copy bootkube binary to remote host.
     scp -i ${IDENT} -P ${REMOTE_PORT} -C ${SSH_OPTS} ../../_output/bin/linux/bootkube ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/bootkube
 
+    # Copy fluentd static pod manifest
+    if [ ${ENABLE_BOOTSTRAP_LOGS} = "true" ]; then
+        scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} bootstrap-fluentd.sample ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/bootstrap-fluentd.sample
+    fi
+
     # Copy self to remote host so script can be executed in "local" mode
     scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} ${BASH_SOURCE[0]} ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/init-master.sh
-    ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "sudo REMOTE_USER=${REMOTE_USER} CLOUD_PROVIDER=${CLOUD_PROVIDER} SELF_HOST_ETCD=${SELF_HOST_ETCD} /home/${REMOTE_USER}/init-master.sh local"
+    ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "sudo REMOTE_USER=${REMOTE_USER} CLOUD_PROVIDER=${CLOUD_PROVIDER} SELF_HOST_ETCD=${SELF_HOST_ETCD} ENABLE_BOOTSTRAP_LOGS=${ENABLE_BOOTSTRAP_LOGS} /home/${REMOTE_USER}/init-master.sh local"
 
     # Copy assets from remote host to a local directory. These can be used to launch additional nodes & contain TLS assets
     mkdir ${CLUSTER_DIR}
@@ -118,6 +131,12 @@ if [ "${REMOTE_HOST}" != "local" ]; then
     echo "Additional nodes can be added to the cluster using:"
     echo "./init-node.sh <node-ip> ${CLUSTER_DIR}/auth/kubeconfig"
     echo
+
+    if [ ${ENABLE_BOOTSTRAP_LOGS} = "true" ]; then
+        echo "Fetch bootstrap logs using:"
+        echo "scp -q -C -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} -r ${REMOTE_USER}@${REMOTE_HOST}:/var/log/bootkube-bootstrap/ logs"
+        echo        
+    fi
 
 # Execute this script locally on the machine, assumes a kubelet.service file has already been placed on host.
 elif [ "$1" == "local" ]; then

@@ -26,6 +26,13 @@ if [ ! -d "cluster" ]; then
 	fi
 fi
 
+# Add fluentd static pod
+ENABLE_BOOTSTRAP_LOGS=${ENABLE_BOOTSTRAP_LOGS:-false}
+if [ ${ENABLE_BOOTSTRAP_LOGS} = "true" ]; then
+    echo "Writing asset: cluster/bootstrap-manifests/bootstrap-fluentd.yaml"
+    cp bootstrap-fluentd.sample cluster/bootstrap-manifests/bootstrap-fluentd.yaml
+fi
+
 # Start the VM
 vagrant up
 vagrant ssh-config > ssh_config
@@ -41,3 +48,9 @@ echo
 echo "Bootstrap complete. Access your kubernetes cluster using:"
 echo "kubectl --kubeconfig=cluster/auth/kubeconfig get nodes"
 echo
+
+if [ ${ENABLE_BOOTSTRAP_LOGS} = "true" ]; then
+    echo "Fetch bootstrap logs using:"
+    echo "scp -q -r -C -F ssh_config core@default:/var/log/bootkube-bootstrap bootstrap-logs"
+    echo
+fi
