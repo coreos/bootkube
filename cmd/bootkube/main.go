@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/kubernetes-incubator/bootkube/pkg/util"
 	"github.com/kubernetes-incubator/bootkube/pkg/version"
@@ -28,6 +29,11 @@ var (
 		},
 	}
 )
+
+func init() {
+	remove := pflag.Lookup("log-flush-frequency")
+	remove.Hidden = true
+}
 
 func main() {
 	flag.Parse()
