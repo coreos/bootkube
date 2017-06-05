@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kube-flannel-cfg
+  namespace: kube-system
+  labels:
+    tier: node
+    app: flannel
+data:
+  cni-conf.json: |
+    {
+      "name": "cbr0",
+      "type": "flannel",
+      "delegate": {
+        "isDefaultGateway": true
+      }
+    }
+  net-conf.json: |
+    {
+      "Network": "${pod_cidr}",
+      "Backend": {
+        "Type": "vxlan"
+      }
+    }

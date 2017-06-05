@@ -1,0 +1,81 @@
+apiVersion: "extensions/v1beta1"
+kind: DaemonSet
+metadata:
+  name: kube-apiserver
+  namespace: kube-system
+  labels:
+    tier: control-plane
+    component: kube-apiserver
+spec:
+  template:
+    metadata:
+      labels:
+        tier: control-plane
+        component: kube-apiserver
+      annotations:
+        checkpointer.alpha.coreos.com/checkpoint: "true"
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+    spec:
+      containers:
+      - name: kube-apiserver
+        image: ${hyperkube_image}
+        command:
+        - /usr/bin/flock
+        - --exclusive
+        - --timeout=30
+        - /var/lock/api-server.lock
+        - /hyperkube
+        - apiserver
+        - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota
+        - --advertise-address=$(POD_IP)
+        - --allow-privileged=true
+        - --anonymous-auth=false
+        - --authorization-mode=RBAC
+        - --bind-address=0.0.0.0
+        - --client-ca-file=/etc/kubernetes/secrets/ca.crt
+        - --cloud-provider=${cloud_provider}
+        - --etcd-servers=${etcd_servers}
+        - --insecure-port=0
+        - --kubelet-client-certificate=/etc/kubernetes/secrets/apiserver.crt
+        - --kubelet-client-key=/etc/kubernetes/secrets/apiserver.key
+        - --secure-port=443
+        - --service-account-key-file=/etc/kubernetes/secrets/service-account.pub
+        - --service-cluster-ip-range=${service_cidr}
+        - --storage-backend=etcd3
+        - --tls-ca-file=/etc/kubernetes/secrets/ca.crt
+        - --tls-cert-file=/etc/kubernetes/secrets/apiserver.crt
+        - --tls-private-key-file=/etc/kubernetes/secrets/apiserver.key
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        volumeMounts:
+        - mountPath: /etc/ssl/certs
+          name: ssl-certs-host
+          readOnly: true
+        - mountPath: /etc/kubernetes/secrets
+          name: secrets
+          readOnly: true
+        - mountPath: /var/lock
+          name: var-lock
+          readOnly: false
+      hostNetwork: true
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      volumes:
+      - name: ssl-certs-host
+        hostPath:
+          path: /usr/share/ca-certificates
+      - name: secrets
+        secret:
+          secretName: kube-apiserver
+      - name: var-lock
+        hostPath:
+          path: /var/lock

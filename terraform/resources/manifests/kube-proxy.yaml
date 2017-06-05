@@ -1,0 +1,55 @@
+apiVersion: "extensions/v1beta1"
+kind: DaemonSet
+metadata:
+  name: kube-proxy
+  namespace: kube-system
+  labels:
+    tier: node
+    component: kube-proxy
+spec:
+  template:
+    metadata:
+      labels:
+        tier: node
+        component: kube-proxy
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+    spec:
+      containers:
+      - name: kube-proxy
+        image: ${hyperkube_image}
+        command:
+        - /hyperkube
+        - proxy
+        - --cluster-cidr=${pod_cidr}
+        - --hostname-override=$(NODE_NAME)
+        - --kubeconfig=/etc/kubernetes/kubeconfig
+        - --proxy-mode=iptables
+        env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /etc/ssl/certs
+          name: ssl-certs-host
+          readOnly: true
+        - name: etc-kubernetes
+          mountPath: /etc/kubernetes
+          readOnly: true
+      hostNetwork: true
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      volumes:
+      - hostPath:
+          path: /usr/share/ca-certificates
+        name: ssl-certs-host
+      - name: etc-kubernetes
+        hostPath:
+          path: /etc/kubernetes

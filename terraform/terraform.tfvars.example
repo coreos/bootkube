@@ -1,0 +1,4 @@
+cluster_name = "example"
+api_servers = ["node1.example.com"]
+etcd_servers = ["http://127.0.0.1:2379"]
+asset_dir = "/home/core/clusters/mycluster"
