@@ -994,6 +994,12 @@ var EtcdTPRTemplate = []byte(`{
     "size": 1,
     "version": "v3.1.6",
     "pod": {
+      "resources": {
+        "requests": {
+          "memory": "1Gi",
+          "cpu": "1"
+        }
+      },
       "nodeSelector": {
         "node-role.kubernetes.io/master": ""
       },
