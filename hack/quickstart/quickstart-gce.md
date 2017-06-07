@@ -8,6 +8,28 @@ This can be changed to identify separate clusters.
 export CLUSTER_PREFIX=quickstart
 ```
 
+### Add your SSH public key to project under user core
+
+Quickstart scripts assume you can ssh into the `core` user. Either follow the commands below or go to the web console to add a key for the user `core`.
+
+**WARNING** The following process will clobber existing keys in your project's ssh metadata.
+
+Make a copy of your public key. It often exists at the path: `~/.ssh/id_rsa.pub`
+
+Edit the copy of your public key to ensure it is prefixed with the username `core` The comment can be whatever you like. It should be in the following format:
+
+```
+core:ssh-rsa [KEY_VALUE] [KEY_COMMENT]
+```
+
+Then run the following command on the file:
+
+```
+$ gcloud compute project-info add-metadata --metadata-from-file sshKeys=[KEY_FILE_NAME].pub
+```
+
+Now any instances created on the project will by default have ssh access to the user core with your given ssh key unless project wide metatdata is specifically blocked on that instance.
+
 ### Launch Nodes
 
 Launch nodes:
