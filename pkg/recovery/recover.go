@@ -192,13 +192,20 @@ func setBootstrapPodMetadata(pod *v1.Pod, parent metav1.ObjectMeta) error {
 }
 
 // fixUpBootstrapPods modifies extracted bootstrap pod specs to have correct metadata and point to
-// filesystem-mount-based secrets. It returns mappings from configMap and secret names to output
+// filesystem-mount-based secrets, and removes any security contexts that might prevent the pods
+// from accessing those secrets. It returns mappings from configMap and secret names to output
 // paths that must also be rendered in order for the bootstrap pods to be functional.
 // If selfHostedEtcd is true, it also fixes up the etcd servers flag for the API server.
 func fixUpBootstrapPods(pods []v1.Pod, selfHostedEtcd bool) (requiredConfigMaps, requiredSecrets map[string]string) {
 	requiredConfigMaps, requiredSecrets = make(map[string]string), make(map[string]string)
 	for i := range pods {
 		pod := &pods[i]
+
+		// Fix SecurityContext to ensure the pod runs as root.
+		if pod.Spec.SecurityContext != nil {
+			pod.Spec.SecurityContext.RunAsNonRoot = nil
+			pod.Spec.SecurityContext.RunAsUser = nil
+		}
 
 		// Change secret volumes to point to file mounts.
 		for i := range pod.Spec.Volumes {
@@ -219,6 +226,13 @@ func fixUpBootstrapPods(pods []v1.Pod, selfHostedEtcd bool) (requiredConfigMaps,
 		// Make sure the kubeconfig is in the commandline.
 		for i := range pod.Spec.Containers {
 			cn := &pod.Spec.Containers[i]
+
+			// Fix SecurityContext to ensure the container runs as root.
+			if cn.SecurityContext != nil {
+				cn.SecurityContext.RunAsNonRoot = nil
+				cn.SecurityContext.RunAsUser = nil
+			}
+
 			// Assumes the bootkube naming convention is used. Could also just make sure the image uses hyperkube.
 			if _, ok := kubeConfigK8sContainers[cn.Name]; ok {
 				cn.Command = append(cn.Command, "--kubeconfig=/kubeconfig/kubeconfig")

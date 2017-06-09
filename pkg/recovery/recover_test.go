@@ -207,6 +207,7 @@ func TestFixUpBootstrapPods(t *testing.T) {
 			Namespace: "kube-system",
 		},
 		Spec: v1.PodSpec{
+			SecurityContext: &v1.PodSecurityContext{RunAsNonRoot: boolPtr(true), RunAsUser: int64Ptr(65543)},
 			Containers: []v1.Container{{
 				Name:    "kube-scheduler",
 				Image:   "quay.io/coreos/hyperkube:v1.6.4_coreos.0",
@@ -266,6 +267,7 @@ func TestFixUpBootstrapPods(t *testing.T) {
 			Namespace: "kube-system",
 		},
 		Spec: v1.PodSpec{
+			SecurityContext: &v1.PodSecurityContext{},
 			Containers: []v1.Container{{
 				Name:    "kube-scheduler",
 				Image:   "quay.io/coreos/hyperkube:v1.6.4_coreos.0",
@@ -378,3 +380,7 @@ func TestSetTypeMeta(t *testing.T) {
 		}
 	}
 }
+
+func boolPtr(b bool) *bool { return &b }
+
+func int64Ptr(i int64) *int64 { return &i }
