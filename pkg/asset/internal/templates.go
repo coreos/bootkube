@@ -178,7 +178,7 @@ spec:
         - --insecure-port=0
         - --kubelet-client-certificate=/etc/kubernetes/secrets/apiserver.crt
         - --kubelet-client-key=/etc/kubernetes/secrets/apiserver.key
-        - --secure-port=443
+        - --secure-port=6443
         - --service-account-key-file=/etc/kubernetes/secrets/service-account.pub
         - --service-cluster-ip-range={{ .ServiceCIDR }}
         - --storage-backend=etcd3
@@ -190,6 +190,9 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.podIP
+        ports:
+        - containerPort: 6443
+          hostPort: 443
         volumeMounts:
         - mountPath: /etc/ssl/certs
           name: ssl-certs-host
@@ -200,9 +203,11 @@ spec:
         - mountPath: /var/lock
           name: var-lock
           readOnly: false
-      hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
@@ -1034,11 +1039,23 @@ metadata:
 data:
   cni-conf.json: |
     {
+      "cniVersion": "0.3.1",
       "name": "cbr0",
-      "type": "flannel",
-      "delegate": {
-        "isDefaultGateway": true
-      }
+      "plugins": [
+        {
+          "type": "flannel",
+          "delegate": {
+            "isDefaultGateway": true
+          }
+        },
+        {
+          "type": "portmap",
+          "capabilities": {
+            "portMappings": true
+          },
+          "snat": true
+        }
+      ]
     }
   net-conf.json: |
     {

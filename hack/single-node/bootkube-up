@@ -14,7 +14,7 @@ if [ ${SELF_HOST_ETCD} = "true" ]; then
     echo "WARNING: THIS IS NOT YET FULLY WORKING - merely here to make ongoing testing easier"
     etcd_render_flags="--experimental-self-hosted-etcd"
 else
-    etcd_render_flags=""
+    etcd_render_flags="--etcd-servers=https://172.17.4.100:2379"
 fi
 
 # Render assets
