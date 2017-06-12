@@ -4,6 +4,7 @@ Environment=KUBELET_IMAGE_TAG=v1.6.4_coreos.0
 Environment="RKT_RUN_ARGS=\
 --uuid-file-save=/var/cache/kubelet-pod.uuid \
 --volume etc-resolv,kind=host,source=/etc/resolv.conf --mount volume=etc-resolv,target=/etc/resolv.conf \
+--volume var-log,kind=host,source=/var/log --mount volume=var-log,target=/var/log \
 --volume var-lib-cni,kind=host,source=/var/lib/cni --mount volume=var-lib-cni,target=/var/lib/cni"
 EnvironmentFile=/etc/environment
 ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests
