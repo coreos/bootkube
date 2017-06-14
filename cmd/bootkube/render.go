@@ -38,20 +38,26 @@ var (
 	}
 
 	renderOpts struct {
-		assetDir            string
-		caCertificatePath   string
-		caPrivateKeyPath    string
-		etcdCAPath          string
-		etcdCertificatePath string
-		etcdPrivateKeyPath  string
-		etcdServers         string
-		apiServers          string
-		altNames            string
-		podCIDR             string
-		serviceCIDR         string
-		selfHostKubelet     bool
-		cloudProvider       string
-		selfHostedEtcd      bool
+		assetDir                     string
+		caCertificatePath            string
+		caPrivateKeyPath             string
+		etcdCAPath                   string
+		etcdCertificatePath          string
+		etcdPrivateKeyPath           string
+		selfHostedEtcdClientCAPath   string
+		selfHostedEtcdClientCertPath string
+		selfHostedEtcdClientKeyPath  string
+		selfHostedEtcdPeerCAPath     string
+		selfHostedEtcdPeerCertPath   string
+		selfHostedEtcdPeerKeyPath    string
+		etcdServers                  string
+		apiServers                   string
+		altNames                     string
+		podCIDR                      string
+		serviceCIDR                  string
+		selfHostKubelet              bool
+		cloudProvider                string
+		selfHostedEtcd               bool
 	}
 
 	imageVersions = asset.DefaultImages
@@ -65,6 +71,12 @@ func init() {
 	cmdRender.Flags().StringVar(&renderOpts.etcdCAPath, "etcd-ca-path", "", "Path to an existing PEM encoded CA that will be used for TLS-enabled communication between the apiserver and etcd. Must be used in conjunction with --etcd-certificate-path and --etcd-private-key-path, and must have etcd configured to use TLS with matching secrets.")
 	cmdRender.Flags().StringVar(&renderOpts.etcdCertificatePath, "etcd-certificate-path", "", "Path to an existing certificate that will be used for TLS-enabled communication between the apiserver and etcd. Must be used in conjunction with --etcd-ca-path and --etcd-private-key-path, and must have etcd configured to use TLS with matching secrets.")
 	cmdRender.Flags().StringVar(&renderOpts.etcdPrivateKeyPath, "etcd-private-key-path", "", "Path to an existing private key that will be used for TLS-enabled communication between the apiserver and etcd. Must be used in conjunction with --etcd-ca-path and --etcd-certificate-path, and must have etcd configured to use TLS with matching secrets.")
+	cmdRender.Flags().StringVar(&renderOpts.selfHostedEtcdClientCAPath, "self-hosted-etcd-client-ca", "", "Path to an existing PEM encoded CA that will be used for self-hosted etcd's client port.")
+	cmdRender.Flags().StringVar(&renderOpts.selfHostedEtcdClientCertPath, "self-hosted-etcd-client-cert", "", "Path to an existing certificate that will be used for self-hosted etcd's client port.")
+	cmdRender.Flags().StringVar(&renderOpts.selfHostedEtcdClientKeyPath, "self-hosted-etcd-client-key", "", "Path to an existing private key that will be used for self-hosted etcd's client port.")
+	cmdRender.Flags().StringVar(&renderOpts.selfHostedEtcdPeerCAPath, "self-hosted-etcd-peer-ca", "", "Path to an existing PEM encoded CA that will be used for self-hosted etcd's peer port.")
+	cmdRender.Flags().StringVar(&renderOpts.selfHostedEtcdPeerCertPath, "self-hosted-etcd-peer-cert", "", "Path to an existing certificate that will be used for self-hosted etcd's peer port.")
+	cmdRender.Flags().StringVar(&renderOpts.selfHostedEtcdPeerKeyPath, "self-hosted-etcd-peer-key", "", "Path to an existing private key that will be used for self-hosted etcd's peer port.")
 	cmdRender.Flags().StringVar(&renderOpts.etcdServers, "etcd-servers", defaultEtcdServers, "List of etcd servers URLs including host:port, comma separated")
 	cmdRender.Flags().StringVar(&renderOpts.apiServers, "api-servers", "https://127.0.0.1:443", "List of API server URLs including host:port, commma seprated")
 	cmdRender.Flags().StringVar(&renderOpts.altNames, "api-server-alt-names", "", "List of SANs to use in api-server certificate. Example: 'IP=127.0.0.1,IP=127.0.0.2,DNS=localhost'. If empty, SANs will be extracted from the --api-servers flag.")
@@ -96,11 +108,20 @@ func validateRenderOpts(cmd *cobra.Command, args []string) error {
 	if renderOpts.caPrivateKeyPath != "" && renderOpts.caCertificatePath == "" {
 		return errors.New("You must provide the --ca-certificate-path flag when --ca-private-key-path is provided.")
 	}
+	if renderOpts.selfHostedEtcdClientCAPath != "" && renderOpts.selfHostedEtcdClientCertPath == "" {
+		return errors.New("You must provide the --self-hosted-etcd-client-cert flag when --self-hosted-etcd-client-ca is provided.")
+	}
+	if renderOpts.selfHostedEtcdClientCAPath != "" && renderOpts.selfHostedEtcdClientKeyPath == "" {
+		return errors.New("You must provide the --self-hosted-etcd-client-key flag when --self-hosted-etcd-client-ca is provided.")
+	}
+	if renderOpts.selfHostedEtcdPeerCAPath != "" && renderOpts.selfHostedEtcdPeerCertPath == "" {
+		return errors.New("You must provide the --self-hosted-etcd-peer-cert flag when --self-hosted-etcd-peer-ca is provided.")
+	}
+	if renderOpts.selfHostedEtcdPeerCAPath != "" && renderOpts.selfHostedEtcdPeerKeyPath == "" {
+		return errors.New("You must provide the --self-hosted-etcd-peer-key flag when --self-hosted-etcd-peer-ca is provided.")
+	}
 	if (renderOpts.etcdCAPath != "" || renderOpts.etcdCertificatePath != "" || renderOpts.etcdPrivateKeyPath != "") && (renderOpts.etcdCAPath == "" || renderOpts.etcdCertificatePath == "" || renderOpts.etcdPrivateKeyPath == "") {
 		return errors.New("You must specify either all or none of --etcd-ca-path, --etcd-certificate-path, and --etcd-private-key-path")
-	}
-	if renderOpts.etcdCertificatePath != "" && renderOpts.selfHostedEtcd {
-		return errors.New("Cannot specify --etcd-certificate-path with --experimental-self-hosted-etcd")
 	}
 	if renderOpts.assetDir == "" {
 		return errors.New("Missing required flag: --asset-dir")
