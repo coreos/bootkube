@@ -72,7 +72,9 @@ For complete recovery examples see the
 [hack/multi-node/bootkube-test-recovery](https://github.com/kubernetes-incubator/bootkube/blob/master/hack/multi-node/bootkube-test-recovery)
 and
 [hack/multi-node/bootkube-test-recovery-self-hosted-etcd](https://github.com/kubernetes-incubator/bootkube/blob/master/hack/multi-node/bootkube-test-recovery-self-hosted-etcd)
-scripts.
+scripts. The `bootkube-test-recovery` script is demoed below.
+
+[![asciicast](https://asciinema.org/a/dsp43ziuuzwcztni94y8l25s5.png)](https://asciinema.org/a/dsp43ziuuzwcztni94y8l25s5)
 
 ### If an api-server is still running
 
