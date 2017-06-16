@@ -64,7 +64,7 @@ invoke `bootkube start` to reboot the cluster. For example:
 ```
 scp bootkube user@master-node:
 ssh user@master-node
-./bootkube recover --asset-dir=recovered [scenario-specific options]
+./bootkube recover --recovery-dir=recovered [scenario-specific options]
 sudo ./bootkube start --asset-dir=recovered
 ```
 
@@ -83,7 +83,7 @@ preventing cluster functionality (i.e. the scheduler pods are all down), the
 control plane can be extracted directly from the api-server:
 
 ```
-bootkube recover --asset-dir=recovered --kubeconfig=/etc/kubernetes/kubeconfig
+bootkube recover --recovery-dir=recovered --kubeconfig=/etc/kubernetes/kubeconfig
 ```
 ### If an external etcd cluster is still running
 
@@ -91,7 +91,7 @@ If using an external (non-self-hosted) etcd cluster, the control plane can be
 extracted directly from etcd:
 
 ```
-bootkube recover --asset-dir=recovered --etcd-servers=http://127.0.0.1:2379 --kubeconfig=/etc/kubernetes/kubeconfig
+bootkube recover --recovery-dir=recovered --etcd-servers=http://127.0.0.1:2379 --kubeconfig=/etc/kubernetes/kubeconfig
 ```
 
 ### If an etcd backup is available (non-self-hosted etcd)
@@ -105,7 +105,7 @@ If using self-hosted etcd, recovery is supported via reading from an etcd
 backup file:
 
 ```
-bootkube recover --asset-dir=recovered --etcd-backup-file=backup --kubeconfig=/etc/kubernetes/kubeconfig
+bootkube recover --recovery-dir=recovered --etcd-backup-file=backup --kubeconfig=/etc/kubernetes/kubeconfig
 ```
 
 In addition to rebooting the control plane, this will also destroy and recreate
