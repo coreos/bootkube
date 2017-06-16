@@ -69,19 +69,19 @@ bootkube recover --help
 Recover from an external running etcd cluster:
 
 ```
-bootkube recover --asset-dir=recovered --etcd-servers=http://127.0.0.1:2379 --kubeconfig=/etc/kubernetes/kubeconfig
+bootkube recover --recovery-dir=recovered --etcd-servers=http://127.0.0.1:2379 --kubeconfig=/etc/kubernetes/kubeconfig
 ```
 
 Recover from a running apiserver (i.e. if the scheduler pods are all down):
 
 ```
-bootkube recover --asset-dir=recovered --kubeconfig=/etc/kubernetes/kubeconfig
+bootkube recover --recovery-dir=recovered --kubeconfig=/etc/kubernetes/kubeconfig
 ```
 
 Recover from an etcd backup when self hosted etcd is enabled:
 
 ```
-bootkube recover --asset-dir=recovered --etcd-backup-file=backup --kubeconfig=/etc/kubernetes/kubeconfig
+bootkube recover --recovery-dir=recovered --etcd-backup-file=backup --kubeconfig=/etc/kubernetes/kubeconfig
 ```
 
 For a complete recovery example please see the [hack/multi-node/bootkube-test-recovery](hack/multi-node/bootkube-test-recovery) and the [hack/multi-node/bootkube-test-recovery-self-hosted-etcd](hack/multi-node/bootkube-test-recovery-self-hosted-etcd) scripts.
