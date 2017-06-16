@@ -35,7 +35,7 @@ echo
 
 scp -q -F ssh_config ../../_output/bin/linux/bootkube cluster/auth/kubeconfig cluster/tls/etcd-* core@$HOST:/home/core
 ssh -q -F ssh_config core@$HOST "GLOG_v=${GLOG_v} /home/core/bootkube recover \
-  --asset-dir=/home/core/recovered \
+  --recovery-dir=/home/core/recovered \
   --etcd-ca-path=/home/core/etcd-ca.crt \
   --etcd-certificate-path=/home/core/etcd-client.crt \
   --etcd-private-key-path=/home/core/etcd-client.key \

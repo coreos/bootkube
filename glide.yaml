@@ -5,11 +5,14 @@ import:
   subpackages:
   - pkg/spec
 - package: github.com/coreos/etcd
+  version: v3.1.8
   subpackages:
   - clientv3
   - pkg/fileutil
 - package: github.com/ghodss/yaml
+  version: 0ca9ea5df5451ffdf184b4428c902747c2c11cd7
 - package: github.com/golang/glog
+  version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
 - package: github.com/spf13/cobra
   version: 4cdb38c072b86bf795d2c81de50784d9fdd6eb77
 - package: github.com/spf13/pflag

@@ -1,13 +1,19 @@
-hash: d48f731e2b85a94620868e8fbdb3069cb376a80c1c7bd551310a0a9750f22994
-updated: 2017-05-19T01:15:07.652194201Z
+hash: 1a8bf66f7fb3ac414a1b554eca8610d1c46aa28faec36a48aa15df2c0e776365
+updated: 2017-06-16T12:20:49.257243946-07:00
 imports:
+- name: bitbucket.org/ww/goautoneg
+  version: 75cd24fc2f2c2a2088577d12123ddee5f54e0675
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
   subpackages:
   - compute/metadata
   - internal
+- name: github.com/beorn7/perks
+  version: 3ac7bf7a47d159a033b107610db8a1b6575507a4
+  subpackages:
+  - quantile
 - name: github.com/coreos/etcd
-  version: a73950545a5d77e02ba29432ec07d2a0eba5e830
+  version: d267ca9c184e953554257d0acdd1dc9c47d38229
   subpackages:
   - auth/authpb
   - clientv3
@@ -15,8 +21,9 @@ imports:
   - etcdserver/etcdserverpb
   - mvcc/mvccpb
   - pkg/fileutil
+  - pkg/tlsutil
 - name: github.com/coreos/etcd-operator
-  version: e6c62c0ce5e7fffbe8824fa06b0c1d5f70e2653b
+  version: 95b1b586fef81a82e6be5913a965a2a41922ef14
   subpackages:
   - pkg/spec
 - name: github.com/coreos/go-oidc
@@ -39,7 +46,7 @@ imports:
   subpackages:
   - spew
 - name: github.com/dgrijalva/jwt-go
-  version: d2709f9f1f31ebcda9651b03077758c1f3a0018c
+  version: 01aeca54ebda6e0fbfafd0a524d234159c05ec20
 - name: github.com/docker/distribution
   version: cd27f179f2c10c5d300e6d09025b538c475b0d51
   subpackages:
@@ -106,6 +113,14 @@ imports:
   - proto
 - name: github.com/google/gofuzz
   version: 44d81051d367757e1c7c6a5a86423ece9afcf63c
+- name: github.com/grpc-ecosystem/go-grpc-prometheus
+  version: 6b7015e65d366bf3f19b2b2a000a831940f0f7e0
+- name: github.com/grpc-ecosystem/grpc-gateway
+  version: 84398b94e188ee336f307779b57b3aa91af7063c
+  subpackages:
+  - runtime
+  - runtime/internal
+  - utilities
 - name: github.com/howeyc/gopass
   version: 3ca23474a7c7203e0a0a070fd33508f6efdb9b3d
 - name: github.com/imdario/mergo
@@ -122,8 +137,27 @@ imports:
   - buffer
   - jlexer
   - jwriter
+- name: github.com/matttproud/golang_protobuf_extensions
+  version: fc2b8d3a73c4867e51861bbdd5ae3c1f0869dd6a
+  subpackages:
+  - pbutil
 - name: github.com/pborman/uuid
-  version: ca53cad383cad2479bbba7f7a1a05797ec1386e4
+  version: a97ce2ca70fa5a848076093f05e639a89ca34d06
+- name: github.com/prometheus/client_golang
+  version: c5b7fccd204277076155f10851dad72b76a49317
+  subpackages:
+  - prometheus
+- name: github.com/prometheus/client_model
+  version: fa8ad6fec33561be4280a8f0514318c79d7f6cb6
+  subpackages:
+  - go
+- name: github.com/prometheus/common
+  version: ffe929a3f4c4faeaa10f2b9535c2b1be3ad15650
+  subpackages:
+  - expfmt
+  - model
+- name: github.com/prometheus/procfs
+  version: 454a56f35412459b5e684fd5ec0f9211b94f002a
 - name: github.com/PuerkitoBio/purell
   version: 8a290539e2e8629dbc4e6bad948158f790ec31f4
 - name: github.com/PuerkitoBio/urlesc
@@ -164,7 +198,7 @@ imports:
   - jws
   - jwt
 - name: golang.org/x/sys
-  version: e48874b42435b4347fc52bdee0424a52abc974d7
+  version: 8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9
   subpackages:
   - unix
 - name: golang.org/x/text
@@ -198,23 +232,20 @@ imports:
   - internal/urlfetch
   - urlfetch
 - name: google.golang.org/grpc
-  version: 8050b9cbc271307e5a716a9d782803d09b0d6f2d
+  version: 777daa17ff9b5daef1cfdf915088a2ada3332bf0
   subpackages:
   - codes
   - credentials
   - grpclog
   - internal
-  - keepalive
   - metadata
   - naming
   - peer
-  - stats
-  - tap
   - transport
 - name: gopkg.in/inf.v0
   version: 3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4
 - name: gopkg.in/yaml.v2
-  version: cd8b52f8269e0feb286dfeef29f8fe4d5b397e0b
+  version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
 - name: k8s.io/apimachinery
   version: 75b8dd260ef0469d96d578705a87cffd0e09dab8
   subpackages:
@@ -265,7 +296,7 @@ imports:
   - third_party/forked/golang/json
   - third_party/forked/golang/reflect
 - name: k8s.io/apiserver
-  version: 156ed5ba2d435ec2db08d2f803fecb591b72c058
+  version: 93ba094d6df62f161851e7eea4dbe43f88077ffb
   subpackages:
   - pkg/authentication/authenticator
   - pkg/authentication/serviceaccount

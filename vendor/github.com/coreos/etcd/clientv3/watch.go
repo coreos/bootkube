@@ -616,10 +616,24 @@ func (w *watchGrpcStream) serveSubstream(ws *watcherStream, resumec chan struct{
 					if ws.initReq.createdNotify {
 						ws.outc <- *wr
 					}
+					// once the watch channel is returned, a current revision
+					// watch must resume at the store revision. This is necessary
+					// for the following case to work as expected:
+					//	wch := m1.Watch("a")
+					//	m2.Put("a", "b")
+					//	<-wch
+					// If the revision is only bound on the first observed event,
+					// if wch is disconnected before the Put is issued, then reconnects
+					// after it is committed, it'll miss the Put.
+					if ws.initReq.rev == 0 {
+						nextRev = wr.Header.Revision
+					}
 				}
+			} else {
+				// current progress of watch; <= store revision
+				nextRev = wr.Header.Revision
 			}
 
-			nextRev = wr.Header.Revision
 			if len(wr.Events) > 0 {
 				nextRev = wr.Events[len(wr.Events)-1].Kv.ModRevision + 1
 			}
@@ -711,11 +725,7 @@ func (w *watchGrpcStream) waitCancelSubstreams(stopc <-chan struct{}) <-chan str
 				ws.closing = true
 				close(ws.outc)
 				ws.outc = nil
-				w.wg.Add(1)
-				go func() {
-					defer w.wg.Done()
-					w.closingc <- ws
-				}()
+				go func() { w.closingc <- ws }()
 			case <-stopc:
 			}
 		}(w.resuming[i])

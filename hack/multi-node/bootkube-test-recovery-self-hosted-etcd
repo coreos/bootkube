@@ -41,7 +41,7 @@ echo
 
 scp -q -F ssh_config ../../_output/bin/linux/bootkube cluster/auth/kubeconfig cluster/etcdbackup core@$HOST:/home/core
 ssh -q -F ssh_config core@$HOST "sudo GLOG_v=${GLOG_v} /home/core/bootkube recover \
-  --asset-dir=/home/core/recovered \
+  --recovery-dir=/home/core/recovered \
   --etcd-backup-file=/home/core/etcdbackup \
   --kubeconfig=/home/core/kubeconfig 2>> /home/core/recovery.log"
 

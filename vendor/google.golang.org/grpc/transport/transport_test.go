@@ -49,7 +49,6 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/keepalive"
 )
 
 type server struct {
@@ -180,10 +179,7 @@ func (s *server) start(t *testing.T, port int, maxStreams uint32, ht hType) {
 		if err != nil {
 			return
 		}
-		config := &ServerConfig{
-			MaxStreams: maxStreams,
-		}
-		transport, err := NewServerTransport("http2", conn, config)
+		transport, err := NewServerTransport("http2", conn, maxStreams, nil)
 		if err != nil {
 			return
 		}
@@ -198,33 +194,22 @@ func (s *server) start(t *testing.T, port int, maxStreams uint32, ht hType) {
 		h := &testStreamHandler{transport.(*http2Server)}
 		switch ht {
 		case suspended:
-			go transport.HandleStreams(h.handleStreamSuspension,
-				func(ctx context.Context, method string) context.Context {
-					return ctx
-				})
+			go transport.HandleStreams(h.handleStreamSuspension)
 		case misbehaved:
 			go transport.HandleStreams(func(s *Stream) {
 				go h.handleStreamMisbehave(t, s)
-			}, func(ctx context.Context, method string) context.Context {
-				return ctx
 			})
 		case encodingRequiredStatus:
 			go transport.HandleStreams(func(s *Stream) {
 				go h.handleStreamEncodingRequiredStatus(t, s)
-			}, func(ctx context.Context, method string) context.Context {
-				return ctx
 			})
 		case invalidHeaderField:
 			go transport.HandleStreams(func(s *Stream) {
 				go h.handleStreamInvalidHeaderField(t, s)
-			}, func(ctx context.Context, method string) context.Context {
-				return ctx
 			})
 		default:
 			go transport.HandleStreams(func(s *Stream) {
 				go h.handleStream(t, s)
-			}, func(ctx context.Context, method string) context.Context {
-				return ctx
 			})
 		}
 	}
@@ -252,10 +237,6 @@ func (s *server) stop() {
 }
 
 func setUp(t *testing.T, port int, maxStreams uint32, ht hType) (*server, ClientTransport) {
-	return setUpWithOptions(t, port, maxStreams, ht, ConnectOptions{})
-}
-
-func setUpWithOptions(t *testing.T, port int, maxStreams uint32, ht hType, copts ConnectOptions) (*server, ClientTransport) {
 	server := &server{startedErr: make(chan error, 1)}
 	go server.start(t, port, maxStreams, ht)
 	server.wait(t, 2*time.Second)
@@ -267,133 +248,11 @@ func setUpWithOptions(t *testing.T, port int, maxStreams uint32, ht hType, copts
 	target := TargetInfo{
 		Addr: addr,
 	}
-	ct, connErr = NewClientTransport(context.Background(), target, copts)
+	ct, connErr = NewClientTransport(context.Background(), target, ConnectOptions{})
 	if connErr != nil {
 		t.Fatalf("failed to create transport: %v", connErr)
 	}
 	return server, ct
-}
-
-func setUpWithNoPingServer(t *testing.T, copts ConnectOptions, done chan net.Conn) ClientTransport {
-	lis, err := net.Listen("tcp", "localhost:0")
-	if err != nil {
-		t.Fatalf("Failed to listen: %v", err)
-	}
-	// Launch a non responsive server.
-	go func() {
-		defer lis.Close()
-		conn, err := lis.Accept()
-		if err != nil {
-			t.Errorf("Error at server-side while accepting: %v", err)
-			close(done)
-			return
-		}
-		done <- conn
-	}()
-	tr, err := NewClientTransport(context.Background(), TargetInfo{Addr: lis.Addr().String()}, copts)
-	if err != nil {
-		// Server clean-up.
-		lis.Close()
-		if conn, ok := <-done; ok {
-			conn.Close()
-		}
-		t.Fatalf("Failed to dial: %v", err)
-	}
-	return tr
-}
-
-func TestKeepaliveClientClosesIdleTransport(t *testing.T) {
-	done := make(chan net.Conn, 1)
-	tr := setUpWithNoPingServer(t, ConnectOptions{KeepaliveParams: keepalive.ClientParameters{
-		Time:                2 * time.Second, // Keepalive time = 2 sec.
-		Timeout:             1 * time.Second, // Keepalive timeout = 1 sec.
-		PermitWithoutStream: true,            // Run keepalive even with no RPCs.
-	}}, done)
-	defer tr.Close()
-	conn, ok := <-done
-	if !ok {
-		t.Fatalf("Server didn't return connection object")
-	}
-	defer conn.Close()
-	// Sleep for keepalive to close the connection.
-	time.Sleep(4 * time.Second)
-	// Assert that the connection was closed.
-	ct := tr.(*http2Client)
-	ct.mu.Lock()
-	defer ct.mu.Unlock()
-	if ct.state == reachable {
-		t.Fatalf("Test Failed: Expected client transport to have closed.")
-	}
-}
-
-func TestKeepaliveClientStaysHealthyOnIdleTransport(t *testing.T) {
-	done := make(chan net.Conn, 1)
-	tr := setUpWithNoPingServer(t, ConnectOptions{KeepaliveParams: keepalive.ClientParameters{
-		Time:    2 * time.Second, // Keepalive time = 2 sec.
-		Timeout: 1 * time.Second, // Keepalive timeout = 1 sec.
-	}}, done)
-	defer tr.Close()
-	conn, ok := <-done
-	if !ok {
-		t.Fatalf("server didn't reutrn connection object")
-	}
-	defer conn.Close()
-	// Give keepalive some time.
-	time.Sleep(4 * time.Second)
-	// Assert that connections is still healthy.
-	ct := tr.(*http2Client)
-	ct.mu.Lock()
-	defer ct.mu.Unlock()
-	if ct.state != reachable {
-		t.Fatalf("Test failed: Expected client transport to be healthy.")
-	}
-}
-
-func TestKeepaliveClientClosesWithActiveStreams(t *testing.T) {
-	done := make(chan net.Conn, 1)
-	tr := setUpWithNoPingServer(t, ConnectOptions{KeepaliveParams: keepalive.ClientParameters{
-		Time:    2 * time.Second, // Keepalive time = 2 sec.
-		Timeout: 1 * time.Second, // Keepalive timeout = 1 sec.
-	}}, done)
-	defer tr.Close()
-	conn, ok := <-done
-	if !ok {
-		t.Fatalf("Server didn't return connection object")
-	}
-	defer conn.Close()
-	// Create a stream.
-	_, err := tr.NewStream(context.Background(), &CallHdr{})
-	if err != nil {
-		t.Fatalf("Failed to create a new stream: %v", err)
-	}
-	// Give keepalive some time.
-	time.Sleep(4 * time.Second)
-	// Assert that transport was closed.
-	ct := tr.(*http2Client)
-	ct.mu.Lock()
-	defer ct.mu.Unlock()
-	if ct.state == reachable {
-		t.Fatalf("Test failed: Expected client transport to have closed.")
-	}
-}
-
-func TestKeepaliveClientStaysHealthyWithResponsiveServer(t *testing.T) {
-	s, tr := setUpWithOptions(t, 0, math.MaxUint32, normal, ConnectOptions{KeepaliveParams: keepalive.ClientParameters{
-		Time:                2 * time.Second, // Keepalive time = 2 sec.
-		Timeout:             1 * time.Second, // Keepalive timeout = 1 sec.
-		PermitWithoutStream: true,            // Run keepalive even with no RPCs.
-	}})
-	defer s.stop()
-	defer tr.Close()
-	// Give keep alive some time.
-	time.Sleep(4 * time.Second)
-	// Assert that transport is healthy.
-	ct := tr.(*http2Client)
-	ct.mu.Lock()
-	defer ct.mu.Unlock()
-	if ct.state != reachable {
-		t.Fatalf("Test failed: Expected client transport to be healthy.")
-	}
 }
 
 func TestClientSendAndReceive(t *testing.T) {
@@ -634,10 +493,7 @@ func TestMaxStreams(t *testing.T) {
 			case <-cc.streamsQuota.acquire():
 				t.Fatalf("streamsQuota.acquire() becomes readable mistakenly.")
 			default:
-				cc.streamsQuota.mu.Lock()
-				quota := cc.streamsQuota.quota
-				cc.streamsQuota.mu.Unlock()
-				if quota != 0 {
+				if cc.streamsQuota.quota != 0 {
 					t.Fatalf("streamsQuota.quota got non-zero quota mistakenly.")
 				}
 			}

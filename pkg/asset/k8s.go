@@ -15,9 +15,12 @@ const (
 	// The name of the k8s service that selects self-hosted etcd pods
 	EtcdServiceName = "etcd-service"
 
-	secretNamespace     = "kube-system"
-	secretAPIServerName = "kube-apiserver"
-	secretCMName        = "kube-controller-manager"
+	secretNamespace      = "kube-system"
+	secretAPIServerName  = "kube-apiserver"
+	secretCMName         = "kube-controller-manager"
+	secretEtcdMemberPeer = "etcd-member-peer-tls"
+	secretEtcdMemberCli  = "etcd-member-client-tls"
+	secretEtcdOperator   = "etcd-operator-client-tls"
 )
 
 type staticConfig struct {
@@ -94,6 +97,42 @@ func newKubeConfigAsset(assets Assets, conf Config) (Asset, error) {
 		KubeletCert: base64.StdEncoding.EncodeToString(kubeletCert.Data),
 		KubeletKey:  base64.StdEncoding.EncodeToString(kubeletKey.Data),
 	})
+}
+
+func newSelfHostedEtcdSecretAssets(assets Assets) (Assets, error) {
+	var res Assets
+
+	secretYAML, err := secretFromAssets(secretEtcdMemberPeer, secretNamespace, []string{
+		AssetPathSelfHostedEtcdMemberPeerCA,
+		AssetPathSelfHostedEtcdMemberPeerCert,
+		AssetPathSelfHostedEtcdMemberPeerKey,
+	}, assets)
+	if err != nil {
+		return nil, err
+	}
+	res = append(res, Asset{Name: AssetPathSelfHostedEtcdMemberPeerSecret, Data: secretYAML})
+
+	secretYAML, err = secretFromAssets(secretEtcdMemberCli, secretNamespace, []string{
+		AssetPathSelfHostedEtcdMemberClientCA,
+		AssetPathSelfHostedEtcdMemberClientCert,
+		AssetPathSelfHostedEtcdMemberClientKey,
+	}, assets)
+	if err != nil {
+		return nil, err
+	}
+	res = append(res, Asset{Name: AssetPathSelfHostedEtcdMemberCliSecret, Data: secretYAML})
+
+	secretYAML, err = secretFromAssets(secretEtcdOperator, secretNamespace, []string{
+		AssetPathSelfHostedOperatorEtcdCA,
+		AssetPathSelfHostedOperatorEtcdCert,
+		AssetPathSelfHostedOperatorEtcdKey,
+	}, assets)
+	if err != nil {
+		return nil, err
+	}
+	res = append(res, Asset{Name: AssetPathSelfHostedEtcdOperatorSecret, Data: secretYAML})
+
+	return res, nil
 }
 
 func newAPIServerSecretAsset(assets Assets, etcdUseTLS bool) (Asset, error) {

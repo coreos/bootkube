@@ -15,48 +15,60 @@ import (
 )
 
 const (
-	AssetPathSecrets                     = "tls"
-	AssetPathCAKey                       = "tls/ca.key"
-	AssetPathCACert                      = "tls/ca.crt"
-	AssetPathAPIServerKey                = "tls/apiserver.key"
-	AssetPathAPIServerCert               = "tls/apiserver.crt"
-	AssetPathEtcdCA                      = "tls/etcd-ca.crt"
-	AssetPathEtcdClientCert              = "tls/etcd-client.crt"
-	AssetPathEtcdClientKey               = "tls/etcd-client.key"
-	AssetPathEtcdPeerCert                = "tls/etcd-peer.crt"
-	AssetPathEtcdPeerKey                 = "tls/etcd-peer.key"
-	AssetPathServiceAccountPrivKey       = "tls/service-account.key"
-	AssetPathServiceAccountPubKey        = "tls/service-account.pub"
-	AssetPathKubeletKey                  = "tls/kubelet.key"
-	AssetPathKubeletCert                 = "tls/kubelet.crt"
-	AssetPathKubeConfig                  = "auth/kubeconfig"
-	AssetPathManifests                   = "manifests"
-	AssetPathKubelet                     = "manifests/kubelet.yaml"
-	AssetPathProxy                       = "manifests/kube-proxy.yaml"
-	AssetPathKubeFlannel                 = "manifests/kube-flannel.yaml"
-	AssetPathKubeFlannelCfg              = "manifests/kube-flannel-cfg.yaml"
-	AssetPathAPIServerSecret             = "manifests/kube-apiserver-secret.yaml"
-	AssetPathAPIServer                   = "manifests/kube-apiserver.yaml"
-	AssetPathControllerManager           = "manifests/kube-controller-manager.yaml"
-	AssetPathControllerManagerSecret     = "manifests/kube-controller-manager-secret.yaml"
-	AssetPathControllerManagerDisruption = "manifests/kube-controller-manager-disruption.yaml"
-	AssetPathScheduler                   = "manifests/kube-scheduler.yaml"
-	AssetPathSchedulerDisruption         = "manifests/kube-scheduler-disruption.yaml"
-	AssetPathKubeDNSDeployment           = "manifests/kube-dns-deployment.yaml"
-	AssetPathKubeDNSSvc                  = "manifests/kube-dns-svc.yaml"
-	AssetPathSystemNamespace             = "manifests/kube-system-ns.yaml"
-	AssetPathCheckpointer                = "manifests/pod-checkpointer.yaml"
-	AssetPathEtcdOperator                = "manifests/etcd-operator.yaml"
-	AssetPathEtcdSvc                     = "manifests/etcd-service.yaml"
-	AssetPathKenc                        = "manifests/kube-etcd-network-checkpointer.yaml"
-	AssetPathKubeSystemSARoleBinding     = "manifests/kube-system-rbac-role-binding.yaml"
-	AssetPathBootstrapManifests          = "bootstrap-manifests"
-	AssetPathBootstrapAPIServer          = "bootstrap-manifests/bootstrap-apiserver.yaml"
-	AssetPathBootstrapControllerManager  = "bootstrap-manifests/bootstrap-controller-manager.yaml"
-	AssetPathBootstrapScheduler          = "bootstrap-manifests/bootstrap-scheduler.yaml"
-	AssetPathBootstrapEtcd               = "bootstrap-manifests/bootstrap-etcd.yaml"
-	AssetPathBootstrapEtcdService        = "etcd/bootstrap-etcd-service.json"
-	AssetPathMigrateEtcdCluster          = "etcd/migrate-etcd-cluster.json"
+	AssetPathSecrets                        = "tls"
+	AssetPathCAKey                          = "tls/ca.key"
+	AssetPathCACert                         = "tls/ca.crt"
+	AssetPathAPIServerKey                   = "tls/apiserver.key"
+	AssetPathAPIServerCert                  = "tls/apiserver.crt"
+	AssetPathEtcdCA                         = "tls/etcd-ca.crt"
+	AssetPathEtcdClientCert                 = "tls/etcd-client.crt"
+	AssetPathEtcdClientKey                  = "tls/etcd-client.key"
+	AssetPathEtcdPeerCert                   = "tls/etcd-peer.crt"
+	AssetPathEtcdPeerKey                    = "tls/etcd-peer.key"
+	AssetPathSelfHostedOperatorEtcdCA       = "tls/operator/etcd-ca-crt.pem"
+	AssetPathSelfHostedOperatorEtcdCert     = "tls/operator/etcd-crt.pem"
+	AssetPathSelfHostedOperatorEtcdKey      = "tls/operator/etcd-key.pem"
+	AssetPathSelfHostedEtcdMemberClientCA   = "tls/etcdMember/client-ca-crt.pem"
+	AssetPathSelfHostedEtcdMemberClientCert = "tls/etcdMember/client-crt.pem"
+	AssetPathSelfHostedEtcdMemberClientKey  = "tls/etcdMember/client-key.pem"
+	AssetPathSelfHostedEtcdMemberPeerCA     = "tls/etcdMember/peer-ca-crt.pem"
+	AssetPathSelfHostedEtcdMemberPeerCert   = "tls/etcdMember/peer-crt.pem"
+	AssetPathSelfHostedEtcdMemberPeerKey    = "tls/etcdMember/peer-key.pem"
+	AssetPathServiceAccountPrivKey          = "tls/service-account.key"
+	AssetPathServiceAccountPubKey           = "tls/service-account.pub"
+	AssetPathKubeletKey                     = "tls/kubelet.key"
+	AssetPathKubeletCert                    = "tls/kubelet.crt"
+	AssetPathKubeConfig                     = "auth/kubeconfig"
+	AssetPathManifests                      = "manifests"
+	AssetPathKubelet                        = "manifests/kubelet.yaml"
+	AssetPathProxy                          = "manifests/kube-proxy.yaml"
+	AssetPathKubeFlannel                    = "manifests/kube-flannel.yaml"
+	AssetPathKubeFlannelCfg                 = "manifests/kube-flannel-cfg.yaml"
+	AssetPathAPIServerSecret                = "manifests/kube-apiserver-secret.yaml"
+	AssetPathAPIServer                      = "manifests/kube-apiserver.yaml"
+	AssetPathControllerManager              = "manifests/kube-controller-manager.yaml"
+	AssetPathControllerManagerSecret        = "manifests/kube-controller-manager-secret.yaml"
+	AssetPathControllerManagerDisruption    = "manifests/kube-controller-manager-disruption.yaml"
+	AssetPathScheduler                      = "manifests/kube-scheduler.yaml"
+	AssetPathSchedulerDisruption            = "manifests/kube-scheduler-disruption.yaml"
+	AssetPathKubeDNSDeployment              = "manifests/kube-dns-deployment.yaml"
+	AssetPathKubeDNSSvc                     = "manifests/kube-dns-svc.yaml"
+	AssetPathSystemNamespace                = "manifests/kube-system-ns.yaml"
+	AssetPathCheckpointer                   = "manifests/pod-checkpointer.yaml"
+	AssetPathEtcdOperator                   = "manifests/etcd-operator.yaml"
+	AssetPathSelfHostedEtcdOperatorSecret   = "manifests/etcd-operator-client-tls.yaml"
+	AssetPathSelfHostedEtcdMemberPeerSecret = "manifests/etcd-member-peer-tls.yaml"
+	AssetPathSelfHostedEtcdMemberCliSecret  = "manifests/etcd-member-client-tls.yaml"
+	AssetPathEtcdSvc                        = "manifests/etcd-service.yaml"
+	AssetPathKenc                           = "manifests/kube-etcd-network-checkpointer.yaml"
+	AssetPathKubeSystemSARoleBinding        = "manifests/kube-system-rbac-role-binding.yaml"
+	AssetPathBootstrapManifests             = "bootstrap-manifests"
+	AssetPathBootstrapAPIServer             = "bootstrap-manifests/bootstrap-apiserver.yaml"
+	AssetPathBootstrapControllerManager     = "bootstrap-manifests/bootstrap-controller-manager.yaml"
+	AssetPathBootstrapScheduler             = "bootstrap-manifests/bootstrap-scheduler.yaml"
+	AssetPathBootstrapEtcd                  = "bootstrap-manifests/bootstrap-etcd.yaml"
+	AssetPathBootstrapEtcdService           = "etcd/bootstrap-etcd-service.json"
+	AssetPathMigrateEtcdCluster             = "etcd/migrate-etcd-cluster.json"
 )
 
 var (
@@ -133,11 +145,25 @@ func NewDefaultAssets(conf Config) (Assets, error) {
 
 	// etcd TLS assets.
 	if conf.EtcdUseTLS {
-		etcdTLSAssets, err := newEtcdTLSAssets(conf.EtcdCACert, conf.EtcdClientCert, conf.EtcdClientKey, conf.CACert, conf.CAPrivKey, conf.EtcdServers)
-		if err != nil {
-			return Assets{}, err
+		if conf.SelfHostedEtcd {
+			tlsAssets, err := newSelfHostedEtcdTLSAssets(conf.EtcdServiceIP.String(), conf.BootEtcdServiceIP.String(), conf.CACert, conf.CAPrivKey)
+			if err != nil {
+				return nil, err
+			}
+			as = append(as, tlsAssets...)
+
+			secretAssets, err := newSelfHostedEtcdSecretAssets(as)
+			if err != nil {
+				return nil, err
+			}
+			as = append(as, secretAssets...)
+		} else {
+			etcdTLSAssets, err := newEtcdTLSAssets(conf.EtcdCACert, conf.EtcdClientCert, conf.EtcdClientKey, conf.CACert, conf.CAPrivKey, conf.EtcdServers)
+			if err != nil {
+				return Assets{}, err
+			}
+			as = append(as, etcdTLSAssets...)
 		}
-		as = append(as, etcdTLSAssets...)
 	}
 
 	// K8S kubeconfig

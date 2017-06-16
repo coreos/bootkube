@@ -188,7 +188,7 @@ func TestHandlerTransport_NewServerHandlerTransport(t *testing.T) {
 				},
 				RequestURI: "/service/foo.bar",
 			},
-			wantErr: `stream error: code = Internal desc = "malformed time-out: transport: timeout unit is not recognized: \"tomorrow\""`,
+			wantErr: `stream error: code = 13 desc = "malformed time-out: transport: timeout unit is not recognized: \"tomorrow\""`,
 		},
 		{
 			name: "with metadata",
@@ -300,10 +300,7 @@ func TestHandlerTransport_HandleStreams(t *testing.T) {
 		st.bodyw.Close() // no body
 		st.ht.WriteStatus(s, codes.OK, "")
 	}
-	st.ht.HandleStreams(
-		func(s *Stream) { go handleStream(s) },
-		func(ctx context.Context, method string) context.Context { return ctx },
-	)
+	st.ht.HandleStreams(func(s *Stream) { go handleStream(s) })
 	wantHeader := http.Header{
 		"Date":         nil,
 		"Content-Type": {"application/grpc"},
@@ -330,10 +327,7 @@ func handleStreamCloseBodyTest(t *testing.T, statusCode codes.Code, msg string) 
 	handleStream := func(s *Stream) {
 		st.ht.WriteStatus(s, statusCode, msg)
 	}
-	st.ht.HandleStreams(
-		func(s *Stream) { go handleStream(s) },
-		func(ctx context.Context, method string) context.Context { return ctx },
-	)
+	st.ht.HandleStreams(func(s *Stream) { go handleStream(s) })
 	wantHeader := http.Header{
 		"Date":         nil,
 		"Content-Type": {"application/grpc"},
@@ -381,10 +375,7 @@ func TestHandlerTransport_HandleStreams_Timeout(t *testing.T) {
 		}
 		ht.WriteStatus(s, codes.DeadlineExceeded, "too slow")
 	}
-	ht.HandleStreams(
-		func(s *Stream) { go runStream(s) },
-		func(ctx context.Context, method string) context.Context { return ctx },
-	)
+	ht.HandleStreams(func(s *Stream) { go runStream(s) })
 	wantHeader := http.Header{
 		"Date":         nil,
 		"Content-Type": {"application/grpc"},

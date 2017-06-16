@@ -23,14 +23,14 @@ var (
 	cmdRecover = &cobra.Command{
 		Use:          "recover",
 		Short:        "Recover a self-hosted control plane",
-		Long:         "This command reads control plane manifests from a running apiserver or etcd and writes them to asset-dir. Users can then use `bootkube start` pointed at this asset-dir to re-the a self-hosted cluster. Please see the project README for more details and examples.",
+		Long:         "This command reads control plane manifests from a running apiserver or etcd and writes them to recovery-dir. Users can then use `bootkube start` pointed at this recovery-dir to re-the a self-hosted cluster. Please see the project README for more details and examples.",
 		PreRunE:      validateRecoverOpts,
 		RunE:         runCmdRecover,
 		SilenceUsage: true,
 	}
 
 	recoverOpts struct {
-		assetDir            string
+		recoveryDir         string
 		etcdCAPath          string
 		etcdCertificatePath string
 		etcdPrivateKeyPath  string
@@ -44,7 +44,7 @@ var (
 
 func init() {
 	cmdRoot.AddCommand(cmdRecover)
-	cmdRecover.Flags().StringVar(&recoverOpts.assetDir, "asset-dir", "", "Output path for writing recovered cluster assets.")
+	cmdRecover.Flags().StringVar(&recoverOpts.recoveryDir, "recovery-dir", "", "Output path for writing recovered cluster assets.")
 	cmdRecover.Flags().StringVar(&recoverOpts.etcdCAPath, "etcd-ca-path", "", "Path to an existing PEM encoded CA that will be used for TLS-enabled communication between the apiserver and etcd. Must be used in conjunction with --etcd-certificate-path and --etcd-private-key-path, and must have etcd configured to use TLS with matching secrets.")
 	cmdRecover.Flags().StringVar(&recoverOpts.etcdCertificatePath, "etcd-certificate-path", "", "Path to an existing certificate that will be used for TLS-enabled communication between the apiserver and etcd. Must be used in conjunction with --etcd-ca-path and --etcd-private-key-path, and must have etcd configured to use TLS with matching secrets.")
 	cmdRecover.Flags().StringVar(&recoverOpts.etcdPrivateKeyPath, "etcd-private-key-path", "", "Path to an existing private key that will be used for TLS-enabled communication between the apiserver and etcd. Must be used in conjunction with --etcd-ca-path and --etcd-certificate-path, and must have etcd configured to use TLS with matching secrets.")
@@ -111,12 +111,12 @@ func runCmdRecover(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	return as.WriteFiles(recoverOpts.assetDir)
+	return as.WriteFiles(recoverOpts.recoveryDir)
 }
 
 func validateRecoverOpts(cmd *cobra.Command, args []string) error {
-	if recoverOpts.assetDir == "" {
-		return errors.New("missing required flag: --asset-dir")
+	if recoverOpts.recoveryDir == "" {
+		return errors.New("missing required flag: --recovery-dir")
 	}
 	if (recoverOpts.etcdCAPath != "" || recoverOpts.etcdCertificatePath != "" || recoverOpts.etcdPrivateKeyPath != "") && (recoverOpts.etcdCAPath == "" || recoverOpts.etcdCertificatePath == "" || recoverOpts.etcdPrivateKeyPath == "") {
 		return errors.New("you must specify either all or none of --etcd-ca-path, --etcd-certificate-path, and --etcd-private-key-path")

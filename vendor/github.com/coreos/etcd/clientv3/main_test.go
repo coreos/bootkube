@@ -15,12 +15,10 @@
 package clientv3_test
 
 import (
-	"fmt"
 	"os"
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/coreos/etcd/auth"
 	"github.com/coreos/etcd/integration"
@@ -52,10 +50,6 @@ func TestMain(m *testing.M) {
 		}
 		v = m.Run()
 		clus.Terminate(nil)
-		if err := testutil.CheckAfterTest(time.Second); err != nil {
-			fmt.Fprintf(os.Stderr, "%v", err)
-			os.Exit(1)
-		}
 	} else {
 		v = m.Run()
 	}
