@@ -178,7 +178,7 @@ spec:
         - --insecure-port=0
         - --kubelet-client-certificate=/etc/kubernetes/secrets/apiserver.crt
         - --kubelet-client-key=/etc/kubernetes/secrets/apiserver.key
-        - --secure-port=443
+        - --secure-port=6443
         - --service-account-key-file=/etc/kubernetes/secrets/service-account.pub
         - --service-cluster-ip-range={{ .ServiceCIDR }}
         - --storage-backend=etcd3
@@ -190,6 +190,9 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.podIP
+        ports:
+        - containerPort: 6443
+          hostPort: 443
         volumeMounts:
         - mountPath: /etc/ssl/certs
           name: ssl-certs-host
@@ -200,9 +203,11 @@ spec:
         - mountPath: /var/lock
           name: var-lock
           readOnly: false
-      hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
@@ -1034,11 +1039,23 @@ metadata:
 data:
   cni-conf.json: |
     {
+      "cniVersion": "0.3.1",
       "name": "cbr0",
-      "type": "flannel",
-      "delegate": {
-        "isDefaultGateway": true
-      }
+      "plugins": [
+        {
+          "type": "flannel",
+          "delegate": {
+            "isDefaultGateway": true
+          }
+        },
+        {
+          "type": "portmap",
+          "capabilities": {
+            "portMappings": true
+          },
+          "snat": true
+        }
+      ]
     }
   net-conf.json: |
     {
@@ -1092,12 +1109,38 @@ spec:
           mountPath: /etc/kube-flannel/
       - name: install-cni
         image: {{ .Images.Busybox }}
-        command: [ "/bin/sh", "-c", "set -e -x; TMP=/etc/cni/net.d/.tmp-flannel-cfg; cp /etc/kube-flannel/cni-conf.json ${TMP}; mv ${TMP} /etc/cni/net.d/10-flannel.conf; while :; do sleep 3600; done" ]
+        command:
+        - '/bin/sh'
+        - '-c'
+        - >
+          set -e -x;
+          ARCH=${ARCH:-amd64};
+          CNI_RELEASE=${CNI_RELEASE:-0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff};
+          TMP=/etc/cni/net.d/.tmp-flannel-cfg;
+          cp /etc/kube-flannel/cni-conf.json ${TMP};
+          mv ${TMP} /etc/cni/net.d/10-flannel.conflist;
+
+          #TODO(diegs): this tarball doesn't have the portmap plugin. need to build and copy binaries to /opt/cni/bin yourself.
+          #apk add --update ca-certificates openssl && update-ca-certificates;
+          #OPT_CNI=/opt/cni;
+          #mkdir -p ${OPT_CNI};
+          #wget -qO- https://storage.googleapis.com/kubernetes-release/network-plugins/cni-${ARCH}-${CNI_RELEASE}.tar.gz | tar -xz -C ${OPT_CNI};
+
+          #if [ -w "/host/opt/cni/bin/" ]; then
+          #  cp /opt/cni/bin/* /host/opt/cni/bin/;
+          #  echo "Wrote CNI binaries to /host/opt/cni/bin/";
+          #fi;
+
+          while :; do sleep 3600; done;
         volumeMounts:
         - name: cni
           mountPath: /etc/cni/net.d
         - name: flannel-cfg
           mountPath: /etc/kube-flannel/
+        - name: host-cni-bin
+          mountPath: /host/opt/cni/bin/
+        - name: ssl-certs
+          mountPath: /etc/ssl/certs
       hostNetwork: true
       tolerations:
       - key: node-role.kubernetes.io/master
@@ -1113,6 +1156,12 @@ spec:
         - name: flannel-cfg
           configMap:
             name: kube-flannel-cfg
+        - name: host-cni-bin
+          hostPath:
+            path: /opt/cni/bin
+        - name: ssl-certs
+          hostPath:
+            path: /etc/ssl/certs
   updateStrategy:
     rollingUpdate:
       maxUnavailable: 1
