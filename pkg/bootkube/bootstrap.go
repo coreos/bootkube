@@ -61,7 +61,7 @@ func (b *bootstrapControlPlane) Teardown() error {
 // copyFile copies a single file from src to dst. Returns an error if overwrite is true and dst
 // exists, or if any I/O error occurs during copying.
 func copyFile(src, dst string, overwrite bool) error {
-	flags := os.O_CREATE|os.O_WRONLY
+	flags := os.O_CREATE | os.O_WRONLY
 	if !overwrite {
 		flags |= os.O_EXCL
 	}
