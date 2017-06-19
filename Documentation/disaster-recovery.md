@@ -9,8 +9,9 @@ failure scenarios:
 - Loss of all self-hosted etcd nodes
 
 To minimize the likelihood of any of the these scenarios, production
-self-hosted clusters should always run in a [high-availability
-configuration](https://kubernetes.io/docs/admin/high-availability/).
+self-hosted clusters should always run in a high-availability configuration
+(**TODO:** [add documentation for running high-availability self-hosted
+clusters](https://github.com/kubernetes-incubator/bootkube/issues/311)).
 
 Nevertheless, in the event of a control plane loss the bootkube project
 provides limited disaster avoidance and recovery support through the
@@ -51,7 +52,9 @@ it extracts the control plane configuration from an available source and
 renders manifests in a format that `bootkube start` can use invoked to reboot
 the cluster.
 
-To see available options, run:
+For best results always use the latest Bootkube release when using `recover`,
+regardless of which release was used to create the cluster. To see available
+options, run:
 
 ```
 bootkube recover --help
