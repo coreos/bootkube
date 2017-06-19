@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"net"
 	"net/url"
-	"strings"
 
 	"github.com/kubernetes-incubator/bootkube/pkg/tlsutil"
 )
@@ -211,7 +210,7 @@ func newSelfHostedEtcdTLSAssets(etcdSvcIP, bootEtcdSvcIP string, caCert *x509.Ce
 func newEtcdKeyAndCert(caCert *x509.Certificate, caPrivKey *rsa.PrivateKey, commonName string, etcdServers []*url.URL) (*rsa.PrivateKey, *x509.Certificate, error) {
 	addrs := make([]string, len(etcdServers))
 	for i := range etcdServers {
-		addrs[i] = etcdServers[i].Host
+		addrs[i] = etcdServers[i].Hostname()
 	}
 	return newKeyAndCert(caCert, caPrivKey, commonName, addrs)
 }
@@ -223,11 +222,10 @@ func newKeyAndCert(caCert *x509.Certificate, caPrivKey *rsa.PrivateKey, commonNa
 	}
 	var altNames tlsutil.AltNames
 	for _, addr := range addrs {
-		hostname := stripPort(addr)
-		if ip := net.ParseIP(hostname); ip != nil {
+		if ip := net.ParseIP(addr); ip != nil {
 			altNames.IPs = append(altNames.IPs, ip)
 		} else {
-			altNames.DNSNames = append(altNames.DNSNames, hostname)
+			altNames.DNSNames = append(altNames.DNSNames, addr)
 		}
 	}
 	config := tlsutil.CertConfig{
@@ -240,16 +238,4 @@ func newKeyAndCert(caCert *x509.Certificate, caPrivKey *rsa.PrivateKey, commonNa
 		return nil, nil, err
 	}
 	return key, cert, err
-}
-
-// TODO(diegs): remove this and switch to URL.Hostname() once bootkube uses Go 1.8.
-func stripPort(hostport string) string {
-	colon := strings.IndexByte(hostport, ':')
-	if colon == -1 {
-		return hostport
-	}
-	if i := strings.IndexByte(hostport, ']'); i != -1 {
-		return strings.TrimPrefix(hostport[:i], "[")
-	}
-	return hostport[:colon]
 }
