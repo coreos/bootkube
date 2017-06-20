@@ -916,9 +916,6 @@ spec:
               fieldPath: metadata.name
       nodeSelector:
         node-role.kubernetes.io/master: ""
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 65534
       tolerations:
       - key: node-role.kubernetes.io/master
         operator: Exists
