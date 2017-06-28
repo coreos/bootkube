@@ -109,33 +109,46 @@ func newKubeConfigAsset(assets Assets, conf Config) (Asset, error) {
 }
 
 func newSelfHostedEtcdSecretAssets(assets Assets) (Assets, error) {
-	var res Assets
+	// etcd-operator expects specific filenames / secrets - translate our assets into that scheme
+	caCert := assets.MustGet(AssetPathEtcdCA)
+	peerCert := assets.MustGet(AssetPathEtcdPeerCert)
+	peerKey := assets.MustGet(AssetPathEtcdPeerKey)
+	clientCert := assets.MustGet(AssetPathEtcdClientCert)
+	clientKey := assets.MustGet(AssetPathEtcdClientKey)
+	serverCert := assets.MustGet(AssetPathEtcdServerCert)
+	serverKey := assets.MustGet(AssetPathEtcdServerKey)
 
-	secretYAML, err := secretFromAssets(SecretEtcdMemberPeer, secretNamespace, []string{
-		AssetPathSelfHostedEtcdMemberPeerCA,
-		AssetPathSelfHostedEtcdMemberPeerCert,
-		AssetPathSelfHostedEtcdMemberPeerKey,
-	}, assets)
+	var res Assets
+	// Peer Cert
+	secretYAML, err := secretFromAllAssets(SecretEtcdMemberPeer, secretNamespace, Assets{
+		{Name: "peer-ca-crt.pem", Data: caCert.Data},
+		{Name: "peer-crt.pem", Data: peerCert.Data},
+		{Name: "peer-key.pem", Data: peerKey.Data},
+	})
 	if err != nil {
 		return nil, err
 	}
 	res = append(res, Asset{Name: AssetPathSelfHostedEtcdMemberPeerSecret, Data: secretYAML})
 
-	secretYAML, err = secretFromAssets(SecretEtcdMemberCli, secretNamespace, []string{
-		AssetPathSelfHostedEtcdMemberClientCA,
-		AssetPathSelfHostedEtcdMemberClientCert,
-		AssetPathSelfHostedEtcdMemberClientKey,
-	}, assets)
+	// "client" cert
+	// etcd-operator expects "client" cert to have server usage (use our server cert)
+	secretYAML, err = secretFromAllAssets(SecretEtcdMemberCli, secretNamespace, Assets{
+		{Name: "client-ca-crt.pem", Data: caCert.Data},
+		{Name: "client-crt.pem", Data: serverCert.Data},
+		{Name: "client-key.pem", Data: serverKey.Data},
+	})
+
 	if err != nil {
 		return nil, err
 	}
 	res = append(res, Asset{Name: AssetPathSelfHostedEtcdMemberCliSecret, Data: secretYAML})
 
-	secretYAML, err = secretFromAssets(SecretEtcdOperator, secretNamespace, []string{
-		AssetPathSelfHostedOperatorEtcdCA,
-		AssetPathSelfHostedOperatorEtcdCert,
-		AssetPathSelfHostedOperatorEtcdKey,
-	}, assets)
+	// Operator uses an actual "client" cert
+	secretYAML, err = secretFromAllAssets(SecretEtcdOperator, secretNamespace, Assets{
+		{Name: "etcd-ca-crt.pem", Data: caCert.Data},
+		{Name: "etcd-crt.pem", Data: clientCert.Data},
+		{Name: "etcd-key.pem", Data: clientKey.Data},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -188,6 +201,14 @@ type secret struct {
 	Metadata   map[string]string `json:"metadata"`
 	Type       string            `json:"type"`
 	Data       map[string]string `json:"data"`
+}
+
+func secretFromAllAssets(name, namespace string, assets Assets) ([]byte, error) {
+	var assetNames []string
+	for _, a := range assets {
+		assetNames = append(assetNames, a.Name)
+	}
+	return secretFromAssets(name, namespace, assetNames, assets)
 }
 
 func secretFromAssets(name, namespace string, assetNames []string, assets Assets) ([]byte, error) {
