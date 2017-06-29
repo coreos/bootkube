@@ -964,13 +964,13 @@ spec:
     - --initial-cluster-state=new
     - --data-dir=/var/etcd/data
     - --peer-client-cert-auth=true
-    - --peer-trusted-ca-file=/etc/kubernetes/secrets/etcdMember/peer-ca-crt.pem
-    - --peer-cert-file=/etc/kubernetes/secrets/etcdMember/peer-crt.pem
-    - --peer-key-file=/etc/kubernetes/secrets/etcdMember/peer-key.pem
+    - --peer-trusted-ca-file=/etc/kubernetes/secrets/etcd-ca.crt
+    - --peer-cert-file=/etc/kubernetes/secrets/etcd-peer.crt
+    - --peer-key-file=/etc/kubernetes/secrets/etcd-peer.key
     - --client-cert-auth=true
-    - --trusted-ca-file=/etc/kubernetes/secrets/etcdMember/client-ca-crt.pem
-    - --cert-file=/etc/kubernetes/secrets/etcdMember/client-crt.pem
-    - --key-file=/etc/kubernetes/secrets/etcdMember/client-key.pem
+    - --trusted-ca-file=/etc/kubernetes/secrets/etcd-ca.crt
+    - --cert-file=/etc/kubernetes/secrets/etcd-server.crt
+    - --key-file=/etc/kubernetes/secrets/etcd-server.key
     volumeMounts:
     - mountPath: /etc/kubernetes/secrets
       name: secrets

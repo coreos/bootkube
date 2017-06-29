@@ -25,15 +25,8 @@ const (
 	AssetPathEtcdClientKey                  = "tls/etcd-client.key"
 	AssetPathEtcdPeerCert                   = "tls/etcd-peer.crt"
 	AssetPathEtcdPeerKey                    = "tls/etcd-peer.key"
-	AssetPathSelfHostedOperatorEtcdCA       = "tls/operator/etcd-ca-crt.pem"
-	AssetPathSelfHostedOperatorEtcdCert     = "tls/operator/etcd-crt.pem"
-	AssetPathSelfHostedOperatorEtcdKey      = "tls/operator/etcd-key.pem"
-	AssetPathSelfHostedEtcdMemberClientCA   = "tls/etcdMember/client-ca-crt.pem"
-	AssetPathSelfHostedEtcdMemberClientCert = "tls/etcdMember/client-crt.pem"
-	AssetPathSelfHostedEtcdMemberClientKey  = "tls/etcdMember/client-key.pem"
-	AssetPathSelfHostedEtcdMemberPeerCA     = "tls/etcdMember/peer-ca-crt.pem"
-	AssetPathSelfHostedEtcdMemberPeerCert   = "tls/etcdMember/peer-crt.pem"
-	AssetPathSelfHostedEtcdMemberPeerKey    = "tls/etcdMember/peer-key.pem"
+	AssetPathEtcdServerCert                 = "tls/etcd-server.crt"
+	AssetPathEtcdServerKey                  = "tls/etcd-server.key"
 	AssetPathServiceAccountPrivKey          = "tls/service-account.key"
 	AssetPathServiceAccountPubKey           = "tls/service-account.pub"
 	AssetPathKubeletKey                     = "tls/kubelet.key"
@@ -212,6 +205,14 @@ func (as Assets) Get(name string) (Asset, error) {
 		}
 	}
 	return Asset{}, fmt.Errorf("asset %q does not exist", name)
+}
+
+func (as Assets) MustGet(name string) Asset {
+	asset, err := as.Get(name)
+	if err != nil {
+		panic(err)
+	}
+	return asset
 }
 
 func (as Assets) WriteFiles(path string) error {
