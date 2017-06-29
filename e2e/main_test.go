@@ -111,51 +111,35 @@ func deleteNamespace(c kubernetes.Interface, name string) error {
 // Ready blocks until the cluster is considered available. The current
 // implementation checks that 1 schedulable node is ready.
 func ready(c kubernetes.Interface) error {
-	f := func() error {
+	return retry(50, 10*time.Second, func() error {
 		list, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
 		if err != nil {
-			return err
+			return fmt.Errorf("error listing nodes: %v", err)
 		}
 
 		if len(list.Items) < 1 {
-			return fmt.Errorf("cluster is not ready, waiting for 1 or more worker nodes: %v", len(list.Items))
+			return fmt.Errorf("cluster is not ready, waiting for 1 or more worker nodes, have %v", len(list.Items))
 		}
 
-		// check for 1 or more ready nodes by ignoring nodes marked
-		// unschedulable or containing taints
-		var oneReady bool
+		// check for 1 or more ready nodes by ignoring nodes marked unschedulable or containing taints
 		for _, node := range list.Items {
-			if node.Spec.Unschedulable {
-				log.Println("no worker nodes checked in yet")
-				continue
-			}
-
-			if len(node.Spec.Taints) != 0 {
-				log.Println("no worker nodes checked in yet")
-				continue
-			}
-
-			for _, condition := range node.Status.Conditions {
-				if condition.Type == v1.NodeReady {
-					if condition.Status == v1.ConditionTrue {
-						oneReady = true
+			switch {
+			case node.Spec.Unschedulable:
+				log.Printf("worker node %q is unschedulable\n", node.Name)
+			case len(node.Spec.Taints) != 0:
+				log.Printf("worker node %q is tainted\n", node.Name)
+			default:
+				for _, condition := range node.Status.Conditions {
+					if condition.Type == v1.NodeReady && condition.Status == v1.ConditionTrue {
+						log.Printf("worker node %q is ready\n", node.Name)
+						return nil
 					}
-					log.Println("waiting for first worker to be ready")
-					break
 				}
+				log.Printf("worker node %q is not ready\n", node.Name)
 			}
 		}
-		if !oneReady {
-			return fmt.Errorf("waiting for one worker node to be ready")
-		}
-
-		return nil
-	}
-
-	if err := retry(50, 10*time.Second, f); err != nil {
-		return err
-	}
-	return nil
+		return fmt.Errorf("no worker nodes are ready, will retry")
+	})
 }
 
 func retry(attempts int, delay time.Duration, f func() error) error {
