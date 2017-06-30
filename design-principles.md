@@ -6,9 +6,10 @@ There are exceptions to these principles, but these are general guidelines the p
 
 - Bootkube should be a single-use tool, which only runs on the first node in a cluster.
     - An exception is the `recover` subcommand, discussed below.
-- Bootkube should not be required to add new nodes to a cluster.
+- Bootkube should not be required to add new nodes to an existing cluster.
     - For example, adding nodes should not require a `bootkube join` command.
-    - Ideally all that should be required of adding a node is starting the kubelet and providing a valid kubeconfig. All other configuration should be sourced from API objects.
+    - Ideally all that should be required to add a node is starting the kubelet and providing a valid kubeconfig.
+    - Configuration beyond the initial kubeconfig should be sourced from API objects. For example, the pod network is configured via CNI daemonset.
 - Should not require flag or configuration coordination between the `render` and `start` steps.
     - Required flag coordination means certain `render` assets will only work with certain `start` flags, and this is something we should avoid.
     - For example, `bootkube render --self-hosted-etcd` requires no changes when ultimately running `bootkube start`.
