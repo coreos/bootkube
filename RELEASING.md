@@ -28,7 +28,13 @@ Instead, checkpointers are released using the last git-hash of the changes added
 Available releases can be seen on the Quay repository: https://quay.io/repository/coreos/pod-checkpointer.
 If there were no changes made to the checkpointer subtree, a new release is not necessary.
 
-Eventually we might want to consider moving the checkpointer to it's own repo.
+Eventually we might want to consider moving the checkpointer to its own repo. This would allow for independent development / release cycle, which would also benefit other projects that might want to use the pod-checkpointer.
+However, this should also be balanced against the longer-term goal, which would be that checkpointing is natively supported in the kubelet.
+
+For some past discussions related to these topics, see:
+- https://github.com/kubernetes/kubeadm/issues/131
+- https://github.com/kubernetes/kubernetes/issues/489
+- https://github.com/kubernetes-incubator/bootkube/issues/424
 
 ## Updating Kubernetes Version
 
