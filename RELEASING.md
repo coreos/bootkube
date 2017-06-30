@@ -1,5 +1,35 @@
 # Preparing a bootkube release
 
+## Versioning Notes
+
+### Bootkube Versioning
+
+Historically, we bump the minor version when we start supporting a new kubernetes minor version. This means:
+
+```
+v0.1.0 -> Kubernetes v1.3.x
+v0.2.0 -> Kubernetes v1.4.x
+v0.3.0 -> Kubernetes v1.5.x
+v0.4.0 -> Kubernetes v1.6.x
+```
+
+However, as the tool has stabilized in functionality, and we head toward a v1.0, we should also begin bumping minor versions on breaking changes.
+
+A breaking change is considered an incompability between `bootkube render` assets of one version not being able to be used with a newer `bootkube start`.
+
+In those situations we should also begin bumping the minor version to communicate that new assets might need to be generated, or that existing assets need to be updated.
+
+### Checkpointer Versioning
+
+The checkpointer is developed in the same repo, but can be thought of as an independent project.
+Because of this we do not use tags for the checkpointer releases, as they would intermix with bootkube releases (which do not coincide).
+
+Instead, checkpointers are released using the last git-hash of the changes added to the checkpointer subtree.
+Available releases can be seen on the Quay repository: https://quay.io/repository/coreos/pod-checkpointer.
+If there were no changes made to the checkpointer subtree, a new release is not necessary.
+
+Eventually we might want to consider moving the checkpointer to it's own repo.
+
 ## Updating Kubernetes Version
 
 ### Updating Kubernetes vendor code
