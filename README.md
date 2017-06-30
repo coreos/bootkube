@@ -110,15 +110,6 @@ or
 make conformance-multi
 ```
 
-## Roadmap
-
-- Document, test, and create best practice around disaster recovery
-- Work upstream to resolve the long-term self-hosted bootstrapping
-- Self-host other components like etcd and networking to prove the model
-- Get the concept of kubelet checkpointing upstreamed
-- Prove out the self-hosted model on all new releases of k8s and different platforms
-- Document best-practices for upgrades and upstream the idea of a upgradable daemonset
-
 ## Getting Involved
 
 Want to contribute to bootkube? Have Questions? We are looking for active participation from the community
