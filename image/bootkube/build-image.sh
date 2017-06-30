@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 IMAGE_REPO=${IMAGE_REPO:-quay.io/coreos/bootkube}

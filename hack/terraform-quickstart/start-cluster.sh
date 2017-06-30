@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 export BOOTSTRAP_IP=`terraform output bootstrap_node_ip`

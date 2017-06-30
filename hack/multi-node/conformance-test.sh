@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 ssh_key="$(vagrant ssh-config c1 | awk '/IdentityFile/ {print $2}' | tr -d '"')"

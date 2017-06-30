@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 CONFORMANCE_REPO=${CONFORMANCE_REPO:-github.com/coreos/kubernetes}
