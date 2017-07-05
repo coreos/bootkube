@@ -457,7 +457,7 @@ spec:
       - name: ssl-host
         hostPath:
           path: /usr/share/ca-certificates
-      dnsPolicy: Default # Don't use cluster DNS.
+      dnsPolicy: ClusterFirstWithHostNet
 `)
 
 var ControllerManagerServiceAccount = []byte(`apiVersion: v1
