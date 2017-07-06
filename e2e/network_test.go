@@ -264,7 +264,7 @@ var wgetPodNT = &v1.Pod{
 			{
 				Name:    "wget-container",
 				Image:   "busybox:1.26",
-				Command: []string{"wget", "--timeout", "5", "--retry-connrefused", "--waitretry=1", "--tries", "5", "nginx-service-nt"},
+				Command: []string{"wget", "--timeout", "5", "--retry-connrefused", "--waitretry", "1", "--tries", "5", "nginx-service-nt"},
 			},
 		},
 		RestartPolicy: v1.RestartPolicyNever,
