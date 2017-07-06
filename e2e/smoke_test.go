@@ -32,14 +32,14 @@ func TestSmoke(t *testing.T) {
 	getPod := func() error {
 		l, err := client.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "app=smoke-nginx"})
 		if err != nil || len(l.Items) == 0 {
-			return fmt.Errorf("pod not yet running: %v", err)
+			return fmt.Errorf("failed to list smoke-nginx pod: %v", err)
 		}
 
 		// take the first pod
 		p = &l.Items[0]
 
 		if p.Status.Phase != v1.PodRunning {
-			return fmt.Errorf("pod not yet running: %v", p.Status.Phase)
+			return fmt.Errorf("smoke-nginx pod not running. Phase: %q, Reason %q: %v", p.Status.Phase, p.Status.Reason, p.Status.Message)
 		}
 		return nil
 	}
@@ -59,10 +59,10 @@ func TestSmoke(t *testing.T) {
 	getPod = func() error {
 		p, err = client.CoreV1().Pods(namespace).Get("wget-pod", metav1.GetOptions{})
 		if err != nil {
-			return fmt.Errorf("pod not yet running: %v", err)
+			return fmt.Errorf("failed to retrieve wget-pod: %v", err)
 		}
 		if p.Status.Phase != v1.PodSucceeded {
-			return fmt.Errorf("pod not yet running: %v", p.Status.Phase)
+			return fmt.Errorf("wget-pod not running. Phase: %q, Reason %q: %v", p.Status.Phase, p.Status.Reason, p.Status.Message)
 		}
 		return nil
 	}
