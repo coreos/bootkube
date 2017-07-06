@@ -37,6 +37,11 @@ func TestEtcdScale(t *testing.T) {
 // expecting 3 or more. Then block until 3 are ready or fail. Also check that
 // etcd is self-hosted.
 func etcdScalePreCheck(c kubernetes.Interface, t *testing.T) {
+	var requiredMasters int = 3
+	if expectedMasters < requiredMasters {
+		t.Skip(fmt.Errorf("Test requires %d masters, test was run expecting %d", requiredMasters, expectedMasters))
+	}
+
 	checkMasters := func() error {
 		listOpts := metav1.ListOptions{
 			LabelSelector: "node-role.kubernetes.io/master",
@@ -45,20 +50,25 @@ func etcdScalePreCheck(c kubernetes.Interface, t *testing.T) {
 		if err != nil {
 			return fmt.Errorf("error listing nodes: %v", err)
 		}
-		if len(list.Items) < 3 {
+		if len(list.Items) < requiredMasters {
 			return fmt.Errorf("not enough master nodes for etcd scale test: %v", len(list.Items))
+		}
+		var ready int = 0
+		for _, node := range list.Items {
+			for _, condition := range node.Status.Conditions {
+				if condition.Type == v1.NodeReady && condition.Status == v1.ConditionTrue {
+					ready++
+				}
+			}
+		}
+		if ready < requiredMasters {
+			return fmt.Errorf("not enough master nodes are ready for etcd scale test: need %d, ready: %d", requiredMasters, ready)
 		}
 
 		return nil
 	}
-	if expectedMasters < 3 {
-		if err := checkMasters(); err != nil {
-			t.Skip(err)
-		}
-	} else {
-		if err := retry(50, 10*time.Second, checkMasters); err != nil {
-			t.Fatal(err)
-		}
+	if err := retry(50, 10*time.Second, checkMasters); err != nil {
+		t.Fatal(err)
 	}
 
 	// check for etcd-operator by getting pod
