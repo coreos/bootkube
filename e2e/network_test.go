@@ -65,7 +65,7 @@ func TestNetwork(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := retry(10, time.Second*10, getPod(testPodName)); err != nil {
+	if err := retry(10, time.Second*10, getSucceededPod(testPodName)); err != nil {
 		t.Fatalf(fmt.Sprintf("timed out waiting for wget pod to succeed: %v", err))
 	}
 
@@ -176,7 +176,7 @@ func HelperPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := retry(10, time.Second*10, getPod(testPodName)); err != nil {
+	if err := retry(10, time.Second*10, getSucceededPod(testPodName)); err != nil {
 		t.Fatalf(fmt.Sprintf("timed out waiting for wget pod to succeed: %v", err))
 	}
 
@@ -210,14 +210,15 @@ func getNginxPod() error {
 	return nil
 }
 
-func getPod(name string) func() error {
+//TODO(aaron): We shouldn't always be re-trying this until timeout. If the pod failed (not just hasn't been scheduled) it's not ever going to succeed.
+func getSucceededPod(name string) func() error {
 	return func() error {
 		p, err := client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
-			return fmt.Errorf("couldn't get pod: %v", err)
+			return fmt.Errorf("couldn't get pod %q: %v", name, err)
 		}
 		if p.Status.Phase != v1.PodSucceeded {
-			return fmt.Errorf("pod did not succeed: %v", p.Status.Phase)
+			return fmt.Errorf("pod %q has not succeeded. Phase: %q, Reason %q: %v", name, p.Status.Phase, p.Status.Reason, p.Status.Message)
 		}
 		return nil
 	}
@@ -263,7 +264,7 @@ var wgetPodNT = &v1.Pod{
 			{
 				Name:    "wget-container",
 				Image:   "busybox:1.26",
-				Command: []string{"wget", "--timeout", "5", "nginx-service-nt"},
+				Command: []string{"wget", "--timeout", "5", "--retry-connrefused", "--waitretry=1", "--tries", "5", "nginx-service-nt"},
 			},
 		},
 		RestartPolicy: v1.RestartPolicyNever,
