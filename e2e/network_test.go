@@ -196,7 +196,7 @@ func HelperPolicy(t *testing.T) {
 }
 
 func getNginxPod() error {
-	l, err := client.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "app=nginx"})
+	l, err := client.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "app=nginx-nt"})
 	if err != nil || len(l.Items) == 0 {
 		return fmt.Errorf("couldn't list pods: %v", err)
 	}
@@ -245,7 +245,7 @@ spec:
   template:
     metadata:
       labels:
-        app: nginx
+        app: nginx-nt
     spec:
       containers:
       - name: nginx
@@ -276,14 +276,14 @@ metadata:
   name: nginx-service-nt
 spec:
   selector:
-    app: nginx
+    app: nginx-nt
   ports:
     - protocol: TCP
       port: 80
       targetPort: 80
 `)
 
-var defaultDenyNetworkPolicy = []byte(`kind: NetworkPolicy                                                      
+var defaultDenyNetworkPolicy = []byte(`kind: NetworkPolicy
 apiVersion: extensions/v1beta1
 metadata:
   name: default-deny
@@ -291,14 +291,14 @@ spec:
   podSelector:
 `)
 
-var netPolicy = []byte(`kind: NetworkPolicy                                                      
+var netPolicy = []byte(`kind: NetworkPolicy
 apiVersion: extensions/v1beta1
 metadata:
   name: access-nginx
 spec:
   podSelector:
     matchLabels:
-      app: nginx
+      app: nginx-nt
   ingress:
     - from:
       - podSelector:

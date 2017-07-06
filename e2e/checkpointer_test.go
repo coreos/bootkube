@@ -21,7 +21,7 @@ spec:
   template:
     metadata:
       labels:
-        app: nginx
+        app: nginx-checkpoint-test
       annotations:
         checkpointer.alpha.coreos.com/checkpoint: "true"
     spec:
