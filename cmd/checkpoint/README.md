@@ -69,7 +69,7 @@ Parts of the pod manifest will be scrubbed prior to being saved as checkpoints. 
 Secrets are stored using a path of:
 
 ```
-/etc/kubernets/checkpoint-secrets/<namespace>/<pod-name>/<secret-name>
+/etc/kubernetes/checkpoint-secrets/<namespace>/<pod-name>/<secret-name>
 ```
 
 ### ConfigMap Storage
@@ -77,7 +77,7 @@ Secrets are stored using a path of:
 ConfigMaps are stored using a path of:
 
 ```
-/etc/kubernets/checkpoint-configmaps/<namespace>/<pod-name>/<configmap-name>
+/etc/kubernetes/checkpoint-configmaps/<namespace>/<pod-name>/<configmap-name>
 ```
 ### Self Checkpointing
 
