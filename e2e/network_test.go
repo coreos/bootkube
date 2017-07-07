@@ -10,6 +10,7 @@ import (
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
+	batchv1 "k8s.io/client-go/pkg/apis/batch/v1"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
@@ -57,16 +58,15 @@ func TestNetwork(t *testing.T) {
 	defer client.CoreV1().Services(namespace).Delete("nginx-service-nt", &metav1.DeleteOptions{})
 
 	//
-	// 2. create a wget pod that hits the nginx service
-	testPodName := fmt.Sprintf("%s-%s", "wget-pod-nt", utilrand.String(5))
-	wgetPodNT.ObjectMeta.Name = testPodName
-	_, err = client.CoreV1().Pods(namespace).Create(wgetPodNT)
+	// 2. create a wget job that hits the nginx service
+	wgetJob := newWgetJobNT(wgetExpectSuccess, map[string]string{})
+	_, err = client.BatchV1().Jobs(namespace).Create(wgetJob)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := retry(10, time.Second*10, getSucceededPod(testPodName)); err != nil {
-		t.Fatalf(fmt.Sprintf("timed out waiting for wget pod to succeed: %v", err))
+	if err := retry(10, time.Second*10, getSucceededJob(wgetJob.Name)); err != nil {
+		t.Fatalf(fmt.Sprintf("timed out waiting for wget job to succeed: %v", err))
 	}
 
 	t.Run("DefaultDeny", HelperDefaultDeny)
@@ -113,16 +113,15 @@ func HelperDefaultDeny(t *testing.T) {
 	}()
 
 	//
-	// 4. create a wget pod that fails to hit nginx service
-	testPodName := fmt.Sprintf("%s-%s", "wget-pod-nt", utilrand.String(5))
-	wgetPodNT.ObjectMeta.Name = testPodName
-	_, err = client.CoreV1().Pods(namespace).Create(wgetPodNT)
+	// 4. create a wget job that fails to hit nginx service
+	wgetJob := newWgetJobNT(wgetExpectFailure, map[string]string{})
+	_, err = client.BatchV1().Jobs(namespace).Create(wgetJob)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := retry(10, time.Second*10, getFailedPod(testPodName)); err != nil {
-		t.Fatalf(fmt.Sprintf("timed out waiting for wget pod to fail: %v", err))
+	if err := retry(10, time.Second*10, getSucceededJob(wgetJob.Name)); err != nil {
+		t.Fatalf(fmt.Sprintf("timed out waiting for wget job to fail: %v", err))
 	}
 }
 
@@ -166,32 +165,27 @@ func HelperPolicy(t *testing.T) {
 	}()
 
 	//
-	// 6. create a wget pod with label `allow=access` that hits the nginx service
-	testPodName := fmt.Sprintf("%s-%s", "wget-pod-nt", utilrand.String(5))
-	wgetPodNT.ObjectMeta.Name = testPodName
-	wgetPodNT.ObjectMeta.Labels = map[string]string{}
-	wgetPodNT.ObjectMeta.Labels["allow"] = "access"
-	_, err = client.CoreV1().Pods(namespace).Create(wgetPodNT)
+	// 6. create a wget job with label `allow=access` that hits the nginx service
+	wgetJob := newWgetJobNT(wgetExpectSuccess, map[string]string{"allow": "access"})
+	_, err = client.BatchV1().Jobs(namespace).Create(wgetJob)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := retry(10, time.Second*10, getSucceededPod(testPodName)); err != nil {
-		t.Fatalf(fmt.Sprintf("timed out waiting for wget pod to succeed: %v", err))
+	if err := retry(10, time.Second*10, getSucceededJob(wgetJob.Name)); err != nil {
+		t.Fatalf(fmt.Sprintf("timed out waiting for wget job to succeed: %v", err))
 	}
 
 	//
-	// 7. create a wget pod with label `allow=cant-access` that fails to the nginx service
-	testPodName = fmt.Sprintf("%s-%s", "wget-pod-nt", utilrand.String(5))
-	wgetPodNT.ObjectMeta.Name = testPodName
-	wgetPodNT.ObjectMeta.Labels["allow"] = "cant-access"
-	_, err = client.CoreV1().Pods(namespace).Create(wgetPodNT)
+	// 7. create a wget job with label `allow=cant-access` that fails to the nginx service
+	wgetJob = newWgetJobNT(wgetExpectFailure, map[string]string{"allow": "cant-access"})
+	_, err = client.BatchV1().Jobs(namespace).Create(wgetJob)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := retry(10, time.Second*10, getFailedPod(testPodName)); err != nil {
-		t.Fatalf(fmt.Sprintf("timed out waiting for wget pod to fail: %v", err))
+	if err := retry(10, time.Second*10, getSucceededJob(wgetJob.Name)); err != nil {
+		t.Fatalf(fmt.Sprintf("timed out waiting for wget job to fail: %v", err))
 	}
 }
 
@@ -210,28 +204,14 @@ func getNginxPod() error {
 	return nil
 }
 
-//TODO(aaron): We shouldn't always be re-trying this until timeout. If the pod failed (not just hasn't been scheduled) it's not ever going to succeed.
-func getSucceededPod(name string) func() error {
+func getSucceededJob(name string) func() error {
 	return func() error {
-		p, err := client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+		job, err := client.BatchV1().Jobs(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
-			return fmt.Errorf("couldn't get pod %q: %v", name, err)
+			return fmt.Errorf("couldn't get job %q: %v", name, err)
 		}
-		if p.Status.Phase != v1.PodSucceeded {
-			return fmt.Errorf("pod %q has not succeeded. Phase: %q, Reason %q: %v", name, p.Status.Phase, p.Status.Reason, p.Status.Message)
-		}
-		return nil
-	}
-}
-
-func getFailedPod(name string) func() error {
-	return func() error {
-		p, err := client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
-		if err != nil {
-			return fmt.Errorf("couldn't get pod: %v", err)
-		}
-		if p.Status.Phase != v1.PodFailed {
-			return fmt.Errorf("pod did not fail: %v", p.Status.Phase)
+		if job.Status.Succeeded < 1 {
+			return fmt.Errorf("job %q has not succeeded: %s", name, job)
 		}
 		return nil
 	}
@@ -255,21 +235,37 @@ spec:
         - containerPort: 80
 `)
 
-var wgetPodNT = &v1.Pod{
-	ObjectMeta: metav1.ObjectMeta{
-		Namespace: namespace,
-	},
-	Spec: v1.PodSpec{
-		Containers: []v1.Container{
-			{
-				Name:    "wget-container",
-				Image:   "busybox:1.26",
-				Command: []string{"wget", "--timeout", "5", "nginx-service-nt"},
+func newWgetJobNT(wgetCommand string, labels map[string]string) *batchv1.Job {
+	name := fmt.Sprintf("%s-%s", "wget-job-nt", utilrand.String(5))
+	timeoutSeconds := int64(60)
+	return &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+		Spec: batchv1.JobSpec{
+			ActiveDeadlineSeconds: &timeoutSeconds,
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   name,
+					Labels: labels,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:    "wget-container",
+						Image:   "busybox:1.26",
+						Command: []string{"/bin/sh", "-c", wgetCommand},
+					}},
+					RestartPolicy: v1.RestartPolicyOnFailure,
+				},
 			},
 		},
-		RestartPolicy: v1.RestartPolicyNever,
-	},
+	}
 }
+
+const wgetExpectSuccess = "wget --timeout 5 nginx-service-nt"
+
+const wgetExpectFailure = "! wget --timeout 5 nginx-service-nt"
 
 var nginxSVCNT = []byte(`apiVersion: v1
 kind: Service

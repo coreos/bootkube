@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -20,10 +21,8 @@ var (
 	client          kubernetes.Interface
 	sshClient       *SSHClient
 	expectedMasters int // hint for tests to figure out how to fail or block on resources missing
+	namespace       = fmt.Sprintf("bootkube-e2e-%x", rand.Int31())
 )
-
-// non-configurable for now
-const namespace = "bootkube-e2e-testing"
 
 // TestMain handles setup before all tests
 func TestMain(m *testing.M) {
