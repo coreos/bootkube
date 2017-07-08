@@ -18,8 +18,11 @@ import (
 func TestNetwork(t *testing.T) {
 	// check if kube-calico daemonset exists
 	// if absent skip this test
-	if _, err := client.ExtensionsV1beta1().DaemonSets("kube-system").Get("kube-calico", metav1.GetOptions{}); err != nil && apierrors.IsNotFound(err) {
-		t.Skip("skipping as kube-calico daemonset is not installed")
+	if _, err := client.ExtensionsV1beta1().DaemonSets("kube-system").Get("kube-calico", metav1.GetOptions{}); err != nil {
+		if apierrors.IsNotFound(err) {
+			t.Skip("skipping as kube-calico daemonset is not installed")
+		}
+		t.Fatalf("error getting kube-calio daemonset: %v", err)
 	}
 
 	//
