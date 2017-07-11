@@ -50,4 +50,4 @@ import:
   - ssh/agent
   - curve25519
 - package: github.com/coreos/ktestutil
-  version: d598fab525dabcc7af2681ee0455efe47e055dd8 
+  version: 1c5a59f93ffab7cf69fde8b805fee942fd467cdc 
