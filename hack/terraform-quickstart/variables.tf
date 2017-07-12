@@ -18,9 +18,9 @@ variable "resource_owner" {
 }
 
 variable "instance_type" {
-  description = "Name all instances behind a single tag based on who/what is running terraform"
+  description = "The instance type to use for nodes"
   type        = "string"
-  default     = "m3.medium"
+  default     = "m4.large"
 }
 
 variable "self_host_etcd" {

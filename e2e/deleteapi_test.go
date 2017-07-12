@@ -34,10 +34,9 @@ func TestDeleteAPI(t *testing.T) {
 	// apiserver to go down the next step will return sucess before the
 	// apiserver is ever destroyed.
 	waitDestroy := func() error {
-		// only checking api being down , specific function not important
+		// only checking api being down, specific function not important
 		_, err := client.Discovery().ServerVersion()
-
-		if err == nil {
+		if err != nil {
 			return fmt.Errorf("waiting for apiserver to go down: %v", err)
 		}
 		return nil
