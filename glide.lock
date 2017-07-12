@@ -1,5 +1,5 @@
-hash: 57889b7e966fda38a85a6fd8b897c0a6319f8cc018fcb32338e227a9a8887083
-updated: 2017-06-28T14:46:22.092832734-07:00
+hash: fd729fad2709c6a3b9fe89aeab8ae864d555a9cfd325b1857159ea0163161728
+updated: 2017-07-10T12:38:32.263711219-07:00
 imports:
 - name: bitbucket.org/ww/goautoneg
   version: 75cd24fc2f2c2a2088577d12123ddee5f54e0675
@@ -80,7 +80,7 @@ imports:
   - journal
   - util
 - name: github.com/coreos/ktestutil
-  version: d598fab525dabcc7af2681ee0455efe47e055dd8
+  version: 0d87cc912e086f7f01e548c044209ae57ff607b6
   subpackages:
   - log-collector
   - log-collector/pkg/fluentd
@@ -201,11 +201,11 @@ imports:
   subpackages:
   - pbutil
 - name: github.com/pborman/uuid
-  version: a97ce2ca70fa5a848076093f05e639a89ca34d06
+  version: ca53cad383cad2479bbba7f7a1a05797ec1386e4
 - name: github.com/pkg/errors
   version: a22138067af1c4942683050411a841ade67fe1eb
 - name: github.com/pkg/sftp
-  version: 516f73358825b579ad5ddaf6abb80346bd96e54c
+  version: e97b9a47e1814100cb55a58e85a4fe610a0c3982
 - name: github.com/prometheus/client_golang
   version: c5b7fccd204277076155f10851dad72b76a49317
   subpackages:
@@ -359,7 +359,7 @@ imports:
   - third_party/forked/golang/json
   - third_party/forked/golang/reflect
 - name: k8s.io/apiserver
-  version: 93ba094d6df62f161851e7eea4dbe43f88077ffb
+  version: 087d1a2efeb6296f04bb0f54e7af9890052aa6d7
   subpackages:
   - pkg/authentication/authenticator
   - pkg/authentication/serviceaccount

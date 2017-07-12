@@ -6,7 +6,9 @@ import (
 
 	"github.com/coreos/ktestutil/utils"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 )
@@ -23,14 +25,22 @@ const (
 // CreateAssets waits for fluentd master pod and at least one fluentd worker pod to be running.
 func CreateAssets(client kubernetes.Interface, namespace string) error {
 	// select and tag one of the masters
-	nl, err := client.CoreV1().Nodes().List(metav1.ListOptions{LabelSelector: "node-role.kubernetes.io/master="})
-	if err != nil || len(nl.Items) == 0 {
-		return fmt.Errorf("couldn't find master node to run fluentd master %v", err)
-	}
-	n := nl.Items[0]
-	n.ObjectMeta.Labels[fluentMasterNodeAnnotation] = ""
-	if _, err := client.CoreV1().Nodes().Update(&n); err != nil {
-		return fmt.Errorf("couldn't tag one of the master nodes %v", err)
+	if err := wait.PollImmediate(time.Second, 5*time.Minute, func() (bool, error) {
+		nl, err := client.CoreV1().Nodes().List(metav1.ListOptions{LabelSelector: "node-role.kubernetes.io/master="})
+		if err != nil || len(nl.Items) == 0 {
+			return false, fmt.Errorf("couldn't find master node to run fluentd master %v", err)
+		}
+		n := nl.Items[0]
+		n.ObjectMeta.Labels[fluentMasterNodeAnnotation] = ""
+		if _, err := client.CoreV1().Nodes().Update(&n); err != nil {
+			if errors.IsConflict(err) {
+				return false, nil
+			}
+			return false, fmt.Errorf("couldn't tag one of the master nodes %v", err)
+		}
+		return true, nil
+	}); err != nil {
+		return err
 	}
 
 	// create assests
@@ -81,15 +91,22 @@ func DeleteAssets(client kubernetes.Interface, namespace string) error {
 		return fmt.Errorf("error deleting fluentd asset %v", err)
 	}
 
-	labelSelc := fmt.Sprintf("%s=", fluentMasterNodeAnnotation)
-	nl, err := client.CoreV1().Nodes().List(metav1.ListOptions{LabelSelector: labelSelc})
-	if err != nil || len(nl.Items) == 0 {
-		return fmt.Errorf("couldn't find master node running fluentd master %v", err)
-	}
-	n := nl.Items[0]
-	delete(n.ObjectMeta.Labels, fluentMasterNodeAnnotation)
-	if _, err := client.CoreV1().Nodes().Update(&n); err != nil {
-		return fmt.Errorf("couldn't delete annotation from the master node running fluentd master %v", err)
+	if err := wait.PollImmediate(time.Second, 5*time.Minute, func() (bool, error) {
+		nl, err := client.CoreV1().Nodes().List(metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=", fluentMasterNodeAnnotation)})
+		if err != nil || len(nl.Items) == 0 {
+			return false, fmt.Errorf("couldn't find master node running fluentd master %v", err)
+		}
+		n := nl.Items[0]
+		delete(n.ObjectMeta.Labels, fluentMasterNodeAnnotation)
+		if _, err := client.CoreV1().Nodes().Update(&n); err != nil {
+			if errors.IsConflict(err) {
+				return false, nil
+			}
+			return false, fmt.Errorf("couldn't delete annotation from the master node running fluentd master %v", err)
+		}
+		return true, nil
+	}); err != nil {
+		return err
 	}
 
 	return nil
