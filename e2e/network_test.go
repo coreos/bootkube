@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/pkg/api"
@@ -15,6 +16,15 @@ import (
 )
 
 func TestNetwork(t *testing.T) {
+	// check if kube-calico daemonset exists
+	// if absent skip this test
+	if _, err := client.ExtensionsV1beta1().DaemonSets("kube-system").Get("kube-calico", metav1.GetOptions{}); err != nil {
+		if apierrors.IsNotFound(err) {
+			t.Skip("skipping as kube-calico daemonset is not installed")
+		}
+		t.Fatalf("error getting kube-calio daemonset: %v", err)
+	}
+
 	//
 	// 1. create nginx service
 	di, _, err := api.Codecs.UniversalDecoder().Decode(nginxDepNT, nil, &v1beta1.Deployment{})
