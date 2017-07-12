@@ -1,6 +1,6 @@
 [Service]
 Environment=KUBELET_IMAGE_URL=quay.io/coreos/hyperkube
-Environment=KUBELET_IMAGE_TAG=v1.6.6_coreos.1
+Environment=KUBELET_IMAGE_TAG=v1.6.7_coreos.0
 Environment="RKT_RUN_ARGS=\
 --uuid-file-save=/var/cache/kubelet-pod.uuid \
 --volume etc-resolv,kind=host,source=/etc/resolv.conf --mount volume=etc-resolv,target=/etc/resolv.conf \
