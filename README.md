@@ -116,6 +116,10 @@ Want to contribute to bootkube? Have Questions? We are looking for active partic
 
 You can find us at the bootkube channel on [Kubernetes slack](https://github.com/kubernetes/community#slack-chat)
 
+## Related Links
+
+* [Users and Integrations](Documentation/users-integrations.md)
+
 ## License
 
 bootkube is under the Apache 2.0 license. See the [LICENSE](LICENSE) file for details.
