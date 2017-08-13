@@ -9,6 +9,7 @@ IDENT=${IDENT:-${HOME}/.ssh/id_rsa}
 SSH_OPTS=${SSH_OPTS:-}
 TAG_MASTER=${TAG_MASTER:-false}
 CLOUD_PROVIDER=${CLOUD_PROVIDER:-}
+PUBLIC_IP=${PUBLIC_IP:-false}
 
 function usage() {
     echo "USAGE:"
@@ -30,6 +31,10 @@ function init_worker_node() {
 
     # Set cloud provider
     sed -i "s/cloud-provider=/cloud-provider=$CLOUD_PROVIDER/" /etc/systemd/system/kubelet.service
+
+    if [ "$PUBLIC_IP" = true ]; then
+        sed -r -e 's/(--hostname-override=)[^ ]*/\1${COREOS_PUBLIC_IPV4}/' -i /etc/systemd/system/kubelet.service
+    fi
 
     # Start services
     systemctl daemon-reload
@@ -53,7 +58,7 @@ if [ "${REMOTE_HOST}" != "local" ]; then
 
     # Copy self to remote host so script can be executed in "local" mode
     scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} ${BASH_SOURCE[0]} ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/init-node.sh
-    ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "sudo REMOTE_USER=${REMOTE_USER} CLOUD_PROVIDER=${CLOUD_PROVIDER} /home/${REMOTE_USER}/init-node.sh local /home/${REMOTE_USER}/kubeconfig"
+    ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "sudo REMOTE_USER=${REMOTE_USER} CLOUD_PROVIDER=${CLOUD_PROVIDER} PUBLIC_IP=${PUBLIC_IP} /home/${REMOTE_USER}/init-node.sh local /home/${REMOTE_USER}/kubeconfig"
 
     # Cleanup
     ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "rm /home/${REMOTE_USER}/init-node.sh"
