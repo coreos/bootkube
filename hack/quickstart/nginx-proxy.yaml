@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-proxy
+  namespace: kube-system
+  labels:
+    k8s-app: kube-nginx
+spec:
+  hostNetwork: true
+  containers:
+  - name: nginx-proxy
+    image: nginx:1.11.4-alpine
+    imagePullPolicy: IfNotPresent
+    resources:
+      limits:
+        cpu: 50m
+        memory: 32M
+      requests:
+        cpu: 25m
+        memory: 32M
+    securityContext:
+      privileged: true
+    volumeMounts:
+    - mountPath: /etc/nginx
+      name: etc-nginx
+      readOnly: true
+  volumes:
+  - name: etc-nginx
+    hostPath:
+      path: /etc/nginx

@@ -1,0 +1,130 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: nginx-conf-syncer
+  namespace: kube-system
+  labels:
+    k8s-app: kube-nginx
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: nginx-conf-syncer
+        k8s-app: kube-nginx
+    spec:
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: alpine
+        image: alpine:3.6
+        command: ["/bin/sh", "-c", "eval \"$SCRIPT\""]
+        env:
+        - name: SCRIPT
+          value: |
+            set -o nounset -o errexit
+            trap "kill 0" SIGINT SIGTERM
+            apk add --update curl jq
+            curl -sLo /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+            chmod +x /usr/local/bin/kubectl
+            curl -L "https://github.com/gliderlabs/sigil/releases/download/v0.4.0/sigil_0.4.0_$(uname -sm|tr \  _).tgz" | tar -zxC /usr/local/bin
+            while true; do
+                if SERVERS="$(kubectl get node -lnode-role.kubernetes.io/master -ojsonpath="{.items[*].metadata.name}")"; then
+                    if kubectl -n kube-system get configmap nginx-conf -o=jsonpath="{.data.nginx\.conf\.template}" > nginx.conf.template && [ -n "$(cat nginx.conf.template)" ]; then
+                        if sigil -p servers="${SERVERS}" < nginx.conf.template > nginx.conf; then
+                            kubectl -n kube-system patch configmap nginx-conf -p "$(jq -c --arg f "$(cat nginx.conf)" -n '{"data": {"nginx.conf": $f}}')"
+                        fi
+                    fi
+               fi
+               sleep 60 &
+               wait
+            done
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: nginx-conf-checkpointer
+  namespace: kube-system
+  labels:
+    k8s-app: kube-nginx
+spec:
+  template:
+    metadata:
+      labels:
+        name: nginx-conf-checkpointer
+        k8s-app: kube-nginx
+    spec:
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: alpine
+        image: alpine:3.6
+        command: ["/bin/sh", "-c", "eval \"$SCRIPT\""]
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        - name: SCRIPT
+          value: |
+            set -o nounset -o errexit
+            trap "kill 0" SIGINT SIGTERM
+            apk add --update curl
+            curl -sLo /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+            chmod +x /usr/local/bin/kubectl
+            while true; do
+                if kubectl -n kube-system get configmap nginx-conf -o=jsonpath="{.data.nginx\.conf}" > nginx.conf.tmp && [ -n "$(cat nginx.conf.tmp)" ]; then
+                    if [ "$(sha256sum nginx.conf.tmp)" != "$(sha256sum /etc/nginx/nginx.conf)" ]; then
+                        cp nginx.conf.tmp /etc/nginx/nginx.conf
+                        kubectl -n kube-system exec nginx-proxy-${NODE_NAME} -- nginx -s reload
+                    fi
+                fi
+                sleep 60 &
+                wait
+            done
+        volumeMounts:
+        - name: etc-nginx
+          mountPath: /etc/nginx
+      volumes:
+      - name: etc-nginx
+        hostPath:
+          path: /etc/nginx
+  updateStrategy:
+    type: RollingUpdate
+---
+apiVersion: v1
+data:
+  nginx.conf.template: |-
+    error_log stderr notice;
+
+    worker_processes auto;
+    events {
+      multi_accept on;
+      use epoll;
+      worker_connections 1024;
+    }
+
+    stream {
+            upstream kube_apiserver {
+                least_conn;
+                server 127.0.0.1:443;
+    {{ range .servers | split " " }}
+                server {{.}}:443;
+    {{ end }}
+            }
+            server {
+                listen        127.0.0.1:6443;
+                proxy_pass    kube_apiserver;
+                proxy_timeout 10m;
+                proxy_connect_timeout 1s;
+            }
+    }
+kind: ConfigMap
+metadata:
+  name: nginx-conf
+  namespace: kube-system

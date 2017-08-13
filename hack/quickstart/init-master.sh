@@ -7,6 +7,7 @@ REMOTE_USER=${REMOTE_USER:-core}
 CLUSTER_DIR=${CLUSTER_DIR:-cluster}
 IDENT=${IDENT:-${HOME}/.ssh/id_rsa}
 SSH_OPTS=${SSH_OPTS:-}
+MULTI_MASTER=${MULTI_MASTER:-false}
 SELF_HOST_ETCD=${SELF_HOST_ETCD:-false}
 CALICO_NETWORK_POLICY=${CALICO_NETWORK_POLICY:-false}
 CLOUD_PROVIDER=${CLOUD_PROVIDER:-}
@@ -68,13 +69,22 @@ function init_master_node() {
 
     # Render cluster assets
     /home/${REMOTE_USER}/bootkube render --asset-dir=/home/${REMOTE_USER}/assets ${etcd_render_flags} ${cnp_render_flags} \
-      --api-servers=https://${COREOS_PUBLIC_IPV4}:443,https://${COREOS_PRIVATE_IPV4}:443
+      --api-servers=https://${COREOS_PUBLIC_IPV4}:443,https://${COREOS_PRIVATE_IPV4}:443,https://127.0.0.1:6443
 
     # Move the local kubeconfig into expected location
     chown -R ${REMOTE_USER}:${REMOTE_USER} /home/${REMOTE_USER}/assets
     mkdir -p /etc/kubernetes
     cp /home/${REMOTE_USER}/assets/auth/kubeconfig /etc/kubernetes/
     cp /home/${REMOTE_USER}/assets/tls/ca.crt /etc/kubernetes/ca.crt
+
+    if [ "$MULTI_MASTER" = true ]; then
+        sed -r -e "s/(server: ).*/\1https:\/\/127.0.0.1:6443/" -i /etc/kubernetes/kubeconfig
+        mkdir -p /etc/nginx
+        cp nginx.conf /etc/nginx
+        mkdir -p /etc/kubernetes/manifests
+        cp nginx-proxy.yaml /etc/kubernetes/manifests
+        cp nginx-conf.yaml /home/${REMOTE_USER}/assets/manifests/
+    fi
 
     # Start etcd.
     if [ "$SELF_HOST_ETCD" = false ] ; then
@@ -119,9 +129,18 @@ if [ "${REMOTE_HOST}" != "local" ]; then
             exit 1
         fi
     fi
+
+    if [ "$MULTI_MASTER" = true ]; then
+        # Extract nginx.conf from the manifest file without template variables
+        sed -e '1,/nginx.conf.template:/d' -e '/kind/,$d' -e 's/\(^    \|.*{{.*}}.*\)//g' nginx-conf.yaml > nginx.conf
+        scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} nginx.conf ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/nginx.conf
+        scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} nginx-proxy.yaml ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/nginx-proxy.yaml
+        scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} nginx-conf.yaml ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/nginx-conf.yaml
+    fi
+
     # Copy self to remote host so script can be executed in "local" mode
     scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} ${BASH_SOURCE[0]} ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/init-master.sh
-    ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "sudo REMOTE_USER=${REMOTE_USER} CLOUD_PROVIDER=${CLOUD_PROVIDER} SELF_HOST_ETCD=${SELF_HOST_ETCD} CALICO_NETWORK_POLICY=${CALICO_NETWORK_POLICY} /home/${REMOTE_USER}/init-master.sh local"
+    ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "sudo REMOTE_USER=${REMOTE_USER} CLOUD_PROVIDER=${CLOUD_PROVIDER} MULTI_MASTER=${MULTI_MASTER} SELF_HOST_ETCD=${SELF_HOST_ETCD} CALICO_NETWORK_POLICY=${CALICO_NETWORK_POLICY} /home/${REMOTE_USER}/init-master.sh local"
 
     # Copy assets from remote host to a local directory. These can be used to launch additional nodes & contain TLS assets
     mkdir ${CLUSTER_DIR}
