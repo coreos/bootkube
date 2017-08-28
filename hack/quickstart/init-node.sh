@@ -27,6 +27,7 @@ function init_worker_node() {
         sed -r -e "s/(server: ).*/\1https:\/\/127.0.0.1:6443/" -i /etc/kubernetes/kubeconfig
         mkdir -p /etc/nginx
         cp nginx.conf /etc/nginx
+        cp upstream.conf /etc/nginx
         mkdir -p /etc/kubernetes/manifests
         cp nginx-proxy.yaml /etc/kubernetes/manifests
     fi
@@ -60,12 +61,9 @@ if [ "${REMOTE_HOST}" != "local" ]; then
     scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} ${KUBECONFIG} ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/kubeconfig
 
     if [ "$MULTI_MASTER" = true ]; then
-        kubectl --kubeconfig=${KUBECONFIG} -n kube-system get configmap nginx-conf -o=jsonpath="{.data.nginx\.conf}" > nginx.conf
-        if [ -z "$(cat nginx.conf)" ]; then
-            echo "Error: nginx.conf is empty, please wait for nginx-syncer to write it (max 60 sec)"
-            exit 1
-        fi
+        kubectl --kubeconfig=${KUBECONFIG} get node -lnode-role.kubernetes.io/master -o go-template --template '{{range .items}}{{"server "}}{{.metadata.name}}{{" backup;\n"}}{{end}}' > upstream.conf
         scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} nginx.conf ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/nginx.conf
+        scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} upstream.conf ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/upstream.conf
         scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} nginx-proxy.yaml ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/nginx-proxy.yaml
     fi
 

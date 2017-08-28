@@ -81,9 +81,9 @@ function init_master_node() {
         sed -r -e "s/(server: ).*/\1https:\/\/127.0.0.1:6443/" -i /etc/kubernetes/kubeconfig
         mkdir -p /etc/nginx
         cp nginx.conf /etc/nginx
+        echo "server 127.0.0.1:443 backup;" > /etc/nginx/upstream.conf
         mkdir -p /etc/kubernetes/manifests
         cp nginx-proxy.yaml /etc/kubernetes/manifests
-        cp nginx-conf.yaml /home/${REMOTE_USER}/assets/manifests/
     fi
 
     # Start etcd.
@@ -131,11 +131,8 @@ if [ "${REMOTE_HOST}" != "local" ]; then
     fi
 
     if [ "$MULTI_MASTER" = true ]; then
-        # Extract nginx.conf from the manifest file without template variables
-        sed -e '1,/nginx.conf.template:/d' -e '/kind/,$d' -e 's/\(^    \|.*{{.*}}.*\)//g' nginx-conf.yaml > nginx.conf
         scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} nginx.conf ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/nginx.conf
         scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} nginx-proxy.yaml ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/nginx-proxy.yaml
-        scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} nginx-conf.yaml ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/nginx-conf.yaml
     fi
 
     # Copy self to remote host so script can be executed in "local" mode
@@ -147,7 +144,7 @@ if [ "${REMOTE_HOST}" != "local" ]; then
     scp -q -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} -r ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/assets/* ${CLUSTER_DIR}
 
     # Cleanup
-    ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "rm -rf /home/${REMOTE_USER}/{assets,init-master.sh,bootkube}"
+    ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "rm -rf /home/${REMOTE_USER}/{assets,init-master.sh,bootkube,nginx.conf,nginx-proxy.yaml}"
 
     echo "Cluster assets copied to ${CLUSTER_DIR}"
     echo

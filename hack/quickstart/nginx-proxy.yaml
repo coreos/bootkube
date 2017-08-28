@@ -24,7 +24,43 @@ spec:
     - mountPath: /etc/nginx
       name: etc-nginx
       readOnly: true
+  - name: upstream-sync
+    image: alpine:3.6
+    command: ["/bin/sh", "-c", "eval \"$SCRIPT\""]
+    env:
+    - name: NODE_NAME
+      valueFrom:
+        fieldRef:
+          apiVersion: v1
+          fieldPath: spec.nodeName
+    env:
+    - name: SCRIPT
+      value: |
+        set -o nounset -o errexit
+        trap "kill 0" SIGINT SIGTERM
+        apk add --update curl
+        curl -sLo /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+        chmod +x /usr/local/bin/kubectl
+        cd /etc/nginx
+        while true; do
+            kubectl --kubeconfig="/etc/kubernetes/kubeconfig" get node -lnode-role.kubernetes.io/master -o go-template --template '{{range .items}}{{"server "}}{{.metadata.name}}{{" backup;\n"}}{{end}}' > upstream.conf.tmp
+            if cmp -s upstream.conf.tmp upstream.conf; then
+                mv upstream.conf.tmp upstream.conf
+                kubectl --kubeconfig="/etc/kubernetes/kubeconfig" -n kube-system exec nginx-proxy-${NODE_NAME} -- nginx -s reload
+            fi
+            sleep 600 &
+            wait
+        done
+    volumeMounts:
+    - mountPath: /etc/nginx
+      name: etc-nginx
+    - mountPath: /etc/kubernetes
+      name: etc-kubernetes
+      readOnly: true
   volumes:
   - name: etc-nginx
     hostPath:
       path: /etc/nginx
+  - name: etc-kubernetes
+    hostPath:
+      path: /etc/kubernetes
