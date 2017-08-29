@@ -8,6 +8,7 @@ REMOTE_USER=${REMOTE_USER:-core}
 IDENT=${IDENT:-${HOME}/.ssh/id_rsa}
 SSH_OPTS=${SSH_OPTS:-}
 TAG_MASTER=${TAG_MASTER:-false}
+MULTI_MASTER=${MULTI_MASTER:-false}
 CLOUD_PROVIDER=${CLOUD_PROVIDER:-}
 
 function usage() {
@@ -22,6 +23,14 @@ function init_worker_node() {
     # Setup kubeconfig
     mkdir -p /etc/kubernetes
     cp ${KUBECONFIG} /etc/kubernetes/kubeconfig
+    if [ "$MULTI_MASTER" = true ]; then
+        sed -r -e "s/(server: ).*/\1https:\/\/127.0.0.1:6443/" -i /etc/kubernetes/kubeconfig
+        mkdir -p /etc/nginx
+        cp nginx.conf /etc/nginx
+        cp upstream.conf /etc/nginx
+        mkdir -p /etc/kubernetes/manifests
+        cp nginx-proxy.yaml /etc/kubernetes/manifests
+    fi
     # Pulled out of the kubeconfig. Other installations should place the root
     # CA here manually.
     grep 'certificate-authority-data' ${KUBECONFIG} | awk '{print $2}' | base64 -d > /etc/kubernetes/ca.crt
@@ -51,12 +60,19 @@ if [ "${REMOTE_HOST}" != "local" ]; then
     fi
     scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} ${KUBECONFIG} ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/kubeconfig
 
+    if [ "$MULTI_MASTER" = true ]; then
+        kubectl --kubeconfig=${KUBECONFIG} get node -lnode-role.kubernetes.io/master -o go-template --template '{{range .items}}{{"server "}}{{.metadata.name}}{{" backup;\n"}}{{end}}' > upstream.conf
+        scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} nginx.conf ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/nginx.conf
+        scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} upstream.conf ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/upstream.conf
+        scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} nginx-proxy.yaml ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/nginx-proxy.yaml
+    fi
+
     # Copy self to remote host so script can be executed in "local" mode
     scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} ${BASH_SOURCE[0]} ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/init-node.sh
-    ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "sudo REMOTE_USER=${REMOTE_USER} CLOUD_PROVIDER=${CLOUD_PROVIDER} /home/${REMOTE_USER}/init-node.sh local /home/${REMOTE_USER}/kubeconfig"
+    ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "sudo REMOTE_USER=${REMOTE_USER} MULTI_MASTER=${MULTI_MASTER} CLOUD_PROVIDER=${CLOUD_PROVIDER} /home/${REMOTE_USER}/init-node.sh local /home/${REMOTE_USER}/kubeconfig"
 
     # Cleanup
-    ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "rm /home/${REMOTE_USER}/{init-node.sh,kubeconfig}"
+    ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "rm /home/${REMOTE_USER}/{init-node.sh,kubeconfig,nginx-proxy.yaml,nginx.conf}"
 
     echo
     echo "Node bootstrap complete. It may take a few minutes for the node to become ready. Access your kubernetes cluster using:"
