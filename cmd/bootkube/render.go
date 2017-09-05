@@ -38,6 +38,7 @@ var (
 
 	renderOpts struct {
 		assetDir            string
+		assetTemplateDir    string
 		caCertificatePath   string
 		caPrivateKeyPath    string
 		etcdCAPath          string
@@ -60,6 +61,7 @@ var (
 func init() {
 	cmdRoot.AddCommand(cmdRender)
 	cmdRender.Flags().StringVar(&renderOpts.assetDir, "asset-dir", "", "Output path for rendered assets")
+	cmdRender.Flags().StringVar(&renderOpts.assetTemplateDir, "asset-template-dir", "", "Path of the templates for rendering assets, if empty the default templates will be used.")
 	cmdRender.Flags().StringVar(&renderOpts.caCertificatePath, "ca-certificate-path", "", "Path to an existing PEM encoded CA. If provided, TLS assets will be generated using this certificate authority.")
 	cmdRender.Flags().StringVar(&renderOpts.caPrivateKeyPath, "ca-private-key-path", "", "Path to an existing Certificate Authority RSA private key. Required if --ca-certificate is set.")
 	cmdRender.Flags().StringVar(&renderOpts.etcdCAPath, "etcd-ca-path", "", "Path to an existing PEM encoded CA that will be used for TLS-enabled communication between the apiserver and etcd. Must be used in conjunction with --etcd-certificate-path and --etcd-private-key-path, and must have etcd configured to use TLS with matching secrets.")
@@ -81,8 +83,11 @@ func runCmdRender(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-
-	as, err := asset.NewDefaultAssets(*config)
+	templates, err := asset.NewTemplateContent(renderOpts.assetTemplateDir)
+	if err != nil {
+		return err
+	}
+	as, err := asset.NewDefaultAssets(templates, *config)
 	if err != nil {
 		return err
 	}
