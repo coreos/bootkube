@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 
 	"github.com/kubernetes-incubator/bootkube/pkg/asset/internal"
 	"github.com/kubernetes-incubator/bootkube/pkg/tlsutil"
@@ -74,6 +75,7 @@ const (
 	AssetPathBootstrapEtcd               = "bootstrap-manifests/bootstrap-etcd.yaml"
 	AssetPathBootstrapEtcdService        = "etcd/bootstrap-etcd-service.json"
 	AssetPathMigrateEtcdCluster          = "etcd/migrate-etcd-cluster.json"
+	AssetPathOptionalManifests           = "optional-manifests"
 )
 
 const (
@@ -109,6 +111,7 @@ const (
 	TemplatePathCalicoFelixConfigsCRD       = "manifests/calico-felix-configs-crd.yaml"
 	TemplatePathCalicoNetworkPoliciesCRD    = "manifests/calico-network-policies-crd.yaml"
 	TemplatePathCalicoIPPoolsCRD            = "manifests/calico-ip-pools-crd.yaml"
+	TemplatePathOptionalManifests           = "optional-manifests"
 )
 
 var (
@@ -140,6 +143,7 @@ type Config struct {
 	CloudProvider          string
 	BootstrapSecretsSubdir string
 	Images                 ImageVersions
+	Values                 map[string]interface{}
 }
 
 // ImageVersions holds all the images (and their versions) that are rendered into the templates.
@@ -191,6 +195,7 @@ type TemplateContent struct {
 	CalicoFelixConfigsCRD               []byte
 	CalicoNetworkPoliciesCRD            []byte
 	CalicoIPPoolsCRD                    []byte
+	OptionalTemplates                   map[string][]byte
 }
 
 func NewTemplateContent(path string) (*TemplateContent, error) {
@@ -238,6 +243,7 @@ func readTemplateContentFromFiles(path string) (*TemplateContent, error) {
 		CalicoFelixConfigsCRD:               tr.Read(TemplatePathCalicoFelixConfigsCRD),
 		CalicoNetworkPoliciesCRD:            tr.Read(TemplatePathCalicoNetworkPoliciesCRD),
 		CalicoIPPoolsCRD:                    tr.Read(TemplatePathCalicoIPPoolsCRD),
+		OptionalTemplates:                   tr.ReadFolder(TemplatePathOptionalManifests),
 	}
 
 	return templates, tr.Error()
@@ -268,6 +274,35 @@ func (tr *templateReader) Read(templateLocation string) []byte {
 	data, err := ioutil.ReadAll(f)
 	tr.err = err
 	return data
+}
+
+func (tr *templateReader) ReadFolder(templateFolderLocation string) map[string][]byte {
+	if tr.err != nil {
+		return nil
+	}
+	fullPath := path.Join(tr.basePath, templateFolderLocation)
+	files, err := ioutil.ReadDir(fullPath)
+	if err != nil {
+		tr.err = err
+		return nil
+	}
+
+	templateFolder := make(map[string][]byte)
+	for _, f := range files {
+		// Skip folders
+		if f.IsDir() {
+			continue
+		}
+
+		content, err := ioutil.ReadFile(path.Join(fullPath, f.Name()))
+		if err != nil {
+			tr.err = err
+			return nil
+		}
+		templateFolder[path.Join(templateFolderLocation, f.Name())] = content
+	}
+
+	return templateFolder
 }
 
 func (tr *templateReader) Error() error {
@@ -383,6 +418,10 @@ func NewDefaultAssets(templates *TemplateContent, conf Config) (Assets, error) {
 	}
 	as = append(as, cmSecret)
 
+	// Optional assets
+	optAssets := newOptionalAsset(templates, conf, as)
+	as = append(as, optAssets...)
+
 	return as, nil
 }
 
@@ -392,6 +431,17 @@ type Asset struct {
 }
 
 type Assets []Asset
+
+func (as Assets) ToMap() map[string]string {
+	reg, _ := regexp.Compile("[^a-zA-Z0-9]+")
+
+	m := make(map[string]string)
+	for _, s := range as {
+		cleanName := reg.ReplaceAllString(s.Name, "")
+		m[cleanName] = string(s.Data)
+	}
+	return m
+}
 
 func (as Assets) Get(name string) (Asset, error) {
 	for _, asset := range as {

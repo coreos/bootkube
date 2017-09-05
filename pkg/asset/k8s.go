@@ -3,9 +3,11 @@ package asset
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"path/filepath"
 	"text/template"
 
+	"github.com/Masterminds/sprig"
 	"github.com/ghodss/yaml"
 )
 
@@ -183,6 +185,19 @@ func newControllerManagerSecretAsset(assets Assets) (Asset, error) {
 	return Asset{Name: AssetPathControllerManagerSecret, Data: secretYAML}, nil
 }
 
+func newOptionalAsset(templates *TemplateContent, conf Config, as Assets) Assets {
+	var assets Assets = make(Assets, 0, len(templates.OptionalTemplates))
+	q, _ := json.Marshal(conf)
+	var injectConf map[string]interface{}
+	json.Unmarshal(q, &injectConf)
+
+	injectConf["assetsOldGen"] = as.ToMap()
+	for filename, content := range templates.OptionalTemplates {
+		assets = append(assets, MustCreateAssetFromTemplate(filename, content, injectConf))
+	}
+	return assets
+}
+
 // TODO(aaron): use actual secret object (need to wrap in apiversion/type)
 type secret struct {
 	ApiVersion string            `json:"apiVersion"`
@@ -222,7 +237,7 @@ func MustCreateAssetFromTemplate(name string, template []byte, data interface{})
 }
 
 func assetFromTemplate(name string, tb []byte, data interface{}) (Asset, error) {
-	tmpl, err := template.New(name).Parse(string(tb))
+	tmpl, err := template.New(name).Funcs(sprig.HermeticTxtFuncMap()).Parse(string(tb))
 	if err != nil {
 		return Asset{}, err
 	}
