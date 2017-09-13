@@ -1,11 +1,13 @@
-hash: b9a58ccf7889504bfa416d02f02f21e3a013dc45f06aed4b0bc21a78074745e4
-updated: 2017-09-01T15:47:56.313486807-07:00
+hash: 0b703000df1b05a937675db81f11099d50df8aa4567771933915ff4d945a7e2a
+updated: 2017-09-13T15:30:51.97759374+02:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
   subpackages:
   - compute/metadata
   - internal
+- name: github.com/aokoli/goutils
+  version: 3391d3790d23d03408670993e957e8f408993c34
 - name: github.com/aws/aws-sdk-go
   version: 63ce630574a5ec05ecd8e8de5cea16332a5a684d
   subpackages:
@@ -184,6 +186,8 @@ imports:
   - simplelru
 - name: github.com/howeyc/gopass
   version: bf9dde6d0d2c004a008c27aaee91170c786f6db8
+- name: github.com/huandu/xstrings
+  version: 3959339b333561bf62a38b424fd41517c2c90f40
 - name: github.com/imdario/mergo
   version: 6633656539c1639d9d78127b7d47c622b5d7b6dc
 - name: github.com/inconshreveable/mousetrap
@@ -200,6 +204,10 @@ imports:
   - buffer
   - jlexer
   - jwriter
+- name: github.com/Masterminds/semver
+  version: 59c29afe1a994eacb71c833025ca7acf874bb1da
+- name: github.com/Masterminds/sprig
+  version: 9526be0327b26ad31aa70296a7b10704883976d5
 - name: github.com/matttproud/golang_protobuf_extensions
   version: fc2b8d3a73c4867e51861bbdd5ae3c1f0869dd6a
   subpackages:
@@ -209,7 +217,7 @@ imports:
 - name: github.com/pkg/errors
   version: a22138067af1c4942683050411a841ade67fe1eb
 - name: github.com/pkg/sftp
-  version: 98203f5a8333288eb3163b7c667d4260fe1333e9
+  version: 1a91f318a0be84de50afcf22d3b3d78bfe32025c
 - name: github.com/prometheus/client_golang
   version: c5b7fccd204277076155f10851dad72b76a49317
   subpackages:
@@ -232,6 +240,8 @@ imports:
   version: 8a290539e2e8629dbc4e6bad948158f790ec31f4
 - name: github.com/PuerkitoBio/urlesc
   version: 5bd2802263f21d8788851d5305584c82a5c75d7e
+- name: github.com/satori/go.uuid
+  version: 879c5887cd475cd7864858769793b2ceb0d44feb
 - name: github.com/spf13/cobra
   version: 4cdb38c072b86bf795d2c81de50784d9fdd6eb77
 - name: github.com/spf13/pflag
@@ -246,6 +256,8 @@ imports:
   - curve25519
   - ed25519
   - ed25519/internal/edwards25519
+  - pbkdf2
+  - scrypt
   - ssh
   - ssh/agent
   - ssh/terminal
@@ -640,7 +652,7 @@ imports:
   - plugin/pkg/scheduler/schedulercache
   - plugin/pkg/scheduler/util
 - name: k8s.io/metrics
-  version: 8efbc8e22d00b9c600afec5f1c14073fd2412fce
+  version: 47b323a05a15045603e688280c01d1d782ce4b68
   subpackages:
   - pkg/apis/metrics
   - pkg/apis/metrics/v1alpha1

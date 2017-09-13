@@ -53,3 +53,5 @@ import:
   - curve25519
 - package: github.com/coreos/ktestutil
   version: 1c5a59f93ffab7cf69fde8b805fee942fd467cdc
+- package: github.com/Masterminds/sprig
+  version: 9526be0327b26ad31aa70296a7b10704883976d5
