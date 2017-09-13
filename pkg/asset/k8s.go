@@ -24,6 +24,10 @@ const (
 	secretCMName        = "kube-controller-manager"
 )
 
+const (
+	oldAssetsInjectName = "assetsOldGen"
+)
+
 type staticConfig struct {
 	Images ImageVersions
 }
@@ -186,12 +190,13 @@ func newControllerManagerSecretAsset(assets Assets) (Asset, error) {
 }
 
 func newOptionalAsset(templates *TemplateContent, conf Config, as Assets) Assets {
+
 	var assets Assets = make(Assets, 0, len(templates.OptionalTemplates))
 	q, _ := json.Marshal(conf)
 	var injectConf map[string]interface{}
 	json.Unmarshal(q, &injectConf)
 
-	injectConf["assetsOldGen"] = as.ToMap()
+	injectConf[oldAssetsInjectName] = as.ToMap()
 	for filename, content := range templates.OptionalTemplates {
 		assets = append(assets, MustCreateAssetFromTemplate(filename, content, injectConf))
 	}
