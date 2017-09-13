@@ -10,7 +10,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 
+	"github.com/kubernetes-incubator/bootkube/pkg/asset/internal"
 	"github.com/kubernetes-incubator/bootkube/pkg/tlsutil"
 )
 
@@ -73,6 +75,43 @@ const (
 	AssetPathBootstrapEtcd               = "bootstrap-manifests/bootstrap-etcd.yaml"
 	AssetPathBootstrapEtcdService        = "etcd/bootstrap-etcd-service.json"
 	AssetPathMigrateEtcdCluster          = "etcd/migrate-etcd-cluster.json"
+	AssetPathOptionalManifests           = "optional-manifests"
+)
+
+const (
+	TemplatePathKubeConfig                  = "auth/kubeconfig"
+	TemplatePathKubeSystemSARoleBinding     = "manifests/kube-system-rbac-role-binding.yaml"
+	TemplatePathKubelet                     = "manifests/kubelet.yaml"
+	TemplatePathAPIServer                   = "manifests/kube-apiserver.yaml"
+	TemplatePathBootstrapAPIServer          = "bootstrap-manifests/bootstrap-apiserver.yaml"
+	TemplatePathKenc                        = "manifests/kube-etcd-network-checkpointer.yaml"
+	TemplatePathCheckpointer                = "manifests/pod-checkpointer.yaml"
+	TemplatePathControllerManager           = "manifests/kube-controller-manager.yaml"
+	TemplatePathBootstrapControllerManager  = "bootstrap-manifests/bootstrap-controller-manager.yaml"
+	TemplatePathControllerManagerDisruption = "manifests/kube-controller-manager-disruption.yaml"
+	TemplatePathScheduler                   = "manifests/kube-scheduler.yaml"
+	TemplatePathBootstrapScheduler          = "bootstrap-manifests/bootstrap-scheduler.yaml"
+	TemplatePathSchedulerDisruption         = "manifests/kube-scheduler-disruption.yaml"
+	TemplatePathProxy                       = "manifests/kube-proxy.yaml"
+	TemplatePathDNSDeployment               = "manifests/kube-dns-deployment.yaml"
+	TemplatePathDNSSvc                      = "manifests/kube-dns-svc.yaml"
+	TemplatePathEtcdOperator                = "manifests/etcd-operator.yaml"
+	TemplatePathEtcdSvc                     = "manifests/etcd-service.yaml"
+	TemplatePathBootstrapEtcd               = "bootstrap-manifests/bootstrap-etcd.yaml"
+	TemplatePathBootstrapEtcdSvc            = "etcd/bootstrap-etcd-service.json"
+	TemplatePathEtcdCRD                     = "etcd/migrate-etcd-cluster.json"
+	TemplatePathKubeFlannelCfg              = "manifests/kube-flannel.yaml"
+	TemplatePathKubeFlannel                 = "manifests/kube-flannel-cfg.yaml"
+	TemplatePathCalico                      = "manifests/calico.yaml"
+	TemplatePathCalicoCfg                   = "manifests/calico-config.yaml"
+	TemplatePathCalcioSA                    = "manifests/calico-service-account.yaml"
+	TemplatePathCalcioRole                  = "manifests/calico-role.yaml"
+	TemplatePathCalcioRoleBinding           = "manifests/calico-role-binding.yaml"
+	TemplatePathCalicoBGPConfigsCRD         = "manifests/calico-bgp-configs-crd.yaml"
+	TemplatePathCalicoFelixConfigsCRD       = "manifests/calico-felix-configs-crd.yaml"
+	TemplatePathCalicoNetworkPoliciesCRD    = "manifests/calico-network-policies-crd.yaml"
+	TemplatePathCalicoIPPoolsCRD            = "manifests/calico-ip-pools-crd.yaml"
+	TemplatePathOptionalManifests           = "optional-manifests"
 )
 
 var (
@@ -104,6 +143,7 @@ type Config struct {
 	CloudProvider          string
 	BootstrapSecretsSubdir string
 	Images                 ImageVersions
+	Values                 map[string]interface{}
 }
 
 // ImageVersions holds all the images (and their versions) that are rendered into the templates.
@@ -122,14 +162,198 @@ type ImageVersions struct {
 	PodCheckpointer string
 }
 
+type TemplateContent struct {
+	KubeConfigTemplate                  []byte
+	KubeSystemSARoleBindingTemplate     []byte
+	KubeletTemplate                     []byte
+	APIServerTemplate                   []byte
+	BootstrapAPIServerTemplate          []byte
+	KencTemplate                        []byte
+	CheckpointerTemplate                []byte
+	ControllerManagerTemplate           []byte
+	BootstrapControllerManagerTemplate  []byte
+	ControllerManagerDisruptionTemplate []byte
+	SchedulerTemplate                   []byte
+	BootstrapSchedulerTemplate          []byte
+	SchedulerDisruptionTemplate         []byte
+	ProxyTemplate                       []byte
+	DNSDeploymentTemplate               []byte
+	DNSSvcTemplate                      []byte
+	EtcdOperatorTemplate                []byte
+	EtcdSvcTemplate                     []byte
+	BootstrapEtcdTemplate               []byte
+	BootstrapEtcdSvcTemplate            []byte
+	EtcdCRDTemplate                     []byte
+	KubeFlannelCfgTemplate              []byte
+	KubeFlannelTemplate                 []byte
+	CalicoCfgTemplate                   []byte
+	CalicoRoleTemplate                  []byte
+	CalicoRoleBindingTemplate           []byte
+	CalicoServiceAccountTemplate        []byte
+	CalicoNodeTemplate                  []byte
+	CalicoBGPConfigsCRD                 []byte
+	CalicoFelixConfigsCRD               []byte
+	CalicoNetworkPoliciesCRD            []byte
+	CalicoIPPoolsCRD                    []byte
+	OptionalTemplates                   map[string][]byte
+}
+
+func NewTemplateContent(path string) (*TemplateContent, error) {
+	if path == "" {
+		return defaultInternalTemplateContent(), nil
+	}
+	if _, err := os.Stat(path); err != nil {
+		return nil, err
+	}
+	return readTemplateContentFromFiles(path)
+}
+
+func readTemplateContentFromFiles(path string) (*TemplateContent, error) {
+	tr := newTemplateReader(path)
+	templates := &TemplateContent{
+		KubeConfigTemplate:                  tr.Read(TemplatePathKubeConfig),
+		KubeSystemSARoleBindingTemplate:     tr.Read(TemplatePathKubeSystemSARoleBinding),
+		KubeletTemplate:                     tr.Read(TemplatePathKubelet),
+		APIServerTemplate:                   tr.Read(TemplatePathAPIServer),
+		BootstrapAPIServerTemplate:          tr.Read(TemplatePathBootstrapAPIServer),
+		KencTemplate:                        tr.Read(TemplatePathKenc),
+		CheckpointerTemplate:                tr.Read(TemplatePathCheckpointer),
+		ControllerManagerTemplate:           tr.Read(TemplatePathControllerManager),
+		BootstrapControllerManagerTemplate:  tr.Read(TemplatePathBootstrapControllerManager),
+		ControllerManagerDisruptionTemplate: tr.Read(TemplatePathControllerManagerDisruption),
+		SchedulerTemplate:                   tr.Read(TemplatePathScheduler),
+		BootstrapSchedulerTemplate:          tr.Read(TemplatePathBootstrapScheduler),
+		SchedulerDisruptionTemplate:         tr.Read(TemplatePathSchedulerDisruption),
+		ProxyTemplate:                       tr.Read(TemplatePathProxy),
+		DNSDeploymentTemplate:               tr.Read(TemplatePathDNSDeployment),
+		DNSSvcTemplate:                      tr.Read(TemplatePathDNSSvc),
+		EtcdOperatorTemplate:                tr.Read(TemplatePathEtcdOperator),
+		EtcdSvcTemplate:                     tr.Read(TemplatePathEtcdSvc),
+		BootstrapEtcdTemplate:               tr.Read(TemplatePathBootstrapEtcd),
+		BootstrapEtcdSvcTemplate:            tr.Read(TemplatePathBootstrapEtcdSvc),
+		EtcdCRDTemplate:                     tr.Read(TemplatePathEtcdCRD),
+		KubeFlannelCfgTemplate:              tr.Read(TemplatePathKubeFlannelCfg),
+		KubeFlannelTemplate:                 tr.Read(TemplatePathKubeFlannel),
+		CalicoCfgTemplate:                   tr.Read(TemplatePathCalicoCfg),
+		CalicoRoleTemplate:                  tr.Read(TemplatePathCalcioRole),
+		CalicoRoleBindingTemplate:           tr.Read(TemplatePathCalcioRoleBinding),
+		CalicoServiceAccountTemplate:        tr.Read(TemplatePathCalcioSA),
+		CalicoNodeTemplate:                  tr.Read(TemplatePathCalico),
+		CalicoBGPConfigsCRD:                 tr.Read(TemplatePathCalicoBGPConfigsCRD),
+		CalicoFelixConfigsCRD:               tr.Read(TemplatePathCalicoFelixConfigsCRD),
+		CalicoNetworkPoliciesCRD:            tr.Read(TemplatePathCalicoNetworkPoliciesCRD),
+		CalicoIPPoolsCRD:                    tr.Read(TemplatePathCalicoIPPoolsCRD),
+		OptionalTemplates:                   tr.ReadFolder(TemplatePathOptionalManifests),
+	}
+
+	return templates, tr.Error()
+}
+
+type templateReader struct {
+	basePath string
+	err      error
+}
+
+func newTemplateReader(basePath string) *templateReader {
+	return &templateReader{
+		basePath: basePath,
+	}
+}
+
+func (tr *templateReader) Read(templateLocation string) []byte {
+	if tr.err != nil {
+		return nil
+	}
+
+	f, err := os.Open(path.Join(tr.basePath, templateLocation))
+	if err != nil {
+		tr.err = err
+		return nil
+	}
+	defer f.Close()
+	data, err := ioutil.ReadAll(f)
+	tr.err = err
+	return data
+}
+
+func (tr *templateReader) ReadFolder(templateFolderLocation string) map[string][]byte {
+	if tr.err != nil {
+		return nil
+	}
+	fullPath := path.Join(tr.basePath, templateFolderLocation)
+	files, err := ioutil.ReadDir(fullPath)
+	if err != nil {
+		tr.err = err
+		return nil
+	}
+
+	templateFolder := make(map[string][]byte)
+	for _, f := range files {
+		// Skip folders
+		if f.IsDir() {
+			continue
+		}
+
+		content, err := ioutil.ReadFile(path.Join(fullPath, f.Name()))
+		if err != nil {
+			tr.err = err
+			return nil
+		}
+		templateFolder[path.Join(templateFolderLocation, f.Name())] = content
+	}
+
+	return templateFolder
+}
+
+func (tr *templateReader) Error() error {
+	return tr.err
+}
+
+func defaultInternalTemplateContent() *TemplateContent {
+	return &TemplateContent{
+		KubeConfigTemplate:                  internal.KubeConfigTemplate,
+		KubeSystemSARoleBindingTemplate:     internal.KubeSystemSARoleBindingTemplate,
+		KubeletTemplate:                     internal.KubeletTemplate,
+		APIServerTemplate:                   internal.APIServerTemplate,
+		BootstrapAPIServerTemplate:          internal.BootstrapAPIServerTemplate,
+		KencTemplate:                        internal.KencTemplate,
+		CheckpointerTemplate:                internal.CheckpointerTemplate,
+		ControllerManagerTemplate:           internal.ControllerManagerTemplate,
+		BootstrapControllerManagerTemplate:  internal.BootstrapControllerManagerTemplate,
+		ControllerManagerDisruptionTemplate: internal.ControllerManagerDisruptionTemplate,
+		SchedulerTemplate:                   internal.SchedulerTemplate,
+		BootstrapSchedulerTemplate:          internal.BootstrapSchedulerTemplate,
+		SchedulerDisruptionTemplate:         internal.SchedulerDisruptionTemplate,
+		ProxyTemplate:                       internal.ProxyTemplate,
+		DNSDeploymentTemplate:               internal.DNSDeploymentTemplate,
+		DNSSvcTemplate:                      internal.DNSSvcTemplate,
+		EtcdOperatorTemplate:                internal.EtcdOperatorTemplate,
+		EtcdSvcTemplate:                     internal.EtcdSvcTemplate,
+		BootstrapEtcdTemplate:               internal.BootstrapEtcdTemplate,
+		BootstrapEtcdSvcTemplate:            internal.BootstrapEtcdSvcTemplate,
+		EtcdCRDTemplate:                     internal.EtcdCRDTemplate,
+		KubeFlannelCfgTemplate:              internal.KubeFlannelCfgTemplate,
+		KubeFlannelTemplate:                 internal.KubeFlannelTemplate,
+		CalicoCfgTemplate:                   internal.CalicoCfgTemplate,
+		CalicoRoleTemplate:                  internal.CalicoRoleTemplate,
+		CalicoRoleBindingTemplate:           internal.CalicoRoleBindingTemplate,
+		CalicoServiceAccountTemplate:        internal.CalicoServiceAccountTemplate,
+		CalicoNodeTemplate:                  internal.CalicoNodeTemplate,
+		CalicoBGPConfigsCRD:                 internal.CalicoBGPConfigsCRD,
+		CalicoFelixConfigsCRD:               internal.CalicoFelixConfigsCRD,
+		CalicoNetworkPoliciesCRD:            internal.CalicoNetworkPoliciesCRD,
+		CalicoIPPoolsCRD:                    internal.CalicoIPPoolsCRD,
+	}
+}
+
 // NewDefaultAssets returns a list of default assets, optionally
 // configured via a user provided AssetConfig. Default assets include
 // TLS assets (certs, keys and secrets), and k8s component manifests.
-func NewDefaultAssets(conf Config) (Assets, error) {
+func NewDefaultAssets(templates *TemplateContent, conf Config) (Assets, error) {
 	conf.BootstrapSecretsSubdir = path.Base(BootstrapSecretsDir)
 
-	as := newStaticAssets(conf.Images)
-	as = append(as, newDynamicAssets(conf)...)
+	as := newStaticAssets(templates, conf.Images)
+	as = append(as, newDynamicAssets(templates, conf)...)
 
 	// Add kube-apiserver service IP
 	conf.AltNames.IPs = append(conf.AltNames.IPs, conf.APIServiceIP)
@@ -174,7 +398,7 @@ func NewDefaultAssets(conf Config) (Assets, error) {
 	}
 
 	// K8S kubeconfig
-	kubeConfig, err := newKubeConfigAsset(as, conf)
+	kubeConfig, err := newKubeConfigAsset(templates, as, conf)
 	if err != nil {
 		return Assets{}, err
 	}
@@ -194,6 +418,10 @@ func NewDefaultAssets(conf Config) (Assets, error) {
 	}
 	as = append(as, cmSecret)
 
+	// Optional assets
+	optAssets := newOptionalAsset(templates, conf, as)
+	as = append(as, optAssets...)
+
 	return as, nil
 }
 
@@ -203,6 +431,17 @@ type Asset struct {
 }
 
 type Assets []Asset
+
+func (as Assets) ToMap() map[string]string {
+	reg, _ := regexp.Compile("[^a-zA-Z0-9]+")
+
+	m := make(map[string]string)
+	for _, s := range as {
+		cleanName := reg.ReplaceAllString(s.Name, "")
+		m[cleanName] = string(s.Data)
+	}
+	return m
+}
 
 func (as Assets) Get(name string) (Asset, error) {
 	for _, asset := range as {

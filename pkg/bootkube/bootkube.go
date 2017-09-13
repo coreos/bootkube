@@ -69,7 +69,8 @@ func (b *bootkube) Run() error {
 	}
 
 	if err = CreateAssets(filepath.Join(b.assetDir, asset.AssetPathManifests), assetTimeout); err != nil {
-		return err
+		// Do not fail cluster creation due to missing assets as it is a recoverable situation
+		// See https://github.com/kubernetes-incubator/bootkube/pull/368/files#r105509074
 	}
 
 	selfHostedEtcd, err := detectSelfHostedEtcd(b.assetDir, asset.AssetPathBootstrapEtcd)
@@ -96,7 +97,7 @@ func (b *bootkube) Run() error {
 		}
 	}
 
-	return nil
+	return CreateAssets(filepath.Join(b.assetDir, asset.AssetPathOptionalManifests), assetTimeout)
 }
 
 // All bootkube printing to stdout should go through this fmt.Printf wrapper.

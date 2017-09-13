@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubernetes-incubator/bootkube/pkg/util"
+
 	"github.com/golang/glog"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,8 +18,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-
-	"github.com/kubernetes-incubator/bootkube/pkg/util"
 )
 
 func CreateAssets(manifestDir string, timeout time.Duration) error {
@@ -34,38 +34,26 @@ func CreateAssets(manifestDir string, timeout time.Duration) error {
 		return true, nil
 	}
 
-	createFn := func() (bool, error) {
-		err := createAssets(manifestDir)
-		if err != nil {
-			err = fmt.Errorf("Error creating assets: %v", err)
-			glog.Error(err)
-			UserOutput("%v\n", err)
-			UserOutput("\nNOTE: Bootkube failed to create some cluster assets. It is important that manifest errors are resolved and resubmitted to the apiserver.\n")
-			UserOutput("For example, after resolving issues: kubectl create -f <failed-manifest>\n\n")
-		}
-
-		// Do not fail cluster creation due to missing assets as it is a recoverable situation
-		// See https://github.com/kubernetes-incubator/bootkube/pull/368/files#r105509074
-		return true, nil
-	}
-
 	UserOutput("Waiting for api-server...\n")
-	start := time.Now()
 	if err := wait.Poll(5*time.Second, timeout, upFn); err != nil {
 		err = fmt.Errorf("API Server is not ready: %v", err)
 		glog.Error(err)
 		return err
 	}
 
-	UserOutput("Creating self-hosted assets...\n")
-	timeout = timeout - time.Since(start)
-	if err := wait.PollImmediate(5*time.Second, timeout, createFn); err != nil {
-		err = fmt.Errorf("Failed to create assets: %v", err)
+	err := util.Retry(util.DefaultBackoff, func() error {
+		UserOutput("Trying to create self-hosted assets...\n")
+		return createAssets(manifestDir)
+	})
+	if err != nil {
+		err = fmt.Errorf("Error creating assets: %v", err)
 		glog.Error(err)
-		return err
+		UserOutput("%v\n", err)
+		UserOutput("\nNOTE: Bootkube failed to create some cluster assets. It is important that manifest errors are resolved and resubmitted to the apiserver.\n")
+		UserOutput("For example, after resolving issues: kubectl create -f <failed-manifest>\n\n")
 	}
 
-	return nil
+	return err
 }
 
 func createAssets(manifestDir string) error {
@@ -135,13 +123,10 @@ func createAssets(manifestDir string) error {
 		UserOutput("\tcreated %23s %s\n", info.Name, strings.TrimSuffix(info.Mapping.Resource, "s"))
 		return nil
 	})
-	if err != nil {
-		return err
-	}
 	if count == 0 {
 		return fmt.Errorf("no objects passed to create")
 	}
-	return nil
+	return err
 }
 
 func apiTest() error {

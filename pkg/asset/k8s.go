@@ -3,12 +3,12 @@ package asset
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"path/filepath"
 	"text/template"
 
+	"github.com/Masterminds/sprig"
 	"github.com/ghodss/yaml"
-
-	"github.com/kubernetes-incubator/bootkube/pkg/asset/internal"
 )
 
 const (
@@ -24,64 +24,68 @@ const (
 	secretCMName        = "kube-controller-manager"
 )
 
+const (
+	oldAssetsInjectName = "assetsOldGen"
+)
+
 type staticConfig struct {
 	Images ImageVersions
 }
 
-func newStaticAssets(imageVersions ImageVersions) Assets {
+func newStaticAssets(templates *TemplateContent, imageVersions ImageVersions) Assets {
 	conf := staticConfig{Images: imageVersions}
 	assets := Assets{
-		MustCreateAssetFromTemplate(AssetPathScheduler, internal.SchedulerTemplate, conf),
-		MustCreateAssetFromTemplate(AssetPathSchedulerDisruption, internal.SchedulerDisruptionTemplate, conf),
-		MustCreateAssetFromTemplate(AssetPathControllerManagerDisruption, internal.ControllerManagerDisruptionTemplate, conf),
-		MustCreateAssetFromTemplate(AssetPathKubeDNSDeployment, internal.DNSDeploymentTemplate, conf),
-		MustCreateAssetFromTemplate(AssetPathCheckpointer, internal.CheckpointerTemplate, conf),
-		MustCreateAssetFromTemplate(AssetPathKubeSystemSARoleBinding, internal.KubeSystemSARoleBindingTemplate, conf),
+		MustCreateAssetFromTemplate(AssetPathScheduler, templates.SchedulerTemplate, conf),
+		MustCreateAssetFromTemplate(AssetPathSchedulerDisruption, templates.SchedulerDisruptionTemplate, conf),
+		MustCreateAssetFromTemplate(AssetPathControllerManagerDisruption, templates.ControllerManagerDisruptionTemplate, conf),
+		MustCreateAssetFromTemplate(AssetPathKubeDNSDeployment, templates.DNSDeploymentTemplate, conf),
+		MustCreateAssetFromTemplate(AssetPathCheckpointer, templates.CheckpointerTemplate, conf),
+		MustCreateAssetFromTemplate(AssetPathKubeSystemSARoleBinding, templates.KubeSystemSARoleBindingTemplate, conf),
 	}
 	return assets
 }
 
-func newDynamicAssets(conf Config) Assets {
+func newDynamicAssets(templates *TemplateContent, conf Config) Assets {
 	assets := Assets{
-		MustCreateAssetFromTemplate(AssetPathControllerManager, internal.ControllerManagerTemplate, conf),
-		MustCreateAssetFromTemplate(AssetPathAPIServer, internal.APIServerTemplate, conf),
-		MustCreateAssetFromTemplate(AssetPathProxy, internal.ProxyTemplate, conf),
-		MustCreateAssetFromTemplate(AssetPathKubeFlannelCfg, internal.KubeFlannelCfgTemplate, conf),
-		MustCreateAssetFromTemplate(AssetPathKubeFlannel, internal.KubeFlannelTemplate, conf),
-		MustCreateAssetFromTemplate(AssetPathKubeDNSSvc, internal.DNSSvcTemplate, conf),
-		MustCreateAssetFromTemplate(AssetPathBootstrapAPIServer, internal.BootstrapAPIServerTemplate, conf),
-		MustCreateAssetFromTemplate(AssetPathBootstrapControllerManager, internal.BootstrapControllerManagerTemplate, conf),
-		MustCreateAssetFromTemplate(AssetPathBootstrapScheduler, internal.BootstrapSchedulerTemplate, conf),
+		MustCreateAssetFromTemplate(AssetPathControllerManager, templates.ControllerManagerTemplate, conf),
+		MustCreateAssetFromTemplate(AssetPathAPIServer, templates.APIServerTemplate, conf),
+		MustCreateAssetFromTemplate(AssetPathProxy, templates.ProxyTemplate, conf),
+		MustCreateAssetFromTemplate(AssetPathKubeFlannelCfg, templates.KubeFlannelCfgTemplate, conf),
+		MustCreateAssetFromTemplate(AssetPathKubeFlannel, templates.KubeFlannelTemplate, conf),
+		MustCreateAssetFromTemplate(AssetPathKubeDNSSvc, templates.DNSSvcTemplate, conf),
+		MustCreateAssetFromTemplate(AssetPathBootstrapAPIServer, templates.BootstrapAPIServerTemplate, conf),
+		MustCreateAssetFromTemplate(AssetPathBootstrapControllerManager, templates.BootstrapControllerManagerTemplate, conf),
+		MustCreateAssetFromTemplate(AssetPathBootstrapScheduler, templates.BootstrapSchedulerTemplate, conf),
 	}
 	if conf.SelfHostKubelet {
-		assets = append(assets, MustCreateAssetFromTemplate(AssetPathKubelet, internal.KubeletTemplate, conf))
+		assets = append(assets, MustCreateAssetFromTemplate(AssetPathKubelet, templates.KubeletTemplate, conf))
 	}
 	if conf.SelfHostedEtcd {
 		conf.EtcdServiceName = EtcdServiceName
 		assets = append(assets,
-			MustCreateAssetFromTemplate(AssetPathEtcdOperator, internal.EtcdOperatorTemplate, conf),
-			MustCreateAssetFromTemplate(AssetPathEtcdSvc, internal.EtcdSvcTemplate, conf),
-			MustCreateAssetFromTemplate(AssetPathKenc, internal.KencTemplate, conf),
-			MustCreateAssetFromTemplate(AssetPathBootstrapEtcd, internal.BootstrapEtcdTemplate, conf),
-			MustCreateAssetFromTemplate(AssetPathBootstrapEtcdService, internal.BootstrapEtcdSvcTemplate, conf),
-			MustCreateAssetFromTemplate(AssetPathMigrateEtcdCluster, internal.EtcdCRDTemplate, conf))
+			MustCreateAssetFromTemplate(AssetPathEtcdOperator, templates.EtcdOperatorTemplate, conf),
+			MustCreateAssetFromTemplate(AssetPathEtcdSvc, templates.EtcdSvcTemplate, conf),
+			MustCreateAssetFromTemplate(AssetPathKenc, templates.KencTemplate, conf),
+			MustCreateAssetFromTemplate(AssetPathBootstrapEtcd, templates.BootstrapEtcdTemplate, conf),
+			MustCreateAssetFromTemplate(AssetPathBootstrapEtcdService, templates.BootstrapEtcdSvcTemplate, conf),
+			MustCreateAssetFromTemplate(AssetPathMigrateEtcdCluster, templates.EtcdCRDTemplate, conf))
 	}
 	if conf.CalicoNetworkPolicy {
 		assets = append(assets,
-			MustCreateAssetFromTemplate(AssetPathCalicoCfg, internal.CalicoCfgTemplate, conf),
-			MustCreateAssetFromTemplate(AssetPathCalcioRole, internal.CalicoRoleTemplate, conf),
-			MustCreateAssetFromTemplate(AssetPathCalcioRoleBinding, internal.CalicoRoleBindingTemplate, conf),
-			MustCreateAssetFromTemplate(AssetPathCalcioSA, internal.CalicoServiceAccountTemplate, conf),
-			MustCreateAssetFromTemplate(AssetPathCalico, internal.CalicoNodeTemplate, conf),
-			MustCreateAssetFromTemplate(AssetPathCalicoBGPConfigsCRD, internal.CalicoBGPConfigsCRD, conf),
-			MustCreateAssetFromTemplate(AssetPathCalicoFelixConfigsCRD, internal.CalicoFelixConfigsCRD, conf),
-			MustCreateAssetFromTemplate(AssetPathCalicoNetworkPoliciesCRD, internal.CalicoNetworkPoliciesCRD, conf),
-			MustCreateAssetFromTemplate(AssetPathCalicoIPPoolsCRD, internal.CalicoIPPoolsCRD, conf))
+			MustCreateAssetFromTemplate(AssetPathCalicoCfg, templates.CalicoCfgTemplate, conf),
+			MustCreateAssetFromTemplate(AssetPathCalcioRole, templates.CalicoRoleTemplate, conf),
+			MustCreateAssetFromTemplate(AssetPathCalcioRoleBinding, templates.CalicoRoleBindingTemplate, conf),
+			MustCreateAssetFromTemplate(AssetPathCalcioSA, templates.CalicoServiceAccountTemplate, conf),
+			MustCreateAssetFromTemplate(AssetPathCalico, templates.CalicoNodeTemplate, conf),
+			MustCreateAssetFromTemplate(AssetPathCalicoBGPConfigsCRD, templates.CalicoBGPConfigsCRD, conf),
+			MustCreateAssetFromTemplate(AssetPathCalicoFelixConfigsCRD, templates.CalicoFelixConfigsCRD, conf),
+			MustCreateAssetFromTemplate(AssetPathCalicoNetworkPoliciesCRD, templates.CalicoNetworkPoliciesCRD, conf),
+			MustCreateAssetFromTemplate(AssetPathCalicoIPPoolsCRD, templates.CalicoIPPoolsCRD, conf))
 	}
 	return assets
 }
 
-func newKubeConfigAsset(assets Assets, conf Config) (Asset, error) {
+func newKubeConfigAsset(templates *TemplateContent, assets Assets, conf Config) (Asset, error) {
 	caCert, err := assets.Get(AssetPathCACert)
 	if err != nil {
 		return Asset{}, err
@@ -104,7 +108,7 @@ func newKubeConfigAsset(assets Assets, conf Config) (Asset, error) {
 		KubeletKey  string
 	}
 
-	return assetFromTemplate(AssetPathKubeConfig, internal.KubeConfigTemplate, templateCfg{
+	return assetFromTemplate(AssetPathKubeConfig, templates.KubeConfigTemplate, templateCfg{
 		Server:      conf.APIServers[0].String(),
 		CACert:      base64.StdEncoding.EncodeToString(caCert.Data),
 		KubeletCert: base64.StdEncoding.EncodeToString(kubeletCert.Data),
@@ -185,6 +189,20 @@ func newControllerManagerSecretAsset(assets Assets) (Asset, error) {
 	return Asset{Name: AssetPathControllerManagerSecret, Data: secretYAML}, nil
 }
 
+func newOptionalAsset(templates *TemplateContent, conf Config, as Assets) Assets {
+
+	var assets Assets = make(Assets, 0, len(templates.OptionalTemplates))
+	q, _ := json.Marshal(conf)
+	var injectConf map[string]interface{}
+	json.Unmarshal(q, &injectConf)
+
+	injectConf[oldAssetsInjectName] = as.ToMap()
+	for filename, content := range templates.OptionalTemplates {
+		assets = append(assets, MustCreateAssetFromTemplate(filename, content, injectConf))
+	}
+	return assets
+}
+
 // TODO(aaron): use actual secret object (need to wrap in apiversion/type)
 type secret struct {
 	ApiVersion string            `json:"apiVersion"`
@@ -224,7 +242,7 @@ func MustCreateAssetFromTemplate(name string, template []byte, data interface{})
 }
 
 func assetFromTemplate(name string, tb []byte, data interface{}) (Asset, error) {
-	tmpl, err := template.New(name).Parse(string(tb))
+	tmpl, err := template.New(name).Funcs(sprig.HermeticTxtFuncMap()).Parse(string(tb))
 	if err != nil {
 		return Asset{}, err
 	}
