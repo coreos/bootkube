@@ -14,6 +14,10 @@ output "self_host_etcd" {
   value = "${var.self_host_etcd}"
 }
 
+output "network_provider" {
+  value = "${var.network_provider}"
+}
+
 output "calico_network_policy" {
   value = "${var.calico_network_policy}"
 }

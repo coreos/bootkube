@@ -50,6 +50,8 @@ var (
 		serviceCIDR         string
 		selfHostKubelet     bool
 		cloudProvider       string
+		networkProvider     string
+		networkMTU          int
 		selfHostedEtcd      bool
 		calicoNetworkPolicy bool
 	}
@@ -72,6 +74,8 @@ func init() {
 	cmdRender.Flags().StringVar(&renderOpts.serviceCIDR, "service-cidr", "10.3.0.0/24", "The CIDR range of cluster services.")
 	cmdRender.Flags().BoolVar(&renderOpts.selfHostKubelet, "experimental-self-hosted-kubelet", false, "(Experimental) Create a self-hosted kubelet daemonset.")
 	cmdRender.Flags().StringVar(&renderOpts.cloudProvider, "cloud-provider", "", "The provider for cloud services.  Empty string for no provider")
+	cmdRender.Flags().StringVar(&renderOpts.networkProvider, "network-provider", "flannel", "CNI network provider (flannel or experimental-calico).")
+	cmdRender.Flags().IntVar(&renderOpts.networkMTU, "network-mtu", 1440, "CNI interface MTU (applies to Calico only).")
 	cmdRender.Flags().BoolVar(&renderOpts.selfHostedEtcd, "experimental-self-hosted-etcd", false, "(Experimental) Create self-hosted etcd assets.")
 	cmdRender.Flags().BoolVar(&renderOpts.calicoNetworkPolicy, "experimental-calico-network-policy", false, "(Experimental) Add network policy support by calico.")
 }
@@ -112,6 +116,12 @@ func validateRenderOpts(cmd *cobra.Command, args []string) error {
 	}
 	if renderOpts.apiServers == "" {
 		return errors.New("Missing requried flag: --api-servers")
+	}
+	if renderOpts.networkProvider != asset.NetworkFlannel && renderOpts.networkProvider != asset.NetworkCalico {
+		return errors.New("Must specify --network-provider flannel or experimental-calico")
+	}
+	if renderOpts.networkProvider == asset.NetworkCalico && renderOpts.calicoNetworkPolicy {
+		return errors.New("Cannot specify --experimental-calico-network-policy with --network-provider=experimental-calico, Calico supports network policy automatically.")
 	}
 	return nil
 }
@@ -240,6 +250,8 @@ func flagsToAssetConfig() (c *asset.Config, err error) {
 		EtcdServiceIP:       etcdServiceIP,
 		SelfHostKubelet:     renderOpts.selfHostKubelet,
 		CloudProvider:       renderOpts.cloudProvider,
+		NetworkProvider:     renderOpts.networkProvider,
+		NetworkMTU:          renderOpts.networkMTU,
 		SelfHostedEtcd:      renderOpts.selfHostedEtcd,
 		CalicoNetworkPolicy: renderOpts.calicoNetworkPolicy,
 		Images:              imageVersions,

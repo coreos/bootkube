@@ -28,6 +28,11 @@ variable "self_host_etcd" {
   default = "true"
 }
 
+variable "network_provider" {
+  type = "string"
+  default = "flannel"
+}
+
 variable "calico_network_policy" {
   type    = "string"
   default = "true"
