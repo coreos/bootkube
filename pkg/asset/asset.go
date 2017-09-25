@@ -102,6 +102,8 @@ type Config struct {
 	SelfHostedEtcd         bool
 	CalicoNetworkPolicy    bool
 	CloudProvider          string
+	NetworkProvider        string
+	NetworkMTU             int
 	BootstrapSecretsSubdir string
 	Images                 ImageVersions
 }

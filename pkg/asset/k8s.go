@@ -19,6 +19,9 @@ const (
 	SecretEtcdServer = "etcd-server-tls"
 	SecretEtcdClient = "etcd-client-tls"
 
+	NetworkFlannel = "flannel"
+	NetworkCalico  = "experimental-calico"
+
 	secretNamespace     = "kube-system"
 	secretAPIServerName = "kube-apiserver"
 	secretCMName        = "kube-controller-manager"
