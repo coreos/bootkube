@@ -1225,6 +1225,132 @@ spec:
       hostNetwork: true
       serviceAccountName: calico-node
       tolerations:
+        # Allow the pod to run on master nodes
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+        # Mark the pod as a critical add-on for rescheduling
+        - key: "CriticalAddonsOnly"
+          operator: "Exists"
+      containers:
+        - name: calico-node
+          image: {{ .Images.Calico }}
+          env:
+            - name: DATASTORE_TYPE
+              value: "kubernetes"
+            - name: FELIX_LOGSEVERITYSCREEN
+              value: "info"
+            - name: CLUSTER_TYPE
+              value: "k8s,bgp"
+            - name: CALICO_DISABLE_FILE_LOGGING
+              value: "true"
+            - name: FELIX_DEFAULTENDPOINTTOHOSTACTION
+              value: "ACCEPT"
+            - name: FELIX_IPV6SUPPORT
+              value: "false"
+            - name: FELIX_IPINIPMTU
+              value: "{{ .NetworkMTU }}"
+            - name: WAIT_FOR_DATASTORE
+              value: "true"
+            - name: CALICO_IPV4POOL_CIDR
+              value: "{{ .PodCIDR }}"
+            - name: CALICO_IPV4POOL_IPIP
+              value: "always"
+            - name: FELIX_IPINIPENABLED
+              value: "true"
+            - name: NODENAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: FELIX_HEALTHENABLED
+              value: "true"
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              cpu: 250m
+          livenessProbe:
+            httpGet:
+              path: /liveness
+              port: 9099
+            periodSeconds: 10
+            initialDelaySeconds: 10
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /readiness
+              port: 9099
+            periodSeconds: 10
+          volumeMounts:
+            - mountPath: /lib/modules
+              name: lib-modules
+              readOnly: true
+            - mountPath: /var/run/calico
+              name: var-run-calico
+              readOnly: false
+        - name: install-cni
+          image: quay.io/calico/cni:v1.10.0
+          command: ["/install-cni.sh"]
+          env:
+            - name: CNI_NETWORK_CONFIG
+              valueFrom:
+                configMapKeyRef:
+                  name: calico-config
+                  key: cni_network_config
+            - name: CNI_NET_DIR
+              value: "/etc/kubernetes/cni/net.d"
+            - name: KUBERNETES_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - mountPath: /host/opt/cni/bin
+              name: cni-bin-dir
+            - mountPath: /host/etc/cni/net.d
+              name: cni-net-dir
+      volumes:
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
+        - name: var-run-calico
+          hostPath:
+            path: /var/run/calico
+        - name: cni-bin-dir
+          hostPath:
+            path: /opt/cni/bin
+        - name: cni-net-dir
+          hostPath:
+            path: /etc/kubernetes/cni/net.d
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 1
+    type: RollingUpdate
+`)
+
+var CalicoPolicyOnlyTemplate = []byte(`apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: calico-node
+  namespace: kube-system
+  labels:
+    k8s-app: calico-node
+spec:
+  selector:
+    matchLabels:
+      k8s-app: calico-node
+  template:
+    metadata:
+      labels:
+        k8s-app: calico-node
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+    spec:
+      hostNetwork: true
+      serviceAccountName: calico-node
+      tolerations:
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
         - key: "CriticalAddonsOnly"

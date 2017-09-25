@@ -40,6 +40,7 @@ const (
 	AssetPathKubeFlannel                 = "manifests/kube-flannel.yaml"
 	AssetPathKubeFlannelCfg              = "manifests/kube-flannel-cfg.yaml"
 	AssetPathCalico                      = "manifests/calico.yaml"
+	AssetPathCalicoPolicyOnly            = "manifests/calico-policy.yaml"
 	AssetPathCalicoCfg                   = "manifests/calico-config.yaml"
 	AssetPathCalcioSA                    = "manifests/calico-service-account.yaml"
 	AssetPathCalcioRole                  = "manifests/calico-role.yaml"
