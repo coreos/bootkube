@@ -98,7 +98,7 @@ func setPtrCustomType(base structPointer, f field, v interface{}) {
 	if v == nil {
 		return
 	}
-	structPointer_SetStructPointer(base, f, toStructPointer(reflect.ValueOf(v)))
+	structPointer_SetStructPointer(base, f, structPointer(reflect.ValueOf(v).Pointer()))
 }
 
 func setCustomType(base structPointer, f field, value interface{}) {
@@ -165,8 +165,7 @@ func (o *Buffer) dec_custom_slice_bytes(p *Properties, base structPointer) error
 	}
 	newBas := appendStructPointer(base, p.field, p.ctype)
 
-	var zero field
-	setCustomType(newBas, zero, custom)
+	setCustomType(newBas, 0, custom)
 
 	return nil
 }

@@ -196,10 +196,12 @@ func size_ref_struct_message(p *Properties, base structPointer) int {
 // Encode a slice of references to message struct pointers ([]struct).
 func (o *Buffer) enc_slice_ref_struct_message(p *Properties, base structPointer) error {
 	var state errorState
-	ss := structPointer_StructRefSlice(base, p.field, p.stype.Size())
-	l := ss.Len()
+	ss := structPointer_GetStructPointer(base, p.field)
+	ss1 := structPointer_GetRefStructPointer(ss, field(0))
+	size := p.stype.Size()
+	l := structPointer_Len(base, p.field)
 	for i := 0; i < l; i++ {
-		structp := ss.Index(i)
+		structp := structPointer_Add(ss1, field(uintptr(i)*size))
 		if structPointer_IsNil(structp) {
 			return errRepeatedHasNil
 		}
@@ -231,11 +233,13 @@ func (o *Buffer) enc_slice_ref_struct_message(p *Properties, base structPointer)
 
 //TODO this is only copied, please fix this
 func size_slice_ref_struct_message(p *Properties, base structPointer) (n int) {
-	ss := structPointer_StructRefSlice(base, p.field, p.stype.Size())
-	l := ss.Len()
+	ss := structPointer_GetStructPointer(base, p.field)
+	ss1 := structPointer_GetRefStructPointer(ss, field(0))
+	size := p.stype.Size()
+	l := structPointer_Len(base, p.field)
 	n += l * len(p.tagcode)
 	for i := 0; i < l; i++ {
-		structp := ss.Index(i)
+		structp := structPointer_Add(ss1, field(uintptr(i)*size))
 		if structPointer_IsNil(structp) {
 			return // return the size up to this point
 		}

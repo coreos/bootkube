@@ -1,4 +1,4 @@
-// +build !freebsd,!linux,!windows
+// +build !linux,!windows
 
 /*
 Copyright 2017 The Kubernetes Authors.

@@ -18,10 +18,14 @@ import:
   version: 4cdb38c072b86bf795d2c81de50784d9fdd6eb77
 - package: github.com/spf13/pflag
   version: e57e3eeb33f795204c1ca35f56c44f83227c6e66
+- package: k8s.io/apiextensions-apiserver
+  version: release-1.7
 - package: k8s.io/apiserver
-  version: 087d1a2efeb6296f04bb0f54e7af9890052aa6d7
+  version: a7f02eb8e3920e446965036c9610ec52a7ede92f
 - package: k8s.io/apimachinery
-  version: abe34e4f5b4413c282a83011892cbeea5b32223b
+  version: 1fd2e63a9a370677308a42f24fd40c86438afddf
+- package: k8s.io/metrics
+  version: 02cccda7258b5d9709c19dd7413ccb15e15d03ce
   subpackages:
   - pkg/api/errors
   - pkg/apis/meta/v1
@@ -52,4 +56,6 @@ import:
   - ssh/agent
   - curve25519
 - package: github.com/coreos/ktestutil
-  version: 1c5a59f93ffab7cf69fde8b805fee942fd467cdc
+  version: 28c4856c11030d7cb4885cd40137f57e814b5d38
+- package: github.com/pkg/sftp
+  version: 98203f5a8333288eb3163b7c667d4260fe1333e9

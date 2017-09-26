@@ -1,5 +1,5 @@
-hash: b9a58ccf7889504bfa416d02f02f21e3a013dc45f06aed4b0bc21a78074745e4
-updated: 2017-09-01T15:47:56.313486807-07:00
+hash: ed8e8897a8a4e084945803ca1baad28972b46c38a17b047c35c5ff584d2f168e
+updated: 2017-09-26T17:22:54.152482584-07:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -77,7 +77,7 @@ imports:
   - journal
   - util
 - name: github.com/coreos/ktestutil
-  version: 1c5a59f93ffab7cf69fde8b805fee942fd467cdc
+  version: 28c4856c11030d7cb4885cd40137f57e814b5d38
   subpackages:
   - log-collector
   - log-collector/pkg/fluentd
@@ -155,7 +155,9 @@ imports:
 - name: github.com/gogo/protobuf
   version: 909568be09de550ed094403c2bf8a261b5bb730a
   subpackages:
+  - gogoproto
   - proto
+  - protoc-gen-gogo/descriptor
   - sortkeys
 - name: github.com/golang/glog
   version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
@@ -320,8 +322,13 @@ imports:
   version: e532fdb5587debfd7aade56dabe9eb5df9544baf
   subpackages:
   - core/v1
+- name: k8s.io/apiextensions-apiserver
+  version: fcd622fe88a4a6efcb5aea9e94ee87324ac1b036
+  subpackages:
+  - pkg/apis/apiextensions
+  - pkg/apis/apiextensions/v1beta1
 - name: k8s.io/apimachinery
-  version: abe34e4f5b4413c282a83011892cbeea5b32223b
+  version: 1fd2e63a9a370677308a42f24fd40c86438afddf
   subpackages:
   - pkg/api/equality
   - pkg/api/errors
@@ -374,7 +381,7 @@ imports:
   - third_party/forked/golang/json
   - third_party/forked/golang/reflect
 - name: k8s.io/apiserver
-  version: 087d1a2efeb6296f04bb0f54e7af9890052aa6d7
+  version: a7f02eb8e3920e446965036c9610ec52a7ede92f
   subpackages:
   - pkg/apis/audit
   - pkg/authentication/authenticator
@@ -613,8 +620,10 @@ imports:
   - pkg/kubectl/resource
   - pkg/kubectl/util
   - pkg/kubelet/apis
+  - pkg/kubelet/apis/cri/v1alpha1/runtime
   - pkg/kubelet/qos
   - pkg/kubelet/types
+  - pkg/kubelet/util
   - pkg/master/ports
   - pkg/printers
   - pkg/printers/internalversion
@@ -640,13 +649,19 @@ imports:
   - plugin/pkg/scheduler/schedulercache
   - plugin/pkg/scheduler/util
 - name: k8s.io/metrics
-  version: 8efbc8e22d00b9c600afec5f1c14073fd2412fce
+  version: 02cccda7258b5d9709c19dd7413ccb15e15d03ce
   subpackages:
+  - pkg/api/errors
+  - pkg/apis/meta/v1
   - pkg/apis/metrics
   - pkg/apis/metrics/v1alpha1
   - pkg/client/clientset_generated/clientset
   - pkg/client/clientset_generated/clientset/scheme
   - pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1
+  - pkg/fields
+  - pkg/runtime
+  - pkg/util/wait
+  - pkg/watch
 - name: vbom.ml/util
   version: db5cfe13f5cc80a4990d98e2e1b0707a4d1a5394
   subpackages:
