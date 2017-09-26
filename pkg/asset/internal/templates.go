@@ -1091,6 +1091,7 @@ data:
       "Network": "{{ .PodCIDR }}",
       "Backend": {
         "Type": "vxlan"
+		"Port": 4789
       }
     }
 `)
