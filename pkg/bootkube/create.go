@@ -1,6 +1,7 @@
 package bootkube
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -8,8 +9,11 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	v1beta1ext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
@@ -18,6 +22,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 
 	"github.com/kubernetes-incubator/bootkube/pkg/util"
+)
+
+const (
+	crdRolloutDuration = 5 * time.Second
+	crdRolloutTimeout  = 2 * time.Minute
 )
 
 func CreateAssets(manifestDir string, timeout time.Duration) error {
@@ -68,6 +77,10 @@ func CreateAssets(manifestDir string, timeout time.Duration) error {
 	return nil
 }
 
+// TODO(derekparker) Although it may be difficult or tedious to move away from using the kubectl code
+// we should consider refactoring this. The kubectl code tends to be very verbose and difficult to
+// reason about, especially as the behevior of certain functions (e.g. `Visit`) can be difficult to
+// predict with regards to error handling.
 func createAssets(manifestDir string) error {
 	f := cmdutil.NewFactory(kubeConfig)
 
@@ -125,6 +138,15 @@ func createAssets(manifestDir string) error {
 			return cmdutil.AddSourceToErr("creating", info.Source, err)
 		}
 		info.Refresh(obj, true)
+		gvk := obj.GetObjectKind().GroupVersionKind()
+
+		// If the object is a CRD, wait for it to fully roll out before continuing.
+		// This is because we may also be creating other instances of this CRD later.
+		if gvk.Kind == "CustomResourceDefinition" {
+			if err = waitForCRDRollout(info.Client, gvk, info.Object); err != nil {
+				return err
+			}
+		}
 
 		count++
 		shortOutput := false
@@ -142,6 +164,45 @@ func createAssets(manifestDir string) error {
 		return fmt.Errorf("no objects passed to create")
 	}
 	return nil
+}
+
+func waitForCRDRollout(client resource.RESTClient, gvk schema.GroupVersionKind, obj runtime.Object) error {
+	return wait.PollImmediate(crdRolloutDuration, crdRolloutTimeout, func() (bool, error) {
+		var crd v1beta1ext.CustomResourceDefinition
+		bytes, err := json.Marshal(obj)
+		if err != nil {
+			return false, err
+		}
+		if err = json.Unmarshal(bytes, &crd); err != nil {
+			return false, err
+		}
+		uri := customResourceDefinitionKindURI(crd.Spec.Group, crd.Spec.Version, crd.GetNamespace(), crd.Spec.Names.Plural)
+		res := client.Get().RequestURI(uri).Do()
+		if res.Error() != nil {
+			if apierrors.IsNotFound(res.Error()) {
+				return false, nil
+			}
+			return false, res.Error()
+		}
+		return true, nil
+	})
+}
+
+// customResourceDefinitionKindURI returns the URI for the CRD kind.
+//
+// Example of apiGroup: "tco.coreos.com"
+// Example of version: "v1"
+// Example of namespace: "default"
+// Example of plural: "appversions"
+func customResourceDefinitionKindURI(apiGroup, version, namespace, plural string) string {
+	if namespace == "" {
+		namespace = metav1.NamespaceDefault
+	}
+	return fmt.Sprintf("/apis/%s/%s/namespaces/%s/%s",
+		strings.ToLower(apiGroup),
+		strings.ToLower(version),
+		strings.ToLower(namespace),
+		strings.ToLower(plural))
 }
 
 func apiTest() error {
