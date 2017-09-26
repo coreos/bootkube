@@ -48,7 +48,7 @@ Vendoring currently relies on the [glide](https://github.com/Masterminds/glide) 
 ### Updating hyperkube image / Kubernetes version
 
 - Update hyperkube image for manifests in templates:
-    - `pkg/asset/internal/templates.go`
+    - `pkg/asset/images.go`
 - Update conformance test version: (`CONFORMANCE_VERSION`)
     -  `hack/tests/conformance-test.sh`
 - Update on-host kubelet versions (`KUBELET_IMAGE_TAG`)
