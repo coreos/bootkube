@@ -19,7 +19,7 @@ contexts:
     user: kubelet
 `)
 
-var KubeSystemSARoleBindingTemplate = []byte(`apiVersion: rbac.authorization.k8s.io/v1alpha1
+var KubeSystemSARoleBindingTemplate = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: system:default-sa
@@ -33,7 +33,7 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 `)
 
-var KubeletTemplate = []byte(`apiVersion: extensions/v1beta1
+var KubeletTemplate = []byte(`apiVersion: apps/v1beta2
 kind: DaemonSet
 metadata:
   name: kubelet
@@ -42,6 +42,10 @@ metadata:
     tier: node
     k8s-app: kubelet
 spec:
+  selector:
+    matchLabels:
+      tier: node
+      k8s-app: kubelet
   template:
     metadata:
       labels:
@@ -135,7 +139,7 @@ spec:
     type: RollingUpdate
 `)
 
-var APIServerTemplate = []byte(`apiVersion: "extensions/v1beta1"
+var APIServerTemplate = []byte(`apiVersion: apps/v1beta2
 kind: DaemonSet
 metadata:
   name: kube-apiserver
@@ -144,6 +148,10 @@ metadata:
     tier: control-plane
     k8s-app: kube-apiserver
 spec:
+  selector:
+    matchLabels:
+      tier: control-plane
+      k8s-app: kube-apiserver
   template:
     metadata:
       labels:
@@ -161,7 +169,7 @@ spec:
         - /var/lock/api-server.lock
         - /hyperkube
         - apiserver
-        - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota
+        - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds
         - --advertise-address=$(POD_IP)
         - --allow-privileged=true
         - --anonymous-auth=false
@@ -240,7 +248,7 @@ spec:
     - /var/lock/api-server.lock
     - /hyperkube
     - apiserver
-    - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota
+    - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds
     - --advertise-address=$(POD_IP)
     - --allow-privileged=true
     - --authorization-mode=RBAC
@@ -292,7 +300,7 @@ spec:
       path: /var/lock
 `)
 
-var KencTemplate = []byte(`apiVersion: "extensions/v1beta1"
+var KencTemplate = []byte(`apiVersion: apps/v1beta2
 kind: DaemonSet
 metadata:
   name: kube-etcd-network-checkpointer
@@ -301,6 +309,10 @@ metadata:
     tier: control-plane
     k8s-app: kube-etcd-network-checkpointer
 spec:
+  selector:
+    matchLabels:
+      tier: control-plane
+      k8s-app: kube-etcd-network-checkpointer
   template:
     metadata:
       labels:
@@ -352,7 +364,7 @@ spec:
     type: RollingUpdate
 `)
 
-var CheckpointerTemplate = []byte(`apiVersion: "extensions/v1beta1"
+var CheckpointerTemplate = []byte(`apiVersion: apps/v1beta2
 kind: DaemonSet
 metadata:
   name: pod-checkpointer
@@ -361,6 +373,10 @@ metadata:
     tier: control-plane
     k8s-app: pod-checkpointer
 spec:
+  selector:
+    matchLabels:
+      tier: control-plane
+      k8s-app: pod-checkpointer
   template:
     metadata:
       labels:
@@ -416,7 +432,7 @@ spec:
     type: RollingUpdate
 `)
 
-var ControllerManagerTemplate = []byte(`apiVersion: extensions/v1beta1
+var ControllerManagerTemplate = []byte(`apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
   name: kube-controller-manager
@@ -426,6 +442,10 @@ metadata:
     k8s-app: kube-controller-manager
 spec:
   replicas: 2
+  selector:
+    matchLabels:
+      tier: control-plane
+      k8s-app: kube-controller-manager
   template:
     metadata:
       labels:
@@ -547,7 +567,7 @@ spec:
       k8s-app: kube-controller-manager
 `)
 
-var SchedulerTemplate = []byte(`apiVersion: extensions/v1beta1
+var SchedulerTemplate = []byte(`apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
   name: kube-scheduler
@@ -557,6 +577,10 @@ metadata:
     k8s-app: kube-scheduler
 spec:
   replicas: 2
+  selector:
+    matchLabels:
+      tier: control-plane
+      k8s-app: kube-scheduler
   template:
     metadata:
       labels:
@@ -645,7 +669,7 @@ spec:
       k8s-app: kube-scheduler
 `)
 
-var ProxyTemplate = []byte(`apiVersion: "extensions/v1beta1"
+var ProxyTemplate = []byte(`apiVersion: apps/v1beta2
 kind: DaemonSet
 metadata:
   name: kube-proxy
@@ -654,6 +678,10 @@ metadata:
     tier: node
     k8s-app: kube-proxy
 spec:
+  selector:
+    matchLabels:
+      tier: node
+      k8s-app: kube-proxy
   template:
     metadata:
       labels:
@@ -706,7 +734,7 @@ spec:
     type: RollingUpdate
 `)
 
-var DNSDeploymentTemplate = []byte(`apiVersion: extensions/v1beta1
+var DNSDeploymentTemplate = []byte(`apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
   name: kube-dns
@@ -886,7 +914,7 @@ spec:
     protocol: TCP
 `)
 
-var EtcdOperatorTemplate = []byte(`apiVersion: extensions/v1beta1
+var EtcdOperatorTemplate = []byte(`apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
   name: etcd-operator
@@ -894,12 +922,10 @@ metadata:
   labels:
     k8s-app: etcd-operator
 spec:
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
-      maxSurge: 1
   replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: etcd-operator
   template:
     metadata:
       labels:
@@ -929,6 +955,11 @@ spec:
       - key: node-role.kubernetes.io/master
         operator: Exists
         effect: NoSchedule
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
 `)
 
 var EtcdSvcTemplate = []byte(`apiVersion: v1
@@ -1095,7 +1126,7 @@ data:
     }
 `)
 
-var KubeFlannelTemplate = []byte(`apiVersion: extensions/v1beta1
+var KubeFlannelTemplate = []byte(`apiVersion: apps/v1beta2
 kind: DaemonSet
 metadata:
   name: kube-flannel
@@ -1104,6 +1135,10 @@ metadata:
     tier: node
     k8s-app: flannel
 spec:
+  selector:
+    matchLabels:
+      tier: node
+      k8s-app: flannel
   template:
     metadata:
       labels:
@@ -1204,7 +1239,7 @@ data:
     }
 `)
 
-var CalicoNodeTemplate = []byte(`apiVersion: extensions/v1beta1
+var CalicoNodeTemplate = []byte(`apiVersion: apps/v1beta2
 kind: DaemonSet
 metadata:
   name: calico-node
@@ -1328,7 +1363,7 @@ spec:
     type: RollingUpdate
 `)
 
-var CalicoPolicyOnlyTemplate = []byte(`apiVersion: extensions/v1beta1
+var CalicoPolicyOnlyTemplate = []byte(`apiVersion: apps/v1beta2
 kind: DaemonSet
 metadata:
   name: calico-node
@@ -1517,7 +1552,7 @@ metadata:
   namespace: kube-system
 `)
 
-var CalicoRoleTemplate = []byte(`apiVersion: rbac.authorization.k8s.io/v1beta1
+var CalicoRoleTemplate = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: calico-node
@@ -1572,7 +1607,7 @@ rules:
       - watch
 `)
 
-var CalicoRoleBindingTemplate = []byte(`apiVersion: rbac.authorization.k8s.io/v1beta1
+var CalicoRoleBindingTemplate = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: calico-node

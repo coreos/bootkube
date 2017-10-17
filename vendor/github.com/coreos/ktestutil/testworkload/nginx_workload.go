@@ -17,9 +17,9 @@ import (
 
 var (
 	// PollTimeoutForNginx is the max duration for polling when using Nginx testworkload.
-	PollTimeoutForNginx = 2 * time.Minute
+	PollTimeoutForNginx = 10 * time.Minute
 	// PollIntervalForNginx is the interval between each condition check of poolling when using Nginx testworkload.
-	PollIntervalForNginx = 5 * time.Second
+	PollIntervalForNginx = 10 * time.Second
 )
 
 // Nginx creates a temp nginx deployment/service pair

@@ -54,17 +54,23 @@ func (n *Node) SSH(cmd string) (stdout, stderr []byte, err error) {
 }
 
 func (n *Node) Reboot() error {
-	stdout, stderr, err := n.SSH("sudo reboot")
-	if _, ok := err.(*ssh.ExitMissingError); ok {
-		// A terminated session is perfectly normal during reboot.
-		err = nil
-	}
-	if err != nil {
-		return fmt.Errorf("issuing reboot command failed: %v\nstdout:%s\nstderr:%s", err, stdout, stderr)
+
+	// ssh to node and reboot
+	rebooter := func() error {
+		stdout, stderr, err := n.SSH("sudo reboot")
+		if _, ok := err.(*ssh.ExitMissingError); ok {
+			// A terminated session is perfectly normal during reboot.
+			err = nil
+		}
+		if err != nil {
+			return fmt.Errorf("issuing reboot command failed: %v\nstdout:%s\nstderr:%s", err, stdout, stderr)
+		}
+		return err
 	}
 
+	// ensure rebooted node is running
 	checker := func() error {
-		stdout, stderr, err = n.SSH("systemctl is-system-running")
+		stdout, stderr, err := n.SSH("systemctl is-system-running")
 		if err != nil {
 			return fmt.Errorf("%v: %v", err, stderr)
 		}
@@ -72,6 +78,10 @@ func (n *Node) Reboot() error {
 			return fmt.Errorf("system is not running yet")
 		}
 		return nil
+	}
+
+	if err := retry(5, 30*time.Second, rebooter); err != nil {
+		return err
 	}
 
 	return retry(20, 10*time.Second, checker)

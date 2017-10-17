@@ -72,7 +72,7 @@ func verifyCheckpoint(c *Cluster, namespace, daemonsetName string, shouldExist, 
 
 		return nil
 	}
-	return retry(20, 10*time.Second, checkpointed)
+	return retry(60, 10*time.Second, checkpointed)
 }
 
 func verifyPod(c *Cluster, daemonsetName string, shouldRun bool) error {
@@ -90,7 +90,7 @@ func verifyPod(c *Cluster, daemonsetName string, shouldRun bool) error {
 		}
 		return nil
 	}
-	return retry(20, 10*time.Second, checkpointsRunning)
+	return retry(60, 10*time.Second, checkpointsRunning)
 }
 
 func isNodeReady(n *Node) bool {
@@ -131,7 +131,7 @@ func waitCluster(t *testing.T) *Cluster {
 		return nil
 	}
 
-	if err := retry(20, 10*time.Second, f); err != nil {
+	if err := retry(60, 10*time.Second, f); err != nil {
 		t.Fatalf("Failed to wait cluster: %v", err)
 	}
 	return c
@@ -144,7 +144,7 @@ func waitForCheckpointDeactivation(t *testing.T) {
 	t.Log("Waiting 120 seconds for checkpoints to deactivate.")
 	time.Sleep(120 * time.Second)
 	successes := 0
-	if err := retry(20, 3*time.Second, func() error {
+	if err := retry(60, 3*time.Second, func() error {
 		_, err := client.Discovery().ServerVersion()
 		if err != nil {
 			successes = 0
@@ -222,8 +222,8 @@ func TestCheckpointerUnscheduleCheckpointer(t *testing.T) {
 	}
 
 	// Delete the pod checkpointer on the worker node by updating the daemonset.
-	patch = `[{"op": "replace", "path": "/spec/template/spec/nodeSelector", "value": {"node-role.kubernetes.io/master":""}}]`
-	_, err = client.ExtensionsV1beta1().DaemonSets("kube-system").Patch("pod-checkpointer", types.JSONPatchType, []byte(patch))
+	patch = `{"spec":{"template":{"spec":{"nodeSelector":{"node-role.kubernetes.io/master":""}}}}}`
+	_, err = client.ExtensionsV1beta1().DaemonSets("kube-system").Patch("pod-checkpointer", types.MergePatchType, []byte(patch))
 	if err != nil {
 		t.Fatalf("Failed to patch checkpointer: %v", err)
 	}
@@ -352,8 +352,8 @@ func TestCheckpointerUnscheduleParent(t *testing.T) {
 	}
 
 	// Delete test pod on the workers.
-	patch = `[{"op": "replace", "path": "/spec/template/spec/nodeSelector", "value": {"node-role.kubernetes.io/master":""}}]`
-	_, err = client.ExtensionsV1beta1().DaemonSets(testNS).Patch("nginx-daemonset", types.JSONPatchType, []byte(patch))
+	patch = `{"spec":{"template":{"spec":{"nodeSelector":{"node-role.kubernetes.io/master":""}}}}}`
+	_, err = client.ExtensionsV1beta1().DaemonSets(testNS).Patch("nginx-daemonset", types.MergePatchType, []byte(patch))
 	if err != nil {
 		t.Fatalf("unable to patch daemonset: %v", err)
 	}
