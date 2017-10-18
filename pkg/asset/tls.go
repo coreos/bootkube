@@ -174,8 +174,8 @@ func newSelfHostedEtcdTLSAssets(etcdSvcIP, bootEtcdSvcIP string, caCert *x509.Ce
 		bootEtcdSvcIP,
 		"127.0.0.1",
 		"localhost",
-		"*.kube-etcd.kube-system.svc.cluster.local",
-		"kube-etcd-client.kube-system.svc.cluster.local",
+		"*.kube-etcd.kube-system.svc",
+		"kube-etcd-client.kube-system.svc",
 	})
 	if err != nil {
 		return nil, err
@@ -188,8 +188,8 @@ func newSelfHostedEtcdTLSAssets(etcdSvcIP, bootEtcdSvcIP string, caCert *x509.Ce
 
 	key, cert, err = newKeyAndCert(caCert, caPrivKey, "etcd member peer", []string{
 		bootEtcdSvcIP,
-		"*.kube-etcd.kube-system.svc.cluster.local",
-		"kube-etcd-client.kube-system.svc.cluster.local",
+		"*.kube-etcd.kube-system.svc",
+		"kube-etcd-client.kube-system.svc",
 	})
 	if err != nil {
 		return nil, err
