@@ -444,13 +444,11 @@ metadata:
   name: pod-checkpointer
 `)
 
-// TODO: Drop checkpointer RBAC resources to a Role and RoleBinding if
-// the checkpoint switches to only watching kube-system.
-
 var CheckpointerRole = []byte(`apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
   name: pod-checkpointer
+  namespace: kube-system
 rules:
 - apiGroups: [""] # "" indicates the core API group
   resources: ["pods"]
@@ -461,12 +459,13 @@ rules:
 `)
 
 var CheckpointerRoleBinding = []byte(`apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
   name: pod-checkpointer
+  namespace: kube-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
+  kind: Role
   name: pod-checkpointer
 subjects:
 - kind: ServiceAccount
