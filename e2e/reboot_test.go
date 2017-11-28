@@ -36,8 +36,6 @@ func TestReboot(t *testing.T) {
 	if err := nodesReady(client, nodeList, t); err != nil {
 		t.Fatalf("some or all nodes did not recover from reboot: %v", err)
 	}
-
-	waitForCheckpointDeactivation(t)
 }
 
 // nodesReady blocks until all nodes in list are ready based on Name. Safe
