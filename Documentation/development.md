@@ -26,7 +26,7 @@ To easily launch local vagrant development clusters:
 
 ```
 # Launch a single-node cluster
-make run-single`
+make run-single
 ```
 
 ```
