@@ -1308,6 +1308,8 @@ spec:
           image: {{ .Images.CalicoCNI }} 
           command: ["/install-cni.sh"]
           env:
+            - name: CNI_CONF_NAME
+              value: "50-calico.conflist"
             - name: CNI_NETWORK_CONFIG
               valueFrom:
                 configMapKeyRef:
