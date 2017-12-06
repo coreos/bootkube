@@ -1195,23 +1195,32 @@ data:
   cni_network_config: |-
     {
         "name": "k8s-pod-network",
-        "cniVersion": "0.3.0",
-        "type": "calico",
-        "log_level": "info",
-        "datastore_type": "kubernetes",
-        "nodename": "__KUBERNETES_NODE_NAME__",
-        "ipam": {
-            "type": "host-local",
-            "subnet": "usePodCidr"
-        },
-        "policy": {
-            "type": "k8s",
-            "k8s_auth_token": "__SERVICEACCOUNT_TOKEN__"
-        },
-        "kubernetes": {
-            "k8s_api_root": "https://__KUBERNETES_SERVICE_HOST__:__KUBERNETES_SERVICE_PORT__",
-            "kubeconfig": "__KUBECONFIG_FILEPATH__"
-        }
+        "cniVersion": "0.3.1",
+        "plugins": [
+          {
+            "type": "calico",
+            "log_level": "info",
+            "datastore_type": "kubernetes",
+            "nodename": "__KUBERNETES_NODE_NAME__",
+            "ipam": {
+                "type": "host-local",
+                "subnet": "usePodCidr"
+            },
+            "policy": {
+                "type": "k8s",
+                "k8s_auth_token": "__SERVICEACCOUNT_TOKEN__"
+            },
+            "kubernetes": {
+                "k8s_api_root": "https://__KUBERNETES_SERVICE_HOST__:__KUBERNETES_SERVICE_PORT__",
+                "kubeconfig": "__KUBECONFIG_FILEPATH__"
+            }
+          },
+          {
+            "type": "portmap",
+            "capabilities": {"portMappings": true},
+            "externalSetMarkChain": "KUBE-MARK-MASQ"
+          }
+        ]
     }
 `)
 
