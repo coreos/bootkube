@@ -86,6 +86,9 @@ function init_master_node() {
     # Set cloud provider
     sed -i "s/cloud-provider=/cloud-provider=$CLOUD_PROVIDER/" /etc/systemd/system/kubelet.service
 
+    # Configure master label and taint
+    echo -e 'node_label=node-role.kubernetes.io/master\nnode_taint=node-role.kubernetes.io/master=:NoSchedule' > /etc/kubernetes/kubelet.env
+
     # Start the kubelet
     systemctl enable kubelet; sudo systemctl start kubelet
 
@@ -104,8 +107,8 @@ function init_master_node() {
 # After assets are available on the remote host, the script will execute itself in "local" mode.
 if [ "${REMOTE_HOST}" != "local" ]; then
     # Set up the kubelet.service on remote host
-    scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} kubelet.master ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/kubelet.master
-    ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "sudo mv /home/${REMOTE_USER}/kubelet.master /etc/systemd/system/kubelet.service"
+    scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} kubelet.service ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/kubelet.service
+    ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "sudo mv /home/${REMOTE_USER}/kubelet.service /etc/systemd/system/kubelet.service"
 
     # Copy bootkube binary to remote host.
     if [ -e "../../_output/bin/linux/bootkube" ]; then

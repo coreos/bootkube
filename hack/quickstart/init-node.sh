@@ -31,6 +31,11 @@ function init_worker_node() {
     # Set cloud provider
     sed -i "s/cloud-provider=/cloud-provider=$CLOUD_PROVIDER/" /etc/systemd/system/kubelet.service
 
+    if [ "$TAG_MASTER" = true ] ; then
+        # Configure master label and taint
+        echo -e 'node_label=node-role.kubernetes.io/master\nnode_taint=node-role.kubernetes.io/master=:NoSchedule' > /etc/kubernetes/kubelet.env
+    fi
+
     # Start services
     systemctl daemon-reload
     systemctl stop locksmithd; systemctl mask locksmithd
@@ -44,16 +49,12 @@ function init_worker_node() {
 if [ "${REMOTE_HOST}" != "local" ]; then
 
     # Copy kubelet service file and kubeconfig to remote host
-    if [ "$TAG_MASTER" = true ] ; then
-        scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} kubelet.master ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/kubelet.service
-    else
-        scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} kubelet.worker ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/kubelet.service
-    fi
+    scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} kubelet.service ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/kubelet.service
     scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} ${KUBECONFIG} ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/kubeconfig
 
     # Copy self to remote host so script can be executed in "local" mode
     scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} ${BASH_SOURCE[0]} ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/init-node.sh
-    ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "sudo REMOTE_USER=${REMOTE_USER} CLOUD_PROVIDER=${CLOUD_PROVIDER} /home/${REMOTE_USER}/init-node.sh local /home/${REMOTE_USER}/kubeconfig"
+    ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "sudo REMOTE_USER=${REMOTE_USER} TAG_MASTER=$TAG_MASTER CLOUD_PROVIDER=${CLOUD_PROVIDER} /home/${REMOTE_USER}/init-node.sh local /home/${REMOTE_USER}/kubeconfig"
 
     # Cleanup
     ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "rm /home/${REMOTE_USER}/{init-node.sh,kubeconfig}"

@@ -1,4 +1,5 @@
 [Service]
+EnvironmentFile=-/etc/kubernetes/kubelet.env
 Environment=KUBELET_IMAGE_URL=docker://gcr.io/google_containers/hyperkube
 Environment=KUBELET_IMAGE_TAG=v1.8.5
 Environment="RKT_RUN_ARGS=\
@@ -12,6 +13,8 @@ EnvironmentFile=/etc/environment
 ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests
 ExecStartPre=/bin/mkdir -p /opt/cni/bin
 ExecStartPre=/bin/mkdir -p /etc/kubernetes/cni/net.d
+ExecStartPre=/bin/mkdir -p /etc/kubernetes/checkpoint-secrets
+ExecStartPre=/bin/mkdir -p /etc/kubernetes/inactive-manifests
 ExecStartPre=/bin/mkdir -p /var/lib/cni
 ExecStartPre=-/usr/bin/rkt rm --uuid-file=/var/cache/kubelet-pod.uuid
 ExecStart=/usr/lib/coreos/kubelet-wrapper \
@@ -28,8 +31,9 @@ ExecStart=/usr/lib/coreos/kubelet-wrapper \
   --lock-file=/var/run/lock/kubelet.lock \
   --minimum-container-ttl-duration=3m0s \
   --network-plugin=cni \
+  --node-labels=${node_label} \
   --pod-manifest-path=/etc/kubernetes/manifests \
-  --require-kubeconfig
+  --register-with-taints=${node_taint}
 ExecStop=-/usr/bin/rkt stop --uuid-file=/var/cache/kubelet-pod.uuid
 Restart=always
 RestartSec=5
