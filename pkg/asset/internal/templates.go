@@ -189,6 +189,9 @@ spec:
       nodeSelector:
         node-role.kubernetes.io/master: ""
       tolerations:
+      - key: node.cloudprovider.kubernetes.io/uninitialized
+        value: "true"
+        effect: NoSchedule
       - key: node-role.kubernetes.io/master
         operator: Exists
         effect: NoSchedule
@@ -322,6 +325,9 @@ spec:
         node-role.kubernetes.io/master: ""
       restartPolicy: Always
       tolerations:
+      - key: node.cloudprovider.kubernetes.io/uninitialized
+        value: "true"
+        effect: NoSchedule
       - key: node-role.kubernetes.io/master
         operator: Exists
         effect: NoSchedule
@@ -450,6 +456,9 @@ spec:
         runAsUser: 65534
       serviceAccountName: kube-controller-manager
       tolerations:
+      - key: node.cloudprovider.kubernetes.io/uninitialized
+        value: "true"
+        effect: NoSchedule
       - key: node-role.kubernetes.io/master
         operator: Exists
         effect: NoSchedule
@@ -592,6 +601,9 @@ spec:
         runAsNonRoot: true
         runAsUser: 65534
       tolerations:
+      - key: node.cloudprovider.kubernetes.io/uninitialized
+        value: "true"
+        effect: NoSchedule
       - key: node-role.kubernetes.io/master
         operator: Exists
         effect: NoSchedule
@@ -684,6 +696,9 @@ spec:
       hostNetwork: true
       serviceAccountName: kube-proxy
       tolerations:
+      - key: node.cloudprovider.kubernetes.io/uninitialized
+        value: "true"
+        effect: NoSchedule
       - key: node-role.kubernetes.io/master
         operator: Exists
         effect: NoSchedule
@@ -785,6 +800,9 @@ spec:
       nodeSelector:
         node-role.kubernetes.io/master: ""
       tolerations:
+      - key: node.cloudprovider.kubernetes.io/uninitialized
+        value: "true"
+        effect: NoSchedule
       - key: node-role.kubernetes.io/master
         operator: Exists
         effect: NoSchedule
@@ -971,6 +989,9 @@ spec:
         runAsNonRoot: true
         runAsUser: 65534
       tolerations:
+      - key: node.cloudprovider.kubernetes.io/uninitialized
+        value: "true"
+        effect: NoSchedule
       - key: node-role.kubernetes.io/master
         operator: Exists
         effect: NoSchedule
@@ -1086,6 +1107,11 @@ var EtcdCRDTemplate = []byte(`{
         "node-role.kubernetes.io/master": ""
       },
       "tolerations": [
+        {
+          "key": "node.cloudprovider.kubernetes.io/uninitialized",
+          "value": "true",
+          "effect": "NoSchedule"
+        },
         {
           "key": "node-role.kubernetes.io/master",
           "operator": "Exists",
@@ -1207,6 +1233,9 @@ spec:
           mountPath: /host/opt/cni/bin/
       hostNetwork: true
       tolerations:
+      - key: node.cloudprovider.kubernetes.io/uninitialized
+        value: "true"
+        effect: NoSchedule
       - key: node-role.kubernetes.io/master
         operator: Exists
         effect: NoSchedule
@@ -1412,6 +1441,9 @@ spec:
       hostNetwork: true
       serviceAccountName: calico-node
       tolerations:
+        - key: node.cloudprovider.kubernetes.io/uninitialized
+          value: "true"
+          effect: NoSchedule
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
       containers:
