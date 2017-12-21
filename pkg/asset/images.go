@@ -8,7 +8,7 @@ var DefaultImages = ImageVersions{
 	FlannelCNI:      "quay.io/coreos/flannel-cni:v0.3.0",
 	Calico:          "quay.io/calico/node:v2.6.4",
 	CalicoCNI:       "quay.io/calico/cni:v1.11.1",
-	Hyperkube:       "gcr.io/google_containers/hyperkube:v1.8.5",
+	Hyperkube:       "gcr.io/google_containers/hyperkube:v1.9.0",
 	Kenc:            "quay.io/coreos/kenc:0.0.2",
 	KubeDNS:         "gcr.io/google_containers/k8s-dns-kube-dns-amd64:1.14.5",
 	KubeDNSMasq:     "gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64:1.14.5",

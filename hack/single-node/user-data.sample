@@ -9,7 +9,7 @@ coreos:
         [Service]
         EnvironmentFile=/etc/environment
         Environment=KUBELET_IMAGE_URL=docker://gcr.io/google_containers/hyperkube
-        Environment=KUBELET_IMAGE_TAG=v1.8.5
+        Environment=KUBELET_IMAGE_TAG=v1.9.0
         Environment="RKT_RUN_ARGS=--uuid-file-save=/var/cache/kubelet-pod.uuid \
           --volume var-lib-cni,kind=host,source=/var/lib/cni \
           --volume opt-cni-bin,kind=host,source=/opt/cni/bin \
