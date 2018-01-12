@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -35,6 +36,9 @@ func TestReboot(t *testing.T) {
 
 	if err := nodesReady(client, nodeList, t); err != nil {
 		t.Fatalf("some or all nodes did not recover from reboot: %v", err)
+	}
+	if err := controlPlaneReady(client); err != nil {
+		t.Fatalf("waiting for control plane: %v", err)
 	}
 }
 
@@ -72,6 +76,38 @@ func nodesReady(c kubernetes.Interface, expectedNodes *v1.NodeList, t *testing.T
 		}
 		if recoveredNodes != len(expectedNodeSet) {
 			return fmt.Errorf("not enough nodes recovered, expected %v got %v", len(expectedNodeSet), recoveredNodes)
+		}
+		return nil
+	})
+}
+
+const checkpointAnnotation = "checkpointer.alpha.coreos.com/checkpoint-of"
+
+// controlPlaneReady waits for API server availability and no checkpointed pods
+// in kube-system.
+func controlPlaneReady(c kubernetes.Interface) error {
+	return retry(60, 5*time.Second, func() error {
+		pods, err := c.CoreV1().Pods("kube-system").List(metav1.ListOptions{})
+		if err != nil {
+			return fmt.Errorf("get pods in kube-system: %v", err)
+		}
+
+		// list of pods that are checkpoint pods, not the real pods.
+		var (
+			checkpointPods []string
+			regularPods    []string
+		)
+		for _, pod := range pods.Items {
+			if len(pod.Annotations) > 0 && pod.Annotations[checkpointAnnotation] != "" {
+				checkpointPods = append(checkpointPods, pod.Name)
+			} else {
+				regularPods = append(regularPods, pod.Name)
+			}
+		}
+		if len(checkpointPods) > 0 {
+			sort.Strings(checkpointPods)
+			sort.Strings(regularPods)
+			return fmt.Errorf("kube-system still has checkpoint pods=%q, non-checkpoint pods=%q", checkpointPods, regularPods)
 		}
 		return nil
 	})
