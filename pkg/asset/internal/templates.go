@@ -151,6 +151,7 @@ spec:
         - --advertise-address=$(POD_IP)
         - --allow-privileged=true
         - --anonymous-auth=false
+        - --audit-log-path=-
         - --authorization-mode=Node,RBAC
         - --bind-address=0.0.0.0
         - --client-ca-file=/etc/kubernetes/secrets/ca.crt
@@ -163,6 +164,7 @@ spec:
 {{- end }}
         - --etcd-quorum-read=true
         - --etcd-servers={{ range $i, $e := .EtcdServers }}{{ if $i }},{{end}}{{ $e }}{{end}}
+        - --feature-gates=AdvancedAuditing=false
         - --insecure-port=0
         - --kubelet-client-certificate=/etc/kubernetes/secrets/apiserver.crt
         - --kubelet-client-key=/etc/kubernetes/secrets/apiserver.key
@@ -173,6 +175,7 @@ spec:
         - --tls-ca-file=/etc/kubernetes/secrets/ca.crt
         - --tls-cert-file=/etc/kubernetes/secrets/apiserver.crt
         - --tls-private-key-file=/etc/kubernetes/secrets/apiserver.key
+        - --v=6
         env:
         - name: POD_IP
           valueFrom:
@@ -223,6 +226,7 @@ spec:
     - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ValidatingAdmissionWebhook,ResourceQuota,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook
     - --advertise-address=$(POD_IP)
     - --allow-privileged=true
+    - --audit-log-path=-
     - --authorization-mode=Node,RBAC
     - --bind-address=0.0.0.0
     - --client-ca-file=/etc/kubernetes/secrets/ca.crt
@@ -234,6 +238,7 @@ spec:
 {{- end }}
     - --etcd-quorum-read=true
     - --etcd-servers={{ range $i, $e := .EtcdServers }}{{ if $i }},{{end}}{{ $e }}{{end}}
+    - --feature-gates=AdvancedAuditing=false
     - --insecure-port=0
     - --kubelet-client-certificate=/etc/kubernetes/secrets/apiserver.crt
     - --kubelet-client-key=/etc/kubernetes/secrets/apiserver.key
@@ -245,6 +250,7 @@ spec:
     - --tls-ca-file=/etc/kubernetes/secrets/ca.crt
     - --tls-cert-file=/etc/kubernetes/secrets/apiserver.crt
     - --tls-private-key-file=/etc/kubernetes/secrets/apiserver.key
+    - --v=6
     env:
     - name: POD_IP
       valueFrom:

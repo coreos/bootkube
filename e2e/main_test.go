@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -157,6 +158,7 @@ func retry(attempts int, delay time.Duration, f func() error) error {
 		}
 
 		if i < attempts-1 {
+			glog.Errorf("attempt %d: %v", i, err)
 			time.Sleep(delay)
 		}
 	}
