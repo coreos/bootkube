@@ -156,6 +156,7 @@ spec:
         - --client-ca-file=/etc/kubernetes/secrets/ca.crt
         - --cloud-provider={{ .CloudProvider }}
         - --enable-bootstrap-token-auth=true
+        - --endpoint-reconciler-type=lease
 {{- if .EtcdUseTLS }}
         - --etcd-cafile=/etc/kubernetes/secrets/etcd-client-ca.crt
         - --etcd-certfile=/etc/kubernetes/secrets/etcd-client.crt
