@@ -9,14 +9,8 @@ if [ ${un} == 'Darwin' ]; then
     local_os="darwin"
 fi
 
-SELF_HOST_ETCD=${SELF_HOST_ETCD:-false}
-if [ ${SELF_HOST_ETCD} = "true" ]; then
-    echo "WARNING: THIS IS NOT YET FULLY WORKING - merely here to make ongoing testing easier"
-    etcd_render_flags="--experimental-self-hosted-etcd"
-else
-    # Note: if you increase the number of etcd servers in the Vagrantfile you must also add them here.
-    etcd_render_flags="--etcd-servers=https://172.17.4.51:2379"
-fi
+# Note: if you increase the number of etcd servers in the Vagrantfile you must also add them here.
+etcd_render_flags="--etcd-servers=https://172.17.4.51:2379"
 
 CALICO_NETWORK_POLICY=${CALICO_NETWORK_POLICY:-false}
 if [ ${CALICO_NETWORK_POLICY} = "true" ]; then

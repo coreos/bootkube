@@ -3,15 +3,9 @@ set -euo pipefail
 
 GLOG_v=${GLOG_v:-1}
 HOST=${HOST:-c1}
-SELF_HOST_ETCD=${SELF_HOST_ETCD:-false}
 
 if [ ! -d "cluster" ]; then
   echo "Need some cluster assets to perform recovery; try running bootkube-up."
-fi
-
-if [ -f cluster/bootstrap-manifests/bootstrap-etcd.yaml ]; then
-  echo "ERROR: $(basename $0) does not currently support self-hosted etcd."
-  exit 1
 fi
 
 echo

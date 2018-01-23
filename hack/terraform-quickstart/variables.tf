@@ -23,11 +23,6 @@ variable "instance_type" {
   default     = "m3.medium"
 }
 
-variable "self_host_etcd" {
-  type    = "string"
-  default = "true"
-}
-
 variable "network_provider" {
   type    = "string"
   default = "flannel"

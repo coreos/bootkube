@@ -10,10 +10,6 @@ output "master_ips" {
   value = ["${aws_instance.master_node.*.public_ip}"]
 }
 
-output "self_host_etcd" {
-  value = "${var.self_host_etcd}"
-}
-
 output "network_provider" {
   value = "${var.network_provider}"
 }

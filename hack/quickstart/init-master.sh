@@ -7,7 +7,6 @@ REMOTE_USER=${REMOTE_USER:-core}
 CLUSTER_DIR=${CLUSTER_DIR:-cluster}
 IDENT=${IDENT:-${HOME}/.ssh/id_rsa}
 SSH_OPTS=${SSH_OPTS:-}
-SELF_HOST_ETCD=${SELF_HOST_ETCD:-false}
 CLOUD_PROVIDER=${CLOUD_PROVIDER:-}
 NETWORK_PROVIDER=${NETWORK_PROVIDER:-flannel}
 
@@ -52,12 +51,7 @@ function init_master_node() {
     systemctl daemon-reload
     systemctl stop locksmithd; systemctl mask locksmithd
 
-    if [ "$SELF_HOST_ETCD" = true ] ; then
-        echo "WARNING: THIS IS NOT YET FULLY WORKING - merely here to make ongoing testing easier"
-        etcd_render_flags="--experimental-self-hosted-etcd"
-    else
-        etcd_render_flags="--etcd-servers=https://${COREOS_PRIVATE_IPV4}:2379"
-    fi
+    etcd_render_flags="--etcd-servers=https://${COREOS_PRIVATE_IPV4}:2379"
 
     if [ "$NETWORK_PROVIDER" = "canal" ]; then
         network_provider_flags="--network-provider=experimental-canal"
@@ -79,10 +73,8 @@ function init_master_node() {
     cp /home/${REMOTE_USER}/assets/tls/ca.crt /etc/kubernetes/ca.crt
 
     # Start etcd.
-    if [ "$SELF_HOST_ETCD" = false ] ; then
-        configure_etcd
-        systemctl enable etcd-member; sudo systemctl start etcd-member
-    fi
+    configure_etcd
+    systemctl enable etcd-member; sudo systemctl start etcd-member
 
     # Set cloud provider
     sed -i "s/cloud-provider=/cloud-provider=$CLOUD_PROVIDER/" /etc/systemd/system/kubelet.service
@@ -123,7 +115,7 @@ if [ "${REMOTE_HOST}" != "local" ]; then
     fi
     # Copy self to remote host so script can be executed in "local" mode
     scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} ${BASH_SOURCE[0]} ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/init-master.sh
-    ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "sudo REMOTE_USER=${REMOTE_USER} CLOUD_PROVIDER=${CLOUD_PROVIDER} SELF_HOST_ETCD=${SELF_HOST_ETCD} NETWORK_PROVIDER=${NETWORK_PROVIDER} /home/${REMOTE_USER}/init-master.sh local"
+    ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "sudo REMOTE_USER=${REMOTE_USER} CLOUD_PROVIDER=${CLOUD_PROVIDER} NETWORK_PROVIDER=${NETWORK_PROVIDER} /home/${REMOTE_USER}/init-master.sh local"
 
     # Copy assets from remote host to a local directory. These can be used to launch additional nodes & contain TLS assets
     mkdir ${CLUSTER_DIR}

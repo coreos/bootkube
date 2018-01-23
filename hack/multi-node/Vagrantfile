@@ -37,14 +37,11 @@ def workerIP(num)
   return "172.17.4.#{num+200}"
 end
 
-$self_host_etcd = true if ENV['SELF_HOST_ETCD'] == "true"
-if !$self_host_etcd
-    $etcd_count = 1
-    $etcd_vm_memory = 512
-    ETCD_CLOUD_CONFIG_PATH = File.expand_path("./etcd-cloud-config.yaml")
-    etcdIPs = [*1..$etcd_count].map{ |i| etcdIP(i) }
-    initial_etcd_cluster = etcdIPs.map.with_index{ |ip, i| "e#{i+1}=https://#{ip}:2380" }.join(",")
-end
+$etcd_count = 1
+$etcd_vm_memory = 512
+ETCD_CLOUD_CONFIG_PATH = File.expand_path("./etcd-cloud-config.yaml")
+etcdIPs = [*1..$etcd_count].map{ |i| etcdIP(i) }
+initial_etcd_cluster = etcdIPs.map.with_index{ |ip, i| "e#{i+1}=https://#{ip}:2380" }.join(",")
 
 Vagrant.configure("2") do |config|
   # always use Vagrant's insecure key
@@ -84,47 +81,45 @@ Vagrant.configure("2") do |config|
     vb.gui = false
   end
 
-  if !$self_host_etcd
-    (1..$etcd_count).each do |i|
-      config.vm.define vm_name = "e%d" % i do |etcd|
+  (1..$etcd_count).each do |i|
+    config.vm.define vm_name = "e%d" % i do |etcd|
 
-        data = File.read(ETCD_CLOUD_CONFIG_PATH)
-        data = data.gsub("{{ETCD_NODE_NAME}}", vm_name)
-        data = data.gsub("{{ETCD_INITIAL_CLUSTER}}", initial_etcd_cluster)
-        etcd_config_file = Tempfile.new('etcd_config')
-        etcd_config_file.write(data)
-        etcd_config_file.close
+      data = File.read(ETCD_CLOUD_CONFIG_PATH)
+      data = data.gsub("{{ETCD_NODE_NAME}}", vm_name)
+      data = data.gsub("{{ETCD_INITIAL_CLUSTER}}", initial_etcd_cluster)
+      etcd_config_file = Tempfile.new('etcd_config')
+      etcd_config_file.write(data)
+      etcd_config_file.close
 
-        etcd.vm.hostname = vm_name
+      etcd.vm.hostname = vm_name
 
-        ["vmware_fusion", "vmware_workstation"].each do |vmware|
-          etcd.vm.provider vmware do |v|
-            v.vmx['memsize'] = $etcd_vm_memory
-          end
+      ["vmware_fusion", "vmware_workstation"].each do |vmware|
+        etcd.vm.provider vmware do |v|
+          v.vmx['memsize'] = $etcd_vm_memory
         end
-
-        etcd.vm.provider :virtualbox do |vb|
-          vb.memory = $etcd_vm_memory
-        end
-
-        etcd.vm.network :private_network, ip: etcdIP(i)
-
-        etcd.vm.provision :file, source: etcd_config_file.path, destination: "/tmp/vagrantfile-user-data"
-        etcd.vm.provision :shell, inline: "mv /tmp/vagrantfile-user-data /var/lib/coreos-vagrant/", privileged: true
-
-        etcd.vm.provision :shell, :inline => "mkdir -p /etc/etcd/tls", :privileged => true
-        Dir.glob(ETCD_CLI_CERT_GLOB) do |etcd_cert_file|
-          etcd.vm.provision :file, :source => etcd_cert_file, :destination => "/tmp/#{File.basename(etcd_cert_file)}"
-          etcd.vm.provision :shell, :inline => "mv /tmp/#{File.basename(etcd_cert_file)} /etc/etcd/tls/", :privileged => true
-        end
-        etcd.vm.provision :shell, :inline => "mkdir -p /etc/etcd/tls/etcd", :privileged => true
-        Dir.glob(ETCD_CERT_GLOB) do |etcd_cert_file|
-          etcd.vm.provision :file, :source => etcd_cert_file, :destination => "/tmp/#{File.basename(etcd_cert_file)}"
-          etcd.vm.provision :shell, :inline => "mv /tmp/#{File.basename(etcd_cert_file)} /etc/etcd/tls/etcd/", :privileged => true
-        end
-        etcd.vm.provision :shell, :inline => "chown -R etcd:etcd /etc/etcd", :privileged => true
-        etcd.vm.provision :shell, :inline => "chmod -R u=rX,g=,o= /etc/etcd", :privileged => true
       end
+
+      etcd.vm.provider :virtualbox do |vb|
+        vb.memory = $etcd_vm_memory
+      end
+
+      etcd.vm.network :private_network, ip: etcdIP(i)
+
+      etcd.vm.provision :file, source: etcd_config_file.path, destination: "/tmp/vagrantfile-user-data"
+      etcd.vm.provision :shell, inline: "mv /tmp/vagrantfile-user-data /var/lib/coreos-vagrant/", privileged: true
+
+      etcd.vm.provision :shell, :inline => "mkdir -p /etc/etcd/tls", :privileged => true
+      Dir.glob(ETCD_CLI_CERT_GLOB) do |etcd_cert_file|
+        etcd.vm.provision :file, :source => etcd_cert_file, :destination => "/tmp/#{File.basename(etcd_cert_file)}"
+        etcd.vm.provision :shell, :inline => "mv /tmp/#{File.basename(etcd_cert_file)} /etc/etcd/tls/", :privileged => true
+      end
+      etcd.vm.provision :shell, :inline => "mkdir -p /etc/etcd/tls/etcd", :privileged => true
+      Dir.glob(ETCD_CERT_GLOB) do |etcd_cert_file|
+        etcd.vm.provision :file, :source => etcd_cert_file, :destination => "/tmp/#{File.basename(etcd_cert_file)}"
+        etcd.vm.provision :shell, :inline => "mv /tmp/#{File.basename(etcd_cert_file)} /etc/etcd/tls/etcd/", :privileged => true
+      end
+      etcd.vm.provision :shell, :inline => "chown -R etcd:etcd /etc/etcd", :privileged => true
+      etcd.vm.provision :shell, :inline => "chmod -R u=rX,g=,o= /etc/etcd", :privileged => true
     end
   end
 

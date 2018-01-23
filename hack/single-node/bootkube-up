@@ -9,14 +9,6 @@ if [ ${un} == 'Darwin' ]; then
     local_os="darwin"
 fi
 
-SELF_HOST_ETCD=${SELF_HOST_ETCD:-false}
-if [ ${SELF_HOST_ETCD} = "true" ]; then
-    echo "WARNING: THIS IS NOT YET FULLY WORKING - merely here to make ongoing testing easier"
-    etcd_render_flags="--experimental-self-hosted-etcd"
-else
-    etcd_render_flags=""
-fi
-
 CALICO_NETWORK_POLICY=${CALICO_NETWORK_POLICY:-false}
 if [ ${CALICO_NETWORK_POLICY} = "true" ]; then
     echo "WARNING: THIS IS EXPERIMENTAL SUPPORT FOR NETWORK POLICY"
@@ -27,11 +19,9 @@ fi
 
 # Render assets
 if [ ! -d "cluster" ]; then
-  ../../_output/bin/${local_os}/bootkube render --asset-dir=cluster --api-servers=https://172.17.4.100:6443 ${etcd_render_flags} ${cnp_render_flags}
+  ../../_output/bin/${local_os}/bootkube render --asset-dir=cluster --api-servers=https://172.17.4.100:6443 ${cnp_render_flags}
   cp user-data.sample cluster/user-data
-	if [ ${SELF_HOST_ETCD} = "false" ]; then
-		cat user-data-etcd.sample >> cluster/user-data
-	fi
+  cat user-data-etcd.sample >> cluster/user-data
 fi
 
 # Start the VM
