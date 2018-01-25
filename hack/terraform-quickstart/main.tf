@@ -5,10 +5,15 @@ provider "aws" {
   version    = "1.8"
 }
 
+resource "aws_key_pair" "core" {
+  key_name   = "${var.resource_owner}"
+  public_key = "${var.ssh_public_key}"
+}
+
 resource "aws_instance" "bootstrap_node" {
   ami                  = "${data.aws_ami.coreos_ami.image_id}"
   instance_type        = "${var.instance_type}"
-  key_name             = "${var.ssh_key}"
+  key_name             = "${aws_key_pair.core.key_name}"
   iam_instance_profile = "${aws_iam_instance_profile.bk_profile.id}"
 
   vpc_security_group_ids      = ["${aws_security_group.allow_all.id}"]
@@ -50,7 +55,7 @@ resource "aws_instance" "bootstrap_node" {
 resource "aws_instance" "worker_node" {
   ami                  = "${data.aws_ami.coreos_ami.image_id}"
   instance_type        = "${var.instance_type}"
-  key_name             = "${var.ssh_key}"
+  key_name             = "${aws_key_pair.core.key_name}"
   count                = "${var.num_workers}"
   iam_instance_profile = "${aws_iam_instance_profile.bk_profile.id}"
 
@@ -93,7 +98,7 @@ resource "aws_instance" "worker_node" {
 resource "aws_instance" "master_node" {
   ami                  = "${data.aws_ami.coreos_ami.image_id}"
   instance_type        = "${var.instance_type}"
-  key_name             = "${var.ssh_key}"
+  key_name             = "${aws_key_pair.core.key_name}"
   count                = "${var.additional_masters}"
   iam_instance_profile = "${aws_iam_instance_profile.bk_profile.id}"
 

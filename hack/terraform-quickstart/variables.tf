@@ -6,8 +6,8 @@ variable "access_key" {
   type = "string"
 }
 
-variable "ssh_key" {
-  description = "aws ssh key"
+variable "ssh_public_key" {
+  description = "SSH Public Key"
   type        = "string"
 }
 
@@ -18,7 +18,7 @@ variable "resource_owner" {
 }
 
 variable "instance_type" {
-  description = "Name all instances behind a single tag based on who/what is running terraform"
+  description = "Instance type"
   type        = "string"
   default     = "m3.medium"
 }
