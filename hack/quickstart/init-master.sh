@@ -84,6 +84,7 @@ function init_master_node() {
 
     # Render cluster assets
     /home/${REMOTE_USER}/bootkube render --asset-dir=/home/${REMOTE_USER}/assets ${etcd_render_flags} ${network_provider_flags} \
+      --cloud-provider=${CLOUD_PROVIDER} \
       --api-servers=https://${COREOS_PUBLIC_IPV4}:6443,https://${COREOS_PRIVATE_IPV4}:6443
 
     # Move the local kubeconfig into expected location
@@ -92,6 +93,12 @@ function init_master_node() {
     cp /home/${REMOTE_USER}/assets/auth/kubeconfig-kubelet /etc/kubernetes/kubeconfig
     cp /home/${REMOTE_USER}/assets/auth/kubeconfig /etc/kubernetes/kubeconfig-admin
     cp /home/${REMOTE_USER}/assets/tls/ca.crt /etc/kubernetes/ca.crt
+
+    # Move the aws authenticator config into expected location
+    if [ "$CLOUD_PROVIDER" == "aws" ]; then
+        mkdir -p /etc/kubernetes/aws-authenticator
+        cp /home/${REMOTE_USER}/aws-authenticator-config.yaml /etc/kubernetes/aws-authenticator/config.yaml
+    fi
 
     # Start etcd.
     configure_etcd
@@ -140,6 +147,12 @@ if [ "${REMOTE_HOST}" != "local" ]; then
     fi
     # Copy self to remote host so script can be executed in "local" mode
     scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} ${BASH_SOURCE[0]} ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/init-master.sh
+
+    # Copy the aws-authenticator config to remote
+    if [ "$CLOUD_PROVIDER" == "aws" ]; then
+        scp -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} aws-authenticator-config.yaml ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/aws-authenticator-config.yaml
+    fi
+
     ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "sudo REMOTE_USER=${REMOTE_USER} CLOUD_PROVIDER=${CLOUD_PROVIDER} NETWORK_PROVIDER=${NETWORK_PROVIDER} /home/${REMOTE_USER}/init-master.sh local"
 
     # Copy assets from remote host to a local directory. These can be used to launch additional nodes & contain TLS assets
