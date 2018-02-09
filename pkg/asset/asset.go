@@ -119,18 +119,19 @@ type Config struct {
 
 // ImageVersions holds all the images (and their versions) that are rendered into the templates.
 type ImageVersions struct {
-	Etcd            string
-	EtcdOperator    string
-	Flannel         string
-	FlannelCNI      string
-	Calico          string
-	CalicoCNI       string
-	Hyperkube       string
-	Kenc            string
-	KubeDNS         string
-	KubeDNSMasq     string
-	KubeDNSSidecar  string
-	PodCheckpointer string
+	Etcd             string
+	EtcdOperator     string
+	Flannel          string
+	FlannelCNI       string
+	Calico           string
+	CalicoCNI        string
+	Hyperkube        string
+	Kenc             string
+	KubeDNS          string
+	KubeDNSMasq      string
+	KubeDNSSidecar   string
+	PodCheckpointer  string
+	AWSAuthenticator string
 }
 
 // NewDefaultAssets returns a list of default assets, optionally

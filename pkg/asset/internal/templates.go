@@ -172,6 +172,9 @@ spec:
         - --tls-ca-file=/etc/kubernetes/secrets/ca.crt
         - --tls-cert-file=/etc/kubernetes/secrets/apiserver.crt
         - --tls-private-key-file=/etc/kubernetes/secrets/apiserver.key
+{{- if eq .CloudProvider "aws" }}
+        - --authentication-token-webhook-config-file=/var/aws-authenticator/kubeconfig.yaml
+{{- end }}
         env:
         - name: POD_IP
           valueFrom:
@@ -184,6 +187,25 @@ spec:
         - mountPath: /etc/kubernetes/secrets
           name: secrets
           readOnly: true
+{{- if eq .CloudProvider "aws" }}
+        - mountPath: /var/aws-authenticator
+          name: var-aws-authenticator
+          readonly: true
+      - args:
+        - server
+        - --config=/etc/kubernetes/aws-authenticator/config.yaml
+        image: {{ .Images.AWSAuthenticator }}
+        name: aws-authenticator
+        volumeMounts:
+        - mountPath: /etc/ssl/certs
+          name: ssl-certs-host
+          readOnly: true
+        - mountPath: /var/aws-authenticator
+          name: var-aws-authenticator
+        - mountPath: /etc/kubernetes/aws-authenticator/
+          name: etc-kubernetes-aws-authenticator
+          readonly: true
+{{- end }}
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
@@ -198,6 +220,13 @@ spec:
       - name: secrets
         secret:
           secretName: kube-apiserver
+{{- if eq .CloudProvider "aws" }}
+      - emptyDir: {}
+        name: var-aws-authenticator
+      - hostPath:
+          path: /etc/kubernetes/aws-authenticator/
+        name: etc-kubernetes-aws-authenticator
+{{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 65534
@@ -243,6 +272,9 @@ spec:
     - --tls-ca-file=/etc/kubernetes/secrets/ca.crt
     - --tls-cert-file=/etc/kubernetes/secrets/apiserver.crt
     - --tls-private-key-file=/etc/kubernetes/secrets/apiserver.key
+{{- if eq .CloudProvider "aws" }}
+    - --authentication-token-webhook-config-file=/var/aws-authenticator/kubeconfig.yaml
+{{- end }}
     env:
     - name: POD_IP
       valueFrom:
@@ -255,6 +287,25 @@ spec:
     - mountPath: /etc/kubernetes/secrets
       name: secrets
       readOnly: true
+{{- if eq .CloudProvider "aws" }}
+    - mountPath: /var/aws-authenticator
+      name: var-aws-authenticator
+      readonly: true
+  - args:
+    - server
+    - --config=/etc/kubernetes/aws-authenticator/config.yaml
+    image: {{ .Images.AWSAuthenticator }}
+    name: aws-authenticator
+    volumeMounts:
+    - mountPath: /etc/ssl/certs
+      name: ssl-certs-host
+      readOnly: true
+    - mountPath: /var/aws-authenticator
+      name: var-aws-authenticator
+    - mountPath: /etc/kubernetes/aws-authenticator/
+      name: etc-kubernetes-aws-authenticator
+      readonly: true
+{{- end }}
   hostNetwork: true
   volumes:
   - name: secrets
@@ -263,6 +314,13 @@ spec:
   - name: ssl-certs-host
     hostPath:
       path: /usr/share/ca-certificates
+{{- if eq .CloudProvider "aws" }}
+  - emptyDir: {}
+    name: var-aws-authenticator
+  - hostPath:
+      path: /etc/kubernetes/aws-authenticator/
+    name: etc-kubernetes-aws-authenticator
+{{- end }}
 `)
 
 var CheckpointerTemplate = []byte(`apiVersion: apps/v1beta2
