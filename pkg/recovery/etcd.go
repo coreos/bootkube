@@ -5,7 +5,6 @@ package recovery
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -16,7 +15,6 @@ import (
 
 	"github.com/coreos/etcd-operator/pkg/spec"
 	"github.com/coreos/etcd/clientv3"
-	"github.com/pborman/uuid"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/pkg/api"
@@ -150,50 +148,6 @@ func StartRecoveryEtcdForBackup(p, backupPath string) error {
 // etcd container.
 func CleanRecoveryEtcd(p string) error {
 	return os.Remove(path.Join(p, assetPathRecoveryEtcd))
-}
-
-func createBootEtcdAsset(pathPrefix, backupPath, serviceIP string) asset.Asset {
-	d, f := path.Split(backupPath)
-
-	config := struct {
-		Image             string
-		BackupFile        string
-		BackupDir         string
-		BootEtcdServiceIP string
-		CRDKey            string
-		MemberPodPrefix   string
-		ClusterToken      string
-	}{
-		Image:             asset.DefaultImages.Etcd,
-		BackupFile:        f,
-		BackupDir:         d,
-		BootEtcdServiceIP: serviceIP,
-		CRDKey:            path.Join(pathPrefix, etcdCRDKey),
-		MemberPodPrefix:   path.Join(pathPrefix, etcdMemberPodPrefix),
-		ClusterToken:      "bootkube-recovery-" + uuid.New(),
-	}
-
-	return asset.MustCreateAssetFromTemplate(asset.AssetPathBootstrapEtcd, bootFromBackupEtcdTemplate, config)
-}
-
-func createBootEtcdServiceAsset(serviceIP string) asset.Asset {
-	config := struct{ BootEtcdServiceIP string }{BootEtcdServiceIP: serviceIP}
-
-	return asset.MustCreateAssetFromTemplate(asset.AssetPathBootstrapEtcdService, recoveryEtcdSvcTemplate, config)
-}
-
-func createEtcdCRDAsset(s spec.EtcdCluster) (*asset.Asset, error) {
-	clone := cloneEtcdClusterCRD(s)
-
-	data, err := json.Marshal(clone)
-	if err != nil {
-		return nil, err
-	}
-
-	return &asset.Asset{
-		Name: asset.AssetPathMigrateEtcdCluster,
-		Data: data,
-	}, nil
 }
 
 func getServiceIPFromClusterSpec(s spec.ClusterSpec) (string, error) {

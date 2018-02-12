@@ -83,9 +83,6 @@ const (
 	AssetPathBootstrapAPIServer          = "bootstrap-manifests/bootstrap-apiserver.yaml"
 	AssetPathBootstrapControllerManager  = "bootstrap-manifests/bootstrap-controller-manager.yaml"
 	AssetPathBootstrapScheduler          = "bootstrap-manifests/bootstrap-scheduler.yaml"
-	AssetPathBootstrapEtcd               = "bootstrap-manifests/bootstrap-etcd.yaml"
-	AssetPathBootstrapEtcdService        = "etcd/bootstrap-etcd-service.json"
-	AssetPathMigrateEtcdCluster          = "etcd/migrate-etcd-cluster.json"
 )
 
 var (
@@ -107,10 +104,7 @@ type Config struct {
 	PodCIDR                *net.IPNet
 	ServiceCIDR            *net.IPNet
 	APIServiceIP           net.IP
-	BootEtcdServiceIP      net.IP
 	DNSServiceIP           net.IP
-	EtcdServiceIP          net.IP
-	EtcdServiceName        string
 	CloudProvider          string
 	NetworkProvider        string
 	BootstrapSecretsSubdir string
@@ -120,7 +114,6 @@ type Config struct {
 // ImageVersions holds all the images (and their versions) that are rendered into the templates.
 type ImageVersions struct {
 	Etcd            string
-	EtcdOperator    string
 	Flannel         string
 	FlannelCNI      string
 	Calico          string

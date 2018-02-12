@@ -19,8 +19,6 @@ import (
 const (
 	apiOffset            = 1
 	dnsOffset            = 10
-	etcdOffset           = 15
-	bootEtcdOffset       = 20
 	defaultServiceBaseIP = "10.3.0.0"
 	defaultEtcdServers   = "https://127.0.0.1:2379"
 )
@@ -157,16 +155,6 @@ func flagsToAssetConfig() (c *asset.Config, err error) {
 		return nil, err
 	}
 
-	bootEtcdServiceIP, err := offsetServiceIP(serviceNet, bootEtcdOffset)
-	if err != nil {
-		return nil, err
-	}
-
-	etcdServiceIP, err := offsetServiceIP(serviceNet, etcdOffset)
-	if err != nil {
-		return nil, err
-	}
-
 	etcdServers, err := parseURLs(renderOpts.etcdServers)
 	if err != nil {
 		return nil, err
@@ -201,24 +189,22 @@ func flagsToAssetConfig() (c *asset.Config, err error) {
 	}
 
 	return &asset.Config{
-		EtcdCACert:        etcdCACert,
-		EtcdClientCert:    etcdClientCert,
-		EtcdClientKey:     etcdClientKey,
-		EtcdServers:       etcdServers,
-		EtcdUseTLS:        etcdUseTLS,
-		CACert:            caCert,
-		CAPrivKey:         caPrivKey,
-		APIServers:        apiServers,
-		AltNames:          altNames,
-		PodCIDR:           podNet,
-		ServiceCIDR:       serviceNet,
-		APIServiceIP:      apiServiceIP,
-		BootEtcdServiceIP: bootEtcdServiceIP,
-		DNSServiceIP:      dnsServiceIP,
-		EtcdServiceIP:     etcdServiceIP,
-		CloudProvider:     renderOpts.cloudProvider,
-		NetworkProvider:   renderOpts.networkProvider,
-		Images:            imageVersions,
+		EtcdCACert:      etcdCACert,
+		EtcdClientCert:  etcdClientCert,
+		EtcdClientKey:   etcdClientKey,
+		EtcdServers:     etcdServers,
+		EtcdUseTLS:      etcdUseTLS,
+		CACert:          caCert,
+		CAPrivKey:       caPrivKey,
+		APIServers:      apiServers,
+		AltNames:        altNames,
+		PodCIDR:         podNet,
+		ServiceCIDR:     serviceNet,
+		APIServiceIP:    apiServiceIP,
+		DNSServiceIP:    dnsServiceIP,
+		CloudProvider:   renderOpts.cloudProvider,
+		NetworkProvider: renderOpts.networkProvider,
+		Images:          imageVersions,
 	}, nil
 }
 
