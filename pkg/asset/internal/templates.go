@@ -120,7 +120,7 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 `)
 
-var APIServerTemplate = []byte(`apiVersion: apps/v1beta2
+var APIServerTemplate = []byte(`apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: kube-apiserver
@@ -265,7 +265,7 @@ spec:
       path: /usr/share/ca-certificates
 `)
 
-var CheckpointerTemplate = []byte(`apiVersion: apps/v1beta2
+var CheckpointerTemplate = []byte(`apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: pod-checkpointer
@@ -375,7 +375,7 @@ subjects:
   namespace: kube-system
 `)
 
-var ControllerManagerTemplate = []byte(`apiVersion: apps/v1beta2
+var ControllerManagerTemplate = []byte(`apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kube-controller-manager
@@ -535,7 +535,7 @@ spec:
       k8s-app: kube-controller-manager
 `)
 
-var SchedulerTemplate = []byte(`apiVersion: apps/v1beta2
+var SchedulerTemplate = []byte(`apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kube-scheduler
@@ -633,7 +633,7 @@ spec:
       k8s-app: kube-scheduler
 `)
 
-var ProxyTemplate = []byte(`apiVersion: apps/v1beta2
+var ProxyTemplate = []byte(`apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: kube-proxy
@@ -755,7 +755,7 @@ data:
         user: service-account
 `)
 
-var DNSDeploymentTemplate = []byte(`apiVersion: apps/v1beta2
+var DNSDeploymentTemplate = []byte(`apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kube-dns
@@ -932,7 +932,7 @@ spec:
     protocol: TCP
 `)
 
-var EtcdOperatorTemplate = []byte(`apiVersion: apps/v1beta2
+var EtcdOperatorTemplate = []byte(`apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: etcd-operator
@@ -1128,7 +1128,7 @@ data:
     }
 `)
 
-var FlannelTemplate = []byte(`apiVersion: apps/v1beta2
+var FlannelTemplate = []byte(`apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: kube-flannel
@@ -1253,7 +1253,7 @@ data:
     }
 `)
 
-var CalicoNodeTemplate = []byte(`apiVersion: apps/v1beta2
+var CalicoNodeTemplate = []byte(`apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: calico-node
@@ -1378,7 +1378,7 @@ spec:
     type: RollingUpdate
 `)
 
-var CalicoPolicyOnlyTemplate = []byte(`apiVersion: apps/v1beta2
+var CalicoPolicyOnlyTemplate = []byte(`apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: calico-node
