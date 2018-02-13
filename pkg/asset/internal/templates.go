@@ -293,6 +293,7 @@ spec:
         - /checkpoint
         - --lock-file=/var/run/lock/pod-checkpointer.lock
         - --kubeconfig=/etc/checkpointer/kubeconfig
+        - --checkpoint-grace-period=10m
         env:
         - name: NODE_NAME
           valueFrom:
