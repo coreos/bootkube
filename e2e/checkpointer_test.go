@@ -36,6 +36,7 @@ func TestCheckpointer(t *testing.T) {
 // 6. Start the worker kubelet, verify the checkpointer and the pod are still running as static pods.
 // 7. Start the master kubelets, verify the checkpointer is removed but the pod is still running.
 func testCheckpointerUnscheduleCheckpointer(t *testing.T) {
+	t.Skip()
 	// Get the cluster
 	c := waitCluster(t)
 
@@ -148,6 +149,7 @@ func testCheckpointerUnscheduleCheckpointer(t *testing.T) {
 // 6. Start the worker kubelet, verify the checkpointer and the pod are still running as static pods.
 // 7. Start the master kubelets, verify the test pod is removed, but not the checkpointer.
 func testCheckpointerUnscheduleParent(t *testing.T) {
+	t.Skip()
 	// Get the cluster
 	c := waitCluster(t)
 

@@ -8,6 +8,7 @@ import (
 )
 
 func TestSmoke(t *testing.T) {
+	t.Skip()
 	nginx, err := testworkload.NewNginx(client, namespace, testworkload.WithNginxPingJobLabels(map[string]string{"allow": "access"}))
 	if err != nil {
 		t.Fatalf("Test nginx creation failed: %v", err)
