@@ -6,18 +6,16 @@ package recovery
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"os"
 	"path"
 	"strings"
 
 	"github.com/kubernetes-incubator/bootkube/pkg/asset"
 
-	"github.com/coreos/etcd-operator/pkg/spec"
 	"github.com/coreos/etcd/clientv3"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // etcdBackend is a backend that extracts a controlPlane from an etcd instance.
@@ -31,7 +29,7 @@ type etcdBackend struct {
 func NewEtcdBackend(client *clientv3.Client, pathPrefix string) Backend {
 	return &etcdBackend{
 		client:     client,
-		decoder:    api.Codecs.UniversalDecoder(),
+		decoder:    legacyscheme.Codecs.UniversalDecoder(),
 		pathPrefix: pathPrefix,
 	}
 }
@@ -65,7 +63,7 @@ func (s *etcdBackend) read(ctx context.Context) (*controlPlane, error) {
 
 // get fetches a single runtime.Object with key `key` from etcd.
 func (s *etcdBackend) get(ctx context.Context, key string, out runtime.Object, ignoreNotFound bool) error {
-	key = path.Join(s.pathPrefix, key, api.NamespaceSystem)
+	key = path.Join(s.pathPrefix, key, "kube-system")
 	getResp, err := s.client.KV.Get(ctx, key)
 	if err != nil {
 		return err
@@ -100,7 +98,7 @@ func (s *etcdBackend) list(ctx context.Context, key string, listObj runtime.Obje
 	if err != nil {
 		return err
 	}
-	key = path.Join(s.pathPrefix, key, api.NamespaceSystem)
+	key = path.Join(s.pathPrefix, key, "kube-system")
 	if !strings.HasSuffix(key, "/") {
 		key += "/"
 	}
@@ -148,26 +146,6 @@ func StartRecoveryEtcdForBackup(p, backupPath string) error {
 // etcd container.
 func CleanRecoveryEtcd(p string) error {
 	return os.Remove(path.Join(p, assetPathRecoveryEtcd))
-}
-
-func getServiceIPFromClusterSpec(s spec.ClusterSpec) (string, error) {
-	ep := s.SelfHosted.BootMemberClientEndpoint
-	u, err := url.Parse(ep)
-	if err != nil {
-		return "", err
-	}
-	return stripPort(u.Host), nil
-}
-
-func cloneEtcdClusterCRD(s spec.EtcdCluster) spec.EtcdCluster {
-	var clone spec.EtcdCluster
-	clone.Spec = s.Spec
-	clone.ObjectMeta.SetName(s.ObjectMeta.GetName())
-	clone.ObjectMeta.SetNamespace(s.ObjectMeta.GetNamespace())
-	clone.APIVersion = s.APIVersion
-	clone.Kind = s.Kind
-
-	return clone
 }
 
 func stripPort(hostport string) string {

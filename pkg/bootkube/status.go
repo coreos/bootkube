@@ -8,13 +8,12 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -65,10 +64,10 @@ func (s *statusController) Run() {
 	podStore, podController := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(lo metav1.ListOptions) (runtime.Object, error) {
-				return s.client.Core().Pods(api.NamespaceSystem).List(options)
+				return s.client.Core().Pods("kube-system").List(options)
 			},
 			WatchFunc: func(lo metav1.ListOptions) (watch.Interface, error) {
-				return s.client.Core().Pods(api.NamespaceSystem).Watch(options)
+				return s.client.Core().Pods("kube-system").Watch(options)
 			},
 		},
 		&v1.Pod{},
@@ -114,7 +113,7 @@ func (s *statusController) PodStatus() (map[string]v1.PodPhase, error) {
 		// Pod names are suffixed with random data. Match on prefix
 		podName := pod
 		for _, pn := range podNames {
-			if strings.HasPrefix(pn, path.Join(api.NamespaceSystem, pod)) {
+			if strings.HasPrefix(pn, path.Join("kube-system", pod)) {
 				podName = pn
 			}
 		}

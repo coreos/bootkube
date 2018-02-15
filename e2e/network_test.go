@@ -8,11 +8,11 @@ import (
 
 	"github.com/kubernetes-incubator/bootkube/e2e/internal/e2eutil/testworkload"
 
+	"k8s.io/api/extensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 const (
@@ -64,7 +64,7 @@ func TestNetwork(t *testing.T) {
 }
 
 func HelperDefaultDeny(t *testing.T, nginx *testworkload.Nginx) {
-	npi, _, err := api.Codecs.UniversalDecoder().Decode(defaultDenyNetworkPolicy, nil, &v1beta1.NetworkPolicy{})
+	npi, _, err := legacyscheme.Codecs.UniversalDecoder().Decode(defaultDenyNetworkPolicy, nil, &v1beta1.NetworkPolicy{})
 	if err != nil {
 		t.Fatalf("unable to decode network policy manifest: %v", err)
 	}
@@ -112,7 +112,7 @@ func HelperDefaultDeny(t *testing.T, nginx *testworkload.Nginx) {
 
 func HelperPolicy(t *testing.T, nginx *testworkload.Nginx) {
 	netPolicy := fmt.Sprintf(string(netPolicyTpl), nginx.Name)
-	npi, _, err := api.Codecs.UniversalDecoder().Decode([]byte(netPolicy), nil, &v1beta1.NetworkPolicy{})
+	npi, _, err := legacyscheme.Codecs.UniversalDecoder().Decode([]byte(netPolicy), nil, &v1beta1.NetworkPolicy{})
 	if err != nil {
 		t.Fatalf("unable to decode network policy manifest: %v", err)
 	}
