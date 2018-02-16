@@ -8,6 +8,7 @@ LOCAL_OS:=$(shell uname | tr A-Z a-z)
 GOFILES:=$(shell find . -name '*.go' | grep -v -E '(./vendor)')
 GOPATH_BIN:=$(shell echo ${GOPATH} | awk 'BEGIN { FS = ":" }; { print $1 }')/bin
 LDFLAGS=-X github.com/kubernetes-incubator/bootkube/pkg/version.Version=$(shell $(CURDIR)/build/git-version.sh)
+TERRAFORM:=$(shell command -v terraform 2> /dev/null)
 
 all: \
 	_output/bin/$(LOCAL_OS)/bootkube \
@@ -31,7 +32,11 @@ release: \
 
 check:
 	@gofmt -l -s $(GOFILES) | read; if [ $$? == 0 ]; then gofmt -s -d $(GOFILES); exit 1; fi
-	@terraform fmt -check ; if [ ! $$? -eq 0 ]; then exit 1; fi
+ifdef TERRAFORM
+	$(TERRAFORM) fmt -check ; if [ ! $$? -eq 0 ]; then exit 1; fi
+else
+	@echo -e "\e[91mSkipping terraform lint. terraform binary not available.\e[0m"
+endif
 	@go vet $(shell go list ./... | grep -v '/vendor/')
 	@./scripts/verify-gopkg.sh
 	@go test -v $(shell go list ./... | grep -v '/vendor/\|/e2e')
