@@ -6,11 +6,11 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 var (
@@ -149,7 +149,7 @@ func isCheckpoint(pod *v1.Pod) bool {
 }
 
 func copyPod(pod *v1.Pod) (*v1.Pod, error) {
-	obj, err := api.Scheme.Copy(pod)
+	obj, err := legacyscheme.Scheme.Copy(pod)
 	if err != nil {
 		return nil, err
 	}

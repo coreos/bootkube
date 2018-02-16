@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
+	rbac "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	rbac "k8s.io/client-go/pkg/apis/rbac/v1beta1"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 
 	"github.com/kubernetes-incubator/bootkube/pkg/asset"
 )
@@ -252,7 +252,7 @@ func makeNamespace(testName string) string {
 }
 
 func createDaemonSet(namespace string, manifest []byte, c *Cluster) error {
-	obj, _, err := api.Codecs.UniversalDecoder().Decode(manifest, nil, &v1beta1.DaemonSet{})
+	obj, _, err := legacyscheme.Codecs.UniversalDecoder().Decode(manifest, nil, &v1beta1.DaemonSet{})
 	if err != nil {
 		return fmt.Errorf("unable to decode manifest: %v", err)
 	}

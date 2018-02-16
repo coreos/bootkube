@@ -5,7 +5,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -37,22 +36,22 @@ func NewAPIServerBackend(kubeConfigPath string) (Backend, error) {
 // read implements Backend.read().
 func (b *apiServerBackend) read(context.Context) (*controlPlane, error) {
 	cp := &controlPlane{}
-	configMaps, err := b.client.CoreV1().ConfigMaps(api.NamespaceSystem).List(metav1.ListOptions{})
+	configMaps, err := b.client.CoreV1().ConfigMaps("kube-system").List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 	cp.configMaps = *configMaps
-	deployments, err := b.client.ExtensionsV1beta1().Deployments(api.NamespaceSystem).List(metav1.ListOptions{})
+	deployments, err := b.client.ExtensionsV1beta1().Deployments("kube-system").List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 	cp.deployments = *deployments
-	daemonSets, err := b.client.ExtensionsV1beta1().DaemonSets(api.NamespaceSystem).List(metav1.ListOptions{})
+	daemonSets, err := b.client.ExtensionsV1beta1().DaemonSets("kube-system").List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 	cp.daemonSets = *daemonSets
-	secrets, err := b.client.CoreV1().Secrets(api.NamespaceSystem).List(metav1.ListOptions{})
+	secrets, err := b.client.CoreV1().Secrets("kube-system").List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

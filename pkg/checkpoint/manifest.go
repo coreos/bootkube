@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // getFileCheckpoints will retrieve all checkpoint manifests from a given filepath.
@@ -41,7 +41,7 @@ func getFileCheckpoints(path string) map[string]*v1.Pod {
 		}
 
 		cp := &v1.Pod{}
-		if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), b, cp); err != nil {
+		if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), b, cp); err != nil {
 			glog.Errorf("Error unmarshalling manifest from %s: %v", filepath.Join(path, f.Name()), err)
 			continue
 		}

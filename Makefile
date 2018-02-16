@@ -76,7 +76,7 @@ conformance-%: clean all
 	@cd hack/$*-node && ./conformance-test.sh
 
 vendor:
-	@dep ensure
+	@dep ensure -v
 	@CGO_ENABLED=1 go build -o _output/bin/license-bill-of-materials ./vendor/github.com/coreos/license-bill-of-materials
 	@./_output/bin/license-bill-of-materials ./cmd/bootkube ./cmd/checkpoint > bill-of-materials.json
 

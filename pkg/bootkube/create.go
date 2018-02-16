@@ -16,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -223,6 +222,6 @@ func apiTest(c clientcmd.ClientConfig) error {
 	}
 
 	// System namespace has been created
-	_, err = client.Namespaces().Get(api.NamespaceSystem, metav1.GetOptions{})
+	_, err = client.Namespaces().Get("kube-system", metav1.GetOptions{})
 	return err
 }
