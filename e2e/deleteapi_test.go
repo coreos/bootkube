@@ -15,36 +15,28 @@ func TestDeleteAPI(t *testing.T) {
 	}
 
 	// delete any api-server pods
-	for i, pod := range apiPods.Items {
-		err := client.CoreV1().Pods("kube-system").Delete(pod.ObjectMeta.Name, &metav1.DeleteOptions{})
+	deletedPods := make(map[string]struct{})
+	for _, pod := range apiPods.Items {
+		if err := client.CoreV1().Pods("kube-system").Delete(pod.ObjectMeta.Name, &metav1.DeleteOptions{}); err != nil {
+			t.Fatalf("error deleting api-server pod: %v", err)
+		}
+		deletedPods[pod.ObjectMeta.Name] = struct{}{}
+	}
+
+	// wait for pods to be completely deleted.
+	if err := retry(100, 1*time.Second, func() error {
+		remainingPods, err := client.CoreV1().Pods("kube-system").List(metav1.ListOptions{LabelSelector: "k8s-app=kube-apiserver"})
 		if err != nil {
-			// TODO: if HA we should be able to successfully
-			// delete all. Until then just log if we can't delete
-			// something that isn't the first pod.
-			if i == 0 {
-				t.Fatalf("error deleting api-server pod: %v", err)
-			} else {
-				t.Logf("error deleting api-server pod: %v", err)
+			return fmt.Errorf("error checking for remaining apiserver pods: %v", err)
+		}
+		for _, pod := range remainingPods.Items {
+			if _, ok := deletedPods[pod.ObjectMeta.Name]; ok {
+				return fmt.Errorf("pod %s is still not deleted", pod.ObjectMeta.Name)
 			}
 		}
-	}
-
-	// wait for api-server to go down by waiting until listing pods returns
-	// errors. This is potentially error prone, but without waiting for the
-	// apiserver to go down the next step will return sucess before the
-	// apiserver is ever destroyed.
-	waitDestroy := func() error {
-		// only checking api being down , specific function not important
-		_, err := client.Discovery().ServerVersion()
-
-		if err == nil {
-			return fmt.Errorf("waiting for apiserver to go down: %v", err)
-		}
 		return nil
-	}
-
-	if err := retry(100, 500*time.Millisecond, waitDestroy); err != nil {
-		t.Fatal(err)
+	}); err != nil {
+		t.Fatalf("error waiting for apiserver pods to be deleted: %v", err)
 	}
 
 	// wait until api server is back up
