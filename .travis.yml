@@ -4,7 +4,8 @@ before_script:
   - unzip terraform_0.11.3_linux_amd64.zip
   - export PATH=$PWD:$PATH
 go:
-  - 1.8.x
-  - 1.9.x
+  - "1.8.x"
+  - "1.9.x"
+  - "1.10.x"
 script:
   - make clean release
