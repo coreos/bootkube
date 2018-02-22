@@ -54,6 +54,7 @@ Commenting on the PR:
 
 * `ok to test`: whitelists an external contributor's PR as safe to test.
 * `coreosbot run e2e`: re-runs the end-to-end test suite.
+* `coreosbot run e2e calico`: re-runs the Calico end-to-end test suite.
 * `coreosbot run e2e checkpointer`: can be used to specifically test new checkpointer code.
     * This will build a new checkpointer image from the PR, and includes that image as part of the checkpointer daemonset.
 * `coreosbot run conformance`: run upstream Kubernetes conformance tests
