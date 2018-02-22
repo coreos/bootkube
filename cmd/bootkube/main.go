@@ -36,7 +36,6 @@ func main() {
 
 	cmdRoot.AddCommand(cmdVersion)
 	if err := cmdRoot.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
