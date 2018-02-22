@@ -16,6 +16,7 @@ func TestDeleteAPI(t *testing.T) {
 
 	// delete any api-server pods
 	deletedPods := make(map[string]struct{})
+	t.Logf("apiPods.Items: %v", apiPods.Items)
 	for _, pod := range apiPods.Items {
 		if err := client.CoreV1().Pods("kube-system").Delete(pod.ObjectMeta.Name, &metav1.DeleteOptions{}); err != nil {
 			t.Fatalf("error deleting api-server pod: %v", err)
