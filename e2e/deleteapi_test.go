@@ -5,7 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 func TestDeleteAPI(t *testing.T) {
@@ -16,11 +18,27 @@ func TestDeleteAPI(t *testing.T) {
 
 	// delete any api-server pods
 	deletedPods := make(map[string]struct{})
-	for _, pod := range apiPods.Items {
-		if err := client.CoreV1().Pods("kube-system").Delete(pod.ObjectMeta.Name, &metav1.DeleteOptions{}); err != nil {
-			t.Fatalf("error deleting api-server pod: %v", err)
+	if err := wait.Poll(5*time.Second, 12*time.Minute, func() (bool, error) {
+		for _, pod := range apiPods.Items {
+			if _, isDeleted := deletedPods[pod.ObjectMeta.Name]; !isDeleted {
+				now := int64(2)
+				err := client.CoreV1().Pods("kube-system").Delete(pod.ObjectMeta.Name, &metav1.DeleteOptions{
+					GracePeriodSeconds: &now,
+				})
+				if err != nil {
+					if errors.IsNotFound(err) {
+						t.Logf("Object does not exist")
+						continue
+					}
+					t.Logf("Client error: %v", err)
+					return false, err
+				}
+				deletedPods[pod.ObjectMeta.Name] = struct{}{}
+			}
 		}
-		deletedPods[pod.ObjectMeta.Name] = struct{}{}
+		return len(deletedPods) == len(apiPods.Items), nil
+	}); err != nil {
+		t.Errorf("deletion of api-server pods failed: %v", err)
 	}
 
 	// wait for pods to be completely deleted.
