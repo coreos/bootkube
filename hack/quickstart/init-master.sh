@@ -109,11 +109,6 @@ function init_master_node() {
 
 [ "$#" == 1 ] || usage
 
-[ -d "${CLUSTER_DIR}" ] && {
-    echo "Error: CLUSTER_DIR=${CLUSTER_DIR} already exists"
-    exit 1
-}
-
 # This script can execute on a remote host by copying itself + bootkube binary + kubelet service unit to remote host.
 # After assets are available on the remote host, the script will execute itself in "local" mode.
 if [ "${REMOTE_HOST}" != "local" ]; then
@@ -143,7 +138,7 @@ if [ "${REMOTE_HOST}" != "local" ]; then
     ssh -i ${IDENT} -p ${REMOTE_PORT} ${SSH_OPTS} ${REMOTE_USER}@${REMOTE_HOST} "sudo REMOTE_USER=${REMOTE_USER} CLOUD_PROVIDER=${CLOUD_PROVIDER} NETWORK_PROVIDER=${NETWORK_PROVIDER} /home/${REMOTE_USER}/init-master.sh local"
 
     # Copy assets from remote host to a local directory. These can be used to launch additional nodes & contain TLS assets
-    mkdir ${CLUSTER_DIR}
+    mkdir -p ${CLUSTER_DIR}
     scp -q -i ${IDENT} -P ${REMOTE_PORT} ${SSH_OPTS} -r ${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/assets/* ${CLUSTER_DIR}
 
     # Cleanup

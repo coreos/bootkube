@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export BOOTSTRAP_IP=`terraform output bootstrap_node_ip`
-export WORKER_IPS=`terraform output -json worker_ips | jq -r '.value[]'`
-export MASTER_IPS=`terraform output -json master_ips | jq -r '.value[]'`
+export TERRAFORM_STATE_FILE="${TERRAFORM_STATE_FILE:-"terraform.tfstate"}"
+
+export BOOTSTRAP_IP=`terraform output -state "${TERRAFORM_STATE_FILE}" bootstrap_node_ip`
+export WORKER_IPS=`terraform output -state "${TERRAFORM_STATE_FILE}"  -json worker_ips | jq -r '.value[]'`
+export MASTER_IPS=`terraform output -state "${TERRAFORM_STATE_FILE}"  -json master_ips | jq -r '.value[]'`
 export SSH_OPTS=${SSH_OPTS:-}" -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 export CLOUD_PROVIDER=${CLOUD_PROVIDER:-aws}
-export NETWORK_PROVIDER=`terraform output network_provider`
+export NETWORK_PROVIDER=`terraform output -state "${TERRAFORM_STATE_FILE}"  network_provider`
 
 # Normally we want to default to aws here since that is all terraform
 # supports and it is required for the e2e tests. However because of an
