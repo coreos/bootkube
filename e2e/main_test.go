@@ -13,12 +13,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
+	rbacv1beta1 "k8s.io/client-go/pkg/apis/rbac/v1beta1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
 // global clients for use by all tests
+//
+// TODO(ericchiang): Refactor this out to avoid global variables. Variables should be
+// test specific or call helper methods.
 var (
 	client             kubernetes.Interface
+	restConfig         *rest.Config
 	sshClient          *SSHClient
 	expectedMasters    int // hint for tests to figure out how to fail or block on resources missing
 	namespace          string
@@ -30,6 +36,13 @@ func init() {
 	namespace = fmt.Sprintf("bootkube-e2e-%x", rand.Int31())
 }
 
+func newRestConfig(t *testing.T) *rest.Config {
+	// TODO(ericchiang) switch to rest.CopyConfig when we bump the kubernetes client-go version
+	cp := new(rest.Config)
+	*cp = *restConfig
+	return cp
+}
+
 // TestMain handles setup before all tests
 func TestMain(m *testing.M) {
 	var kubeconfig = flag.String("kubeconfig", "../hack/quickstart/cluster/auth/kubeconfig", "absolute path to the kubeconfig file")
@@ -38,13 +51,14 @@ func TestMain(m *testing.M) {
 
 	flag.Parse()
 
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	var err error
+	restConfig, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 	// create the clientset
-	client, err = kubernetes.NewForConfig(config)
+	client, err = kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -84,7 +98,40 @@ func createNamespace(c kubernetes.Interface, name string) (*v1.Namespace, error)
 	if errors.IsAlreadyExists(err) {
 		log.Println("ns already exists")
 	} else if err != nil {
-		return nil, fmt.Errorf("failed to create namespace with name %v %v", name, namespace)
+		return nil, fmt.Errorf("failed to create namespace with name %v %v: %v", name, namespace, err)
+	}
+
+	newSubject := func(serviceAccount string) rbacv1beta1.Subject {
+		return rbacv1beta1.Subject{
+			Kind: "ServiceAccount",
+			Name: serviceAccount,
+			// Controller manager service accounts are created in "kube-system"
+			Namespace: "kube-system",
+		}
+	}
+
+	_, err = c.RbacV1beta1().RoleBindings(name).Create(&rbacv1beta1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "psp-permissive",
+			Namespace: name,
+		},
+		Subjects: []rbacv1beta1.Subject{
+			newSubject("replicaset-controller"),
+			newSubject("replication-controller"),
+			newSubject("job-controller"),
+			newSubject("daemon-set-controller"),
+			newSubject("statefulset-controller"),
+		},
+		RoleRef: rbacv1beta1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     "psp-permissive",
+		},
+	})
+	if errors.IsAlreadyExists(err) {
+		log.Println("psp already exists")
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to create psp in namespace %s: %v", namespace, err)
 	}
 
 	return ns, nil
