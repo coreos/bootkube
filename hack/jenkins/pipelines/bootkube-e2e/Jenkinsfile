@@ -21,6 +21,8 @@ pipeline {
   }
   environment {
     CLUSTER_NAME="${JOB_NAME}-${BUILD_NUMBER}"
+    ARTIFACT_DIR="${WORKSPACE}/artifacts"
+    REGION = "us-west-2"
     GOPATH = "${WORKSPACE}"
     WORKDIR = "${WORKSPACE}/src/github.com/kubernetes-incubator/bootkube"
     KUBECONFIG = "${WORKSPACE}/src/github.com/kubernetes-incubator/bootkube/hack/quickstart/cluster/auth/kubeconfig"
@@ -35,6 +37,7 @@ pipeline {
       steps {
         // jnlp slave runs as "jenkins" user, use the escape hatch. (https://hub.docker.com/r/jenkins/slave/~/dockerfile/)
         sh "chmod -R go+rw /home/jenkins"
+        sh "mkdir -p \"${ARTIFACT_DIR}\""
         dir("${WORKDIR}") {
           checkout scm
         }
@@ -43,31 +46,49 @@ pipeline {
     stage('build') {
       steps {
         dir("${WORKDIR}") {
-          sh "make release"
+          sh "make release |& tee -a ${ARTIFACT_DIR}/build.log"
         }
       }
     }
     stage('deploy') {
       steps {
         dir("${WORKDIR}") {
-          sh "./hack/jenkins/scripts/tqs-up.sh"
+          sh "./hack/jenkins/scripts/tqs-up.sh |& tee -a ${ARTIFACT_DIR}/deploy.log"
         }
       }
     }
     stage('e2e') {
       steps {
         dir("${WORKDIR}") {
-          sh "./hack/jenkins/scripts/e2e.sh"
+          sh "./hack/jenkins/scripts/e2e.sh |& tee -a ${ARTIFACT_DIR}/e2e.log"
         }
       }
     }
   }
+  // Notes about the post/always stage(s):
+  // We are breaking the seal and using a script{} block for better management of "stages"
+  // and so that additional actions are available. There is "<cmd> || true" used below, so
+  // that a script failure doesn't prevent teardown/cleanup/log-upload/etc as much as possible.
   post {
     always {
-      script { // break the seal so that we can put cleanup in a stage
+      script {
+        stage('collect-logs') {
+          sh "${WORKDIR}/hack/jenkins/scripts/gather-logs.sh || true"
+          sh """bash -c "cp -r ${WORKDIR}/hack/quickstart/logs-** ${ARTIFACT_DIR}/";"""
+        }
         stage('cleanup') {
-          dir("${WORKDIR}") {
-            sh "./hack/jenkins/scripts/tqs-down.sh"
+          sh "(${WORKDIR}/hack/jenkins/scripts/tqs-down.sh || true) |& tee -a ${ARTIFACT_DIR}/cleanup.log"
+        }
+        stage('archive-logs') {
+          dir("${ARTIFACT_DIR}") {
+            archiveArtifacts '**/*'
+            withAWS(credentials: 'aws', region: "${REGION}") {
+              sh "tar -czf /tmp/artifacts.tar.gz ."
+              sh "mv /tmp/artifacts \"${ARTIFACTS_DIR}/artifacts-${JOB_NAME}-${BUILD_NUMBER}.tar.gz\""
+              // note: do not use includepathpattern! https://issues.jenkins-ci.org/browse/JENKINS-47046
+              s3Upload(acl: 'PublicRead', bucket: 'bootkube-pr-logs', path: "pr/${JOB_NAME}-${BUILD_NUMBER}/",
+                file: "${ARTIFACT_DIR}")
+            }
           }
         }
       }

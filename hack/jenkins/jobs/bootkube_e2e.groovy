@@ -30,6 +30,8 @@ network_providers.each { np ->
 
           extensions {
             commitStatus {
+              // TODO: this is dependent on this merging, or using my fork: https://github.com/awslabs/aws-js-s3-explorer/pull/16
+              statusUrl('https://bootkube-pr-logs.s3-us-west-2.amazonaws.com/index.html#pr/${JOB_NAME}-${BUILD_NUMBER}/')
               context(job_name)
               triggeredStatus('e2e triggered')
               startedStatus('e2e started')
