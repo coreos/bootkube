@@ -1,8 +1,10 @@
-#!/bin/bash -e
-
+#!/usr/bin/env bash
+#
 # Ensure that all vendored packages are pinned to a specific version. This means
 # we never pull HEAD of a dependency, but as a trade-off means we have to manually
 # specify the version of transitive dependencies.
+
+set -e
 
 TOML=$( grep -P '( |^)name = ".*"' Gopkg.toml | tr -d ' ' | sort )
 LOCK=$( grep -P '( |^)name = ".*"' Gopkg.lock | tr -d ' ' | sort )

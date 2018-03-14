@@ -265,7 +265,7 @@ func (s stateActive) String() string {
 // stateActiveGracePeriod is a checkpoint that is active but will be garbage collected after a grace
 // period.
 //
-// stateActiveGracePeriod can transition to stateActive or stateInactive.
+// stateActiveGracePeriod can transition to stateActive, stateInactive, or stateInactiveGracePeriod.
 type stateActiveGracePeriod struct {
 	// gracePeriodEnd is the time when the grace period for this checkpoint is over and it should be
 	// garbage collected.
@@ -295,8 +295,8 @@ func (s stateActiveGracePeriod) transition(now time.Time, apis apiCondition) che
 		return stateActive{}
 	}
 
-	// The apiserver pod is still deleted, remain in stateActiveGracePeriod.
-	return s.checkGracePeriod(now, apis)
+	// The parent pod is deleted and the apiserver is back. Move to inactive grace period.
+	return stateInactiveGracePeriod{gracePeriodEnd: now.Add(checkpointGracePeriod)}.checkGracePeriod(now, apis)
 }
 
 func (s stateActiveGracePeriod) checkGracePeriod(now time.Time, apis apiCondition) checkpointState {
