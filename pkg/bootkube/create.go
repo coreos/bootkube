@@ -145,6 +145,7 @@ func newCreater(c *rest.Config) (*creater, error) {
 }
 
 func (c *creater) createManifests(manifests []manifest) (ok bool) {
+	ok = true
 	// Bootkube used to create manifests in named order ("01-foo" before "02-foo").
 	// Maintain this behavior for everything except CRDs and NSs, which have strict ordering
 	// that we should always respect.
