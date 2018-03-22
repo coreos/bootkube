@@ -167,7 +167,7 @@ func (c *creater) createManifests(manifests []manifest) (ok bool) {
 	create := func(m manifest) {
 		if err := c.create(m); err != nil {
 			ok = false
-			UserOutput("Failed creating %s: %v", m, err)
+			UserOutput("Failed creating %s: %v\n", m, err)
 		} else {
 			UserOutput("Created %s\n", m)
 		}
@@ -188,7 +188,7 @@ func (c *creater) createManifests(manifests []manifest) (ok bool) {
 	for _, crd := range crds {
 		if err := c.waitForCRD(crd); err != nil {
 			ok = false
-			UserOutput("Failed waiting for %s: %v", crd, err)
+			UserOutput("Failed waiting for %s: %v\n", crd, err)
 		}
 	}
 
