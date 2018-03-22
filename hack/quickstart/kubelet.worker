@@ -1,6 +1,6 @@
 [Service]
 Environment=KUBELET_IMAGE_URL=docker://gcr.io/google_containers/hyperkube
-Environment=KUBELET_IMAGE_TAG=v1.9.3
+Environment=KUBELET_IMAGE_TAG=v1.9.6
 Environment=KUBELET_MINIMUM_CONTAINER_TTL_DURATION=3m0s
 Environment=KUBELET_MAXIMUM_DEAD_CONTAINERS=-1
 Environment=KUBELET_MAXIMUM_DEAD_CONTAINERS_PER_CONTAINER=1
