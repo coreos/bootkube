@@ -24,12 +24,6 @@ networking interfaces to be able to dynamically configure them.
 kube-proxy is a network proxy found on every Kubernetes node. Kube-proxy often
 needs to open and manage privileged ports (< 1024) in addition to managing iptables.
 
-### API Server
-
-Currently runs as root, but is in the process of being
-[migrated](https://github.com/kubernetes-incubator/bootkube/pull/789) to use
-non-root ports.
-
 ### DNS
 
 DNS needs to bind to privileged port 53 for UDP and TCP.
