@@ -3,15 +3,14 @@
 ## Requirements
 
 * Go 1.10+
-* Configured [GOPATH](http://golang.org/doc/code.html#GOPATH)
 
 ## Building
 
-First, clone the repo into the proper location in your $GOPATH:
+First, clone the repo into the proper location in your [`GOPATH`][GOPATH]:
 
 ```
 go get -u github.com/kubernetes-incubator/bootkube
-cd $GOPATH/src/github.com/kubernetes-incubator/bootkube
+cd $(go env GOPATH | cut -d: -f1)/src/github.com/kubernetes-incubator/bootkube
 ```
 
 Then build:
@@ -71,3 +70,5 @@ Commenting on the PR:
 * `coreosbot run e2e checkpointer`: can be used to specifically test new checkpointer code.
     * This will build a new checkpointer image from the PR, and includes that image as part of the checkpointer daemonset.
 * `coreosbot run conformance`: run upstream Kubernetes conformance tests
+
+[GOPATH]: https://golang.org/cmd/go/#hdr-GOPATH_environment_variable
