@@ -5,9 +5,6 @@ export PATH:=$(PATH):$(PWD)
 SHELL:=$(shell which bash)
 LOCAL_OS:=$(shell uname | tr A-Z a-z)
 GOFILES:=$(shell find . -name '*.go' | grep -v -E '(./vendor)')
-GOPATH ?= $(shell go env GOPATH)
-PRIMARY_GOPATH ?= $(shell echo ${GOPATH} | cut -d : -f 1)
-GOBIN ?= $(PRIMARY_GOPATH)/bin
 LDFLAGS=-X github.com/kubernetes-incubator/bootkube/pkg/version.Version=$(shell $(CURDIR)/build/git-version.sh)
 TERRAFORM:=$(shell command -v terraform 2> /dev/null)
 
@@ -42,8 +39,8 @@ endif
 	@./scripts/verify-gopkg.sh
 	@go test -v $(shell go list ./... | grep -v '/vendor/\|/e2e')
 
-install: _output/bin/$(LOCAL_OS)/bootkube
-	cp $< $(GOBIN)
+install:
+	go install -ldflags "$(LDFLAGS)" ./cmd/bootkube
 
 _output/bin/%: GOOS=$(word 1, $(subst /, ,$*))
 _output/bin/%: GOARCH=$(word 2, $(subst /, ,$*))
