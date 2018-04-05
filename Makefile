@@ -2,13 +2,13 @@ export CGO_ENABLED:=0
 export GOARCH:=amd64
 export PATH:=$(PATH):$(PWD)
 
-LOCAL_OS:=$(shell uname | tr A-Z a-z)
+GOOS ?= $(shell go env GOOS)
 GOFILES:=$(shell find . -name '*.go' ! -path './vendor/*')
 LDFLAGS=-X github.com/kubernetes-incubator/bootkube/pkg/version.Version=$(shell $(CURDIR)/build/git-version.sh)
 TERRAFORM:=$(shell command -v terraform 2> /dev/null)
 
 all: \
-	_output/bin/$(LOCAL_OS)/bootkube \
+	_output/bin/$(GOOS)/bootkube \
 	_output/bin/linux/bootkube \
 	_output/bin/linux/checkpoint
 
@@ -56,7 +56,8 @@ _output/release/bootkube.tar.gz: _output/bin/linux/bootkube _output/bin/darwin/b
 	tar czf $@ -C _output bin/linux/bootkube bin/darwin/bootkube bin/linux/checkpoint
 
 run-%: GOFLAGS = -i
-run-%: clean-vm-% _output/bin/linux/bootkube _output/bin/$(LOCAL_OS)/bootkube
+run-%: clean-vm-% _output/bin/linux/bootkube _output/bin/$(GOOS)/bootkube
+	test $(GOOS) = $$(uname | tr A-Z a-z)
 	@cd hack/$*-node && ./bootkube-up
 	@echo "Bootkube ready"
 
