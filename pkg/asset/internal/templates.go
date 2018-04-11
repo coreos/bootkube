@@ -147,7 +147,7 @@ spec:
         command:
         - /hyperkube
         - apiserver
-        - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ValidatingAdmissionWebhook,ResourceQuota,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook
+        - --enable-admission-plugins=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultTolerationSeconds,DefaultStorageClass,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,NodeRestriction
         - --advertise-address=$(POD_IP)
         - --allow-privileged=true
         - --anonymous-auth=false
