@@ -8,8 +8,8 @@ var DefaultImages = ImageVersions{
 	Calico:          "quay.io/calico/node:v3.0.3",
 	CalicoCNI:       "quay.io/calico/cni:v2.0.0",
 	Hyperkube:       "k8s.gcr.io/hyperkube:v1.10.1",
-	KubeDNS:         "k8s.gcr.io/k8s-dns-kube-dns-amd64:1.14.8",
-	KubeDNSMasq:     "k8s.gcr.io/k8s-dns-dnsmasq-nanny-amd64:1.14.8",
-	KubeDNSSidecar:  "k8s.gcr.io/k8s-dns-sidecar-amd64:1.14.8",
+	KubeDNS:         "k8s.gcr.io/k8s-dns-kube-dns-amd64:1.14.9",
+	KubeDNSMasq:     "k8s.gcr.io/k8s-dns-dnsmasq-nanny-amd64:1.14.9",
+	KubeDNSSidecar:  "k8s.gcr.io/k8s-dns-sidecar-amd64:1.14.9",
 	PodCheckpointer: "quay.io/coreos/pod-checkpointer:9dc83e1ab3bc36ca25c9f7c18ddef1b91d4a0558",
 }
