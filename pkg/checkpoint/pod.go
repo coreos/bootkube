@@ -72,6 +72,15 @@ func sanitizeCheckpointPod(cp *v1.Pod) *v1.Pod {
 		} else if v.ConfigMap != nil {
 			v.HostPath = &v1.HostPathVolumeSource{Path: configMapPath(cp.Namespace, cp.Name, v.ConfigMap.Name)}
 			v.ConfigMap = nil
+		} else if v.Projected != nil {
+			// can only currently support projected volumes with all secrets or all configmaps
+			if volumeHasSecretProjection(v) {
+				v.HostPath = &v1.HostPathVolumeSource{Path: secretPath(cp.Namespace, cp.Name, v.Name)}
+				v.Projected = nil
+			} else if volumeHasConfigMapProjection(v) {
+				v.HostPath = &v1.HostPathVolumeSource{Path: configMapPath(cp.Namespace, cp.Name, v.Name)}
+				v.Projected = nil
+			}
 		}
 	}
 

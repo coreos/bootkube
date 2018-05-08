@@ -170,6 +170,114 @@ func TestSanitizeCheckpointPod(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc: "Pod secret volumes sanitized",
+			pod: &v1.Pod{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Pod",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "podname",
+					Namespace: "podnamespace",
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{{
+						Name: "static-api-tokens",
+						VolumeSource: v1.VolumeSource{
+							Secret: &v1.SecretVolumeSource{
+								SecretName: "static-api-tokens",
+							},
+						},
+					}},
+				},
+			},
+			expected: &v1.Pod{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Pod",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "podname",
+					Namespace:       "podnamespace",
+					Annotations:     map[string]string{checkpointParentAnnotation: "podname"},
+					OwnerReferences: []metav1.OwnerReference{{APIVersion: "v1", Kind: "Pod", Name: "podname", Controller: &trueVar}},
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{{
+						Name: "static-api-tokens",
+						VolumeSource: v1.VolumeSource{
+							HostPath: &v1.HostPathVolumeSource{
+								Path: secretPath("podnamespace", "podname", "static-api-tokens"),
+							},
+						},
+					}},
+				},
+			},
+		},
+		{
+			desc: "Pod projected secret volumes sanitized",
+			pod: &v1.Pod{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Pod",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "podname",
+					Namespace: "podnamespace",
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{{
+						Name: "k8s-certs",
+						VolumeSource: v1.VolumeSource{
+							Projected: &v1.ProjectedVolumeSource{
+								Sources: []v1.VolumeProjection{
+									{
+										Secret: &v1.SecretProjection{
+											LocalObjectReference: v1.LocalObjectReference{
+												Name: "apiserver",
+											},
+											Items: []v1.KeyToPath{
+												{
+													Key:  "tls.crt",
+													Path: "apiserver.crt",
+												},
+												{
+													Key:  "tls.key",
+													Path: "apiserver.key",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					}},
+				},
+			},
+			expected: &v1.Pod{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Pod",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "podname",
+					Namespace:       "podnamespace",
+					Annotations:     map[string]string{checkpointParentAnnotation: "podname"},
+					OwnerReferences: []metav1.OwnerReference{{APIVersion: "v1", Kind: "Pod", Name: "podname", Controller: &trueVar}},
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{{
+						Name: "k8s-certs",
+						VolumeSource: v1.VolumeSource{
+							HostPath: &v1.HostPathVolumeSource{
+								Path: secretPath("podnamespace", "podname", "k8s-certs"),
+							},
+						},
+					}},
+				},
+			},
+		},
 	}
 
 	for _, tc := range cases {

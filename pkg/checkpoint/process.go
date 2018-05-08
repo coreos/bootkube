@@ -250,6 +250,14 @@ func (c *checkpointer) createCheckpointsForValidParents() {
 				glog.Errorf("Failed to checkpoint configMaps for pod %s: %v", id, err)
 				continue
 			}
+
+			_, err = c.checkpointProjectedVolumes(pod)
+			if err != nil {
+				//TODO(aaron): This can end up spamming logs at times when api-server is unavailable. To reduce spam
+				//             we could only log error if api-server can't be contacted and existing configmap doesn't exist.
+				glog.Errorf("Failed to checkpoint projected volume for pod %s: %v", id, err)
+				continue
+			}
 		}
 	}
 
