@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"math"
+	"math/big"
 	"path/filepath"
 	"text/template"
 
@@ -117,15 +119,35 @@ const validBootstrapTokenChars = "0123456789abcdefghijklmnopqrstuvwxyz"
 // https://kubernetes.io/docs/admin/bootstrap-tokens/#token-format
 func newBootstrapToken() (id string, secret string, err error) {
 	// Read 6 random bytes for the id and 16 random bytes for the token (see spec for details).
-	token := make([]byte, 6+16)
-	if _, err := rand.Read(token); err != nil {
+	tokenLength := 6 + 16
+	charsetLength := len(validBootstrapTokenChars)
+	size := int(math.Ceil(float64(tokenLength) * math.Log2(float64(charsetLength)) / math.Log2(256)))
+
+	random := make([]byte, size)
+	if _, err := rand.Read(random); err != nil {
 		return "", "", err
 	}
 
-	for i, b := range token {
-		token[i] = validBootstrapTokenChars[int(b)%len(validBootstrapTokenChars)]
-	}
+	token := make([]byte, tokenLength)
+	encodeBytes(validBootstrapTokenChars, random, token)
 	return string(token[:6]), string(token[6:]), nil
+}
+
+// encodeBytes encodes the input byte slice into encoded byte slices.
+// The input is treated as a big-endian unsigned integer, and the
+// encoded slice represents the input value in little-endian unsigned
+// base len(charset).  The size of the encoded slice should be set
+// before calling this function; after consuming input, any "extra"
+// encoded slice length will be filled with charset[0].
+func encodeBytes(charset string, input []byte, encoded []byte) {
+	charsetLength := len(charset)
+	inputInt := big.NewInt(0).SetBytes(input)
+	base := big.NewInt(int64(charsetLength))
+	remainder := big.NewInt(0)
+	for i := range encoded {
+		inputInt.QuoRem(inputInt, base, remainder)
+		encoded[i] = charset[int(remainder.Int64())%charsetLength]
+	}
 }
 
 func newKubeConfigAssets(assets Assets, conf Config) ([]Asset, error) {
