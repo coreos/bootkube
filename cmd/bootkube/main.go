@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -31,13 +32,18 @@ var (
 )
 
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	flag.Parse()
-	util.InitLogs()
-	defer util.FlushLogs()
+
+	logsExit := make(chan error, 1)
+	util.InitLogs(ctx, logsExit)
 
 	cmdRoot.AddCommand(cmdVersion)
 	if err := cmdRoot.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		cancel()
+		<-logsExit
 		os.Exit(1)
 	}
 }
