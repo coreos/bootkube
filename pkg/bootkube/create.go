@@ -3,6 +3,7 @@ package bootkube
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,11 +16,11 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/bootkube/pkg/poll"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
@@ -33,7 +34,7 @@ const (
 	crdRolloutTimeout  = 2 * time.Minute
 )
 
-func CreateAssets(config clientcmd.ClientConfig, manifestDir string, timeout time.Duration, strict bool) error {
+func CreateAssets(ctx context.Context, config clientcmd.ClientConfig, manifestDir string, strict bool) error {
 	if _, err := os.Stat(manifestDir); os.IsNotExist(err) {
 		UserOutput(fmt.Sprintf("WARNING: %v does not exist, not creating any self-hosted assets.\n", manifestDir))
 		return nil
@@ -52,7 +53,7 @@ func CreateAssets(config clientcmd.ClientConfig, manifestDir string, timeout tim
 		return fmt.Errorf("loading manifests: %v", err)
 	}
 
-	upFn := func() (bool, error) {
+	upFn := func(ctx context.Context) (bool, error) {
 		if err := apiTest(config); err != nil {
 			glog.Warningf("Unable to determine api-server readiness: %v", err)
 			return false, nil
@@ -61,14 +62,13 @@ func CreateAssets(config clientcmd.ClientConfig, manifestDir string, timeout tim
 	}
 
 	UserOutput("Waiting for api-server...\n")
-	if err := wait.Poll(5*time.Second, timeout, upFn); err != nil {
+	err = poll.Poll(ctx, 5*time.Second, upFn)
+	if err != nil {
 		err = fmt.Errorf("API Server is not ready: %v", err)
-		glog.Error(err)
-		return err
 	}
 
 	UserOutput("Creating self-hosted assets...\n")
-	if ok := creater.createManifests(m); !ok {
+	if ok := creater.createManifests(ctx, m); !ok {
 		UserOutput("\nNOTE: Bootkube failed to create some cluster assets. It is important that manifest errors are resolved and resubmitted to the apiserver.\n")
 		UserOutput("For example, after resolving issues: kubectl create -f <failed-manifest>\n\n")
 
@@ -150,7 +150,7 @@ func newCreater(c *rest.Config, strict bool) (*creater, error) {
 	}, nil
 }
 
-func (c *creater) createManifests(manifests []manifest) (ok bool) {
+func (c *creater) createManifests(ctx context.Context, manifests []manifest) (ok bool) {
 	ok = true
 	// Bootkube used to create manifests in named order ("01-foo" before "02-foo").
 	// Maintain this behavior for everything except CRDs and NSs, which have strict ordering
@@ -197,7 +197,9 @@ func (c *creater) createManifests(manifests []manifest) (ok bool) {
 	// Wait until the API server registers the CRDs. Until then it's not safe to create the
 	// manifests for those custom resources.
 	for _, crd := range crds {
-		if err := c.waitForCRD(crd); err != nil {
+		timeoutCtx, cancel := context.WithTimeout(ctx, crdRolloutTimeout)
+		defer cancel()
+		if err := c.waitForCRD(timeoutCtx, crd); err != nil {
 			ok = false
 			UserOutput("Failed waiting for %s: %v", crd, err)
 			if c.strict {
@@ -216,13 +218,13 @@ func (c *creater) createManifests(manifests []manifest) (ok bool) {
 
 // waitForCRD blocks until the API server begins serving the custom resource this
 // manifest defines. This is determined by listing the custom resource in a loop.
-func (c *creater) waitForCRD(m manifest) error {
+func (c *creater) waitForCRD(ctx context.Context, m manifest) error {
 	var crd apiextensionsv1beta1.CustomResourceDefinition
 	if err := json.Unmarshal(m.raw, &crd); err != nil {
 		return fmt.Errorf("failed to unmarshal manifest: %v", err)
 	}
 
-	return wait.PollImmediate(crdRolloutDuration, crdRolloutTimeout, func() (bool, error) {
+	condition := func(ctx context.Context) (ok bool, err error) {
 		uri := customResourceDefinitionKindURI(crd.Spec.Group, crd.Spec.Version, crd.GetNamespace(), crd.Spec.Names.Plural)
 		res := c.client.Get().RequestURI(uri).Do()
 		if res.Error() != nil {
@@ -232,7 +234,8 @@ func (c *creater) waitForCRD(m manifest) error {
 			return false, res.Error()
 		}
 		return true, nil
-	})
+	}
+	return poll.PollImmediate(ctx, crdRolloutDuration, condition)
 }
 
 // customResourceDefinitionKindURI returns the URI for the CRD kind.

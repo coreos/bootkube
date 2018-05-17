@@ -1,6 +1,7 @@
 package bootkube
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -39,7 +40,7 @@ func NewBootkube(config Config) (*bootkube, error) {
 	}, nil
 }
 
-func (b *bootkube) Run() error {
+func (b *bootkube) Run(ctx context.Context) error {
 	// TODO(diegs): create and share a single client rather than the kubeconfig once all uses of it
 	// are migrated to client-go.
 	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
@@ -67,11 +68,15 @@ func (b *bootkube) Run() error {
 		return err
 	}
 
-	if err = CreateAssets(kubeConfig, filepath.Join(b.assetDir, asset.AssetPathManifests), assetTimeout, b.strict); err != nil {
+	timeoutCtx, cancel := context.WithTimeout(ctx, assetTimeout)
+	defer cancel()
+	if err = CreateAssets(timeoutCtx, kubeConfig, filepath.Join(b.assetDir, asset.AssetPathManifests), b.strict); err != nil {
 		return err
 	}
 
-	if err = WaitUntilPodsRunning(kubeConfig, requiredPods, assetTimeout); err != nil {
+	timeoutCtx, cancel = context.WithTimeout(ctx, assetTimeout)
+	defer cancel()
+	if err = WaitUntilPodsRunning(timeoutCtx, kubeConfig, requiredPods); err != nil {
 		return err
 	}
 

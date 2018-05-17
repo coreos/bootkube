@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 
 	"github.com/spf13/cobra"
@@ -33,6 +34,8 @@ func init() {
 }
 
 func runCmdStart(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+
 	bk, err := bootkube.NewBootkube(bootkube.Config{
 		AssetDir:        startOpts.assetDir,
 		PodManifestPath: startOpts.podManifestPath,
@@ -42,7 +45,7 @@ func runCmdStart(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	err = bk.Run()
+	err = bk.Run(ctx)
 	if err != nil {
 		// Always report errors.
 		bootkube.UserOutput("Error: %v\n", err)
