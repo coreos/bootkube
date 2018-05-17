@@ -1,10 +1,12 @@
 package testworkload
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/bootkube/pkg/poll"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -12,14 +14,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 )
 
 var (
-	// PollTimeoutForNginx is the max duration for polling when using Nginx testworkload.
-	PollTimeoutForNginx = 10 * time.Minute
-	// PollIntervalForNginx is the interval between each condition check of poolling when using Nginx testworkload.
+	// PollIntervalForNginx is the interval between each condition check of polling when using Nginx testworkload.
 	PollIntervalForNginx = 10 * time.Second
 )
 
@@ -42,7 +41,7 @@ type NginxOpts func(*Nginx) error
 
 // NewNginx create this nginx deployment/service pair.
 // It waits until all the pods in the deployment are running.
-func NewNginx(kc kubernetes.Interface, namespace string, options ...NginxOpts) (*Nginx, error) {
+func NewNginx(ctx context.Context, kc kubernetes.Interface, namespace string, options ...NginxOpts) (*Nginx, error) {
 	//create random suffix
 	name := fmt.Sprintf("nginx-%s", utilrand.String(5))
 	n := &Nginx{
@@ -68,7 +67,7 @@ func NewNginx(kc kubernetes.Interface, namespace string, options ...NginxOpts) (
 	var err error
 	defer func() {
 		if err != nil {
-			n.Delete()
+			n.Delete(ctx)
 		}
 	}()
 
@@ -78,7 +77,7 @@ func NewNginx(kc kubernetes.Interface, namespace string, options ...NginxOpts) (
 	if err = n.newNginxService(); err != nil {
 		return nil, fmt.Errorf("error creating service %s: %v", n.Name, err)
 	}
-	if err = wait.PollImmediate(PollIntervalForNginx, PollTimeoutForNginx, func() (bool, error) {
+	if err = poll.PollImmediate(ctx, PollIntervalForNginx, func(ctx context.Context) (bool, error) {
 		d, err := kc.ExtensionsV1beta1().Deployments(n.Namespace).Get(n.Name, metav1.GetOptions{})
 		if err != nil {
 			glog.Errorf("Error getting deployment %s: %v", n.Name, err)
@@ -131,8 +130,8 @@ func WithNginxPingJobLabels(labels map[string]string) NginxOpts {
 
 // IsReachable pings the nginx service.
 // Expects the nginx service to be reachable.
-func (n *Nginx) IsReachable() error {
-	if err := n.newPingPod(true); err != nil {
+func (n *Nginx) IsReachable(ctx context.Context) error {
+	if err := n.newPingPod(ctx, true); err != nil {
 		return fmt.Errorf("error svc wasn't reachable: %v", err)
 	}
 
@@ -141,8 +140,8 @@ func (n *Nginx) IsReachable() error {
 
 // IsUnReachable pings the nginx service.
 // Expects the nginx service to be unreachable.
-func (n *Nginx) IsUnReachable() error {
-	if err := n.newPingPod(false); err != nil {
+func (n *Nginx) IsUnReachable(ctx context.Context) error {
+	if err := n.newPingPod(ctx, false); err != nil {
 		return fmt.Errorf("error svc was reachable: %v", err)
 	}
 
@@ -150,9 +149,9 @@ func (n *Nginx) IsUnReachable() error {
 }
 
 // Delete deletes the deployment and service
-func (n *Nginx) Delete() error {
+func (n *Nginx) Delete(ctx context.Context) error {
 	delPropPolicy := metav1.DeletePropagationForeground
-	if err := wait.PollImmediate(PollIntervalForNginx, PollTimeoutForNginx, func() (bool, error) {
+	if err := poll.PollImmediate(ctx, PollIntervalForNginx, func(ctx context.Context) (bool, error) {
 		if err := n.client.ExtensionsV1beta1().Deployments(n.Namespace).Delete(n.Name, &metav1.DeleteOptions{
 			PropagationPolicy: &delPropPolicy,
 		}); err != nil && !apierrors.IsNotFound(err) {
@@ -241,11 +240,11 @@ func (n *Nginx) newNginxService() error {
 	return nil
 }
 
-func (n *Nginx) newPingPod(reachable bool) error {
+func (n *Nginx) newPingPod(ctx context.Context, reachable bool) error {
 	name := fmt.Sprintf("%s-ping-job-%s", n.Name, utilrand.String(5))
-	deadline := int64(PollTimeoutForNginx.Seconds())
 
-	cmd := fmt.Sprintf("wget --timeout 5 %s", n.Name)
+	var deadline int64 = 6
+	cmd := fmt.Sprintf("wget --timeout %d %s", deadline-1, n.Name)
 	if !reachable {
 		cmd = fmt.Sprintf("! %s", cmd)
 	}
@@ -281,7 +280,7 @@ func (n *Nginx) newPingPod(reachable bool) error {
 	}
 
 	// wait for pod state
-	if err := wait.PollImmediate(PollIntervalForNginx, PollTimeoutForNginx, func() (bool, error) {
+	if err := poll.PollImmediate(ctx, PollIntervalForNginx, func(ctx context.Context) (bool, error) {
 		j, err := n.client.BatchV1().Jobs(n.Namespace).Get(job.GetName(), metav1.GetOptions{})
 		if err != nil {
 			glog.Errorf("Error getting job %s: %v", job.GetName(), err)
