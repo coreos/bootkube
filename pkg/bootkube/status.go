@@ -1,6 +1,7 @@
 package bootkube
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"reflect"
@@ -8,10 +9,10 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/bootkube/pkg/poll"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -22,14 +23,17 @@ const (
 	doesNotExist = "DoesNotExist"
 )
 
-func WaitUntilPodsRunning(c clientcmd.ClientConfig, pods []string, timeout time.Duration) error {
+func WaitUntilPodsRunning(ctx context.Context, c clientcmd.ClientConfig, pods []string) error {
 	sc, err := NewStatusController(c, pods)
 	if err != nil {
 		return err
 	}
 	sc.Run()
 
-	if err := wait.Poll(5*time.Second, timeout, sc.AllRunning); err != nil {
+	condition := func(ctx context.Context) (ok bool, err error) {
+		return sc.AllRunning()
+	}
+	if err := poll.Poll(ctx, 5*time.Second, condition); err != nil {
 		return fmt.Errorf("error while checking pod status: %v", err)
 	}
 
@@ -76,7 +80,7 @@ func (s *statusController) Run() {
 		cache.ResourceEventHandlerFuncs{},
 	)
 	s.podStore = podStore
-	go podController.Run(wait.NeverStop)
+	go podController.Run(make(chan struct{}))
 }
 
 func (s *statusController) AllRunning() (bool, error) {

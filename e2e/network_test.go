@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -8,10 +9,10 @@ import (
 
 	"github.com/kubernetes-incubator/bootkube/e2e/internal/e2eutil/testworkload"
 
+	"github.com/kubernetes-incubator/bootkube/pkg/poll"
 	"k8s.io/api/extensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -27,6 +28,8 @@ const (
 // 5. create NetworkPolicy that allows `allow=access`
 // 6. create a wget job with label `allow=access` that hits the nginx service
 func TestNetwork(t *testing.T) {
+	ctx := context.Background()
+
 	// check if calico-node daemonset exists
 	// if absent skip this test
 	if _, err := client.ExtensionsV1beta1().DaemonSets("kube-system").Get("calico-node", metav1.GetOptions{}); err != nil {
@@ -37,9 +40,11 @@ func TestNetwork(t *testing.T) {
 	}
 
 	var nginx *testworkload.Nginx
-	if err := wait.Poll(networkPingPollInterval, networkPingPollTimeout, func() (bool, error) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, networkPingPollTimeout)
+	defer cancel()
+	if err := poll.Poll(timeoutCtx, networkPingPollInterval, func(ctx context.Context) (bool, error) {
 		var err error
-		if nginx, err = testworkload.NewNginx(client, namespace, testworkload.WithNginxPingJobLabels(map[string]string{"allow": "access"})); err != nil {
+		if nginx, err = testworkload.NewNginx(ctx, client, namespace, testworkload.WithNginxPingJobLabels(map[string]string{"allow": "access"})); err != nil {
 			t.Logf("failed to create test nginx: %v", err)
 			return false, nil
 		}
@@ -47,10 +52,18 @@ func TestNetwork(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("failed to create an testworkload: %v", err)
 	}
-	defer nginx.Delete()
+	defer func() {
+		timeoutCtx, cancel = context.WithTimeout(ctx, networkPingPollTimeout)
+		defer cancel()
+		nginx.Delete(timeoutCtx)
+	}()
 
-	if err := wait.Poll(networkPingPollInterval, networkPingPollTimeout, func() (bool, error) {
-		if err := nginx.IsReachable(); err != nil {
+	timeoutCtx, cancel = context.WithTimeout(ctx, networkPingPollTimeout)
+	defer cancel()
+	if err := poll.Poll(timeoutCtx, networkPingPollInterval, func(ctx context.Context) (bool, error) {
+		timeoutCtx, cancel = context.WithTimeout(ctx, networkPingPollInterval-200*time.Millisecond)
+		defer cancel()
+		if err := nginx.IsReachable(timeoutCtx); err != nil {
 			t.Logf("error not reachable %s: %v", nginx.Name, err)
 			return false, nil
 		}
@@ -59,11 +72,11 @@ func TestNetwork(t *testing.T) {
 		t.Fatalf("network not set up correctly: %v", err)
 	}
 
-	t.Run("DefaultDeny", func(t *testing.T) { HelperDefaultDeny(t, nginx) })
-	t.Run("NetworkPolicy", func(t *testing.T) { HelperPolicy(t, nginx) })
+	t.Run("DefaultDeny", func(t *testing.T) { helperDefaultDeny(ctx, t, nginx) })
+	t.Run("NetworkPolicy", func(t *testing.T) { helperPolicy(ctx, t, nginx) })
 }
 
-func HelperDefaultDeny(t *testing.T, nginx *testworkload.Nginx) {
+func helperDefaultDeny(ctx context.Context, t *testing.T, nginx *testworkload.Nginx) {
 	npi, _, err := scheme.Codecs.UniversalDecoder().Decode(defaultDenyNetworkPolicy, nil, &v1beta1.NetworkPolicy{})
 	if err != nil {
 		t.Fatalf("unable to decode network policy manifest: %v", err)
@@ -99,8 +112,12 @@ func HelperDefaultDeny(t *testing.T, nginx *testworkload.Nginx) {
 
 	}()
 
-	if err := wait.Poll(networkPingPollInterval, networkPingPollTimeout, func() (bool, error) {
-		if err := nginx.IsUnReachable(); err != nil {
+	timeoutCtx, cancel := context.WithTimeout(ctx, networkPingPollTimeout)
+	defer cancel()
+	if err := poll.Poll(timeoutCtx, networkPingPollInterval, func(ctx context.Context) (bool, error) {
+		timeoutCtx, cancel = context.WithTimeout(ctx, networkPingPollInterval-200*time.Millisecond)
+		defer cancel()
+		if err := nginx.IsUnReachable(timeoutCtx); err != nil {
 			t.Logf("error still reachable %s: %v", nginx.Name, err)
 			return false, nil
 		}
@@ -110,7 +127,7 @@ func HelperDefaultDeny(t *testing.T, nginx *testworkload.Nginx) {
 	}
 }
 
-func HelperPolicy(t *testing.T, nginx *testworkload.Nginx) {
+func helperPolicy(ctx context.Context, t *testing.T, nginx *testworkload.Nginx) {
 	netPolicy := fmt.Sprintf(string(netPolicyTpl), nginx.Name)
 	npi, _, err := scheme.Codecs.UniversalDecoder().Decode([]byte(netPolicy), nil, &v1beta1.NetworkPolicy{})
 	if err != nil {
@@ -147,8 +164,12 @@ func HelperPolicy(t *testing.T, nginx *testworkload.Nginx) {
 
 	}()
 
-	if err := wait.Poll(networkPingPollInterval, networkPingPollTimeout, func() (bool, error) {
-		if err := nginx.IsReachable(); err != nil {
+	timeoutCtx, cancel := context.WithTimeout(ctx, networkPingPollTimeout)
+	defer cancel()
+	if err := poll.Poll(timeoutCtx, networkPingPollInterval, func(ctx context.Context) (bool, error) {
+		timeoutCtx, cancel = context.WithTimeout(ctx, networkPingPollInterval-200*time.Millisecond)
+		defer cancel()
+		if err := nginx.IsReachable(timeoutCtx); err != nil {
 			t.Logf("error not reachable %s: %v", nginx.Name, err)
 			return false, nil
 		}
