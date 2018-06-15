@@ -416,6 +416,7 @@ spec:
         command:
         - ./hyperkube
         - controller-manager
+        - --address=127.0.0.1
         - --use-service-account-credentials
         - --allocate-node-cidrs=true
         - --cloud-provider={{ .CloudProvider }}
@@ -427,8 +428,12 @@ spec:
         - --leader-elect=true
         - --root-ca-file=/etc/kubernetes/secrets/ca.crt
         - --service-account-private-key-file=/etc/kubernetes/secrets/service-account.key
+        ports:
+        - name: healthz
+          containerPort: 10252
         livenessProbe:
           httpGet:
+            host: 127.0.0.1
             path: /healthz
             port: 10252  # Note: Using default port. Update if --port option is set differently.
           initialDelaySeconds: 15
@@ -442,6 +447,7 @@ spec:
           readOnly: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
+      hostNetwork: true
       securityContext:
         runAsNonRoot: true
         runAsUser: 65534
@@ -576,15 +582,21 @@ spec:
         command:
         - ./hyperkube
         - scheduler
+        - --address=127.0.0.1
         - --leader-elect=true
+        ports:
+        - name: healthz
+          containerPort: 10251
         livenessProbe:
           httpGet:
+            host: 127.0.0.1
             path: /healthz
             port: 10251  # Note: Using default port. Update if --port option is set differently.
           initialDelaySeconds: 15
           timeoutSeconds: 15
       nodeSelector:
         node-role.kubernetes.io/master: ""
+      hostNetwork: true
       securityContext:
         runAsNonRoot: true
         runAsUser: 65534
