@@ -753,181 +753,181 @@ data:
         user: service-account
 `)
 
-var DNSDeploymentTemplate = []byte(`apiVersion: apps/v1
+var CoreDNSClusterRoleBindingTemplate = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:coredns
+  labels:
+    kubernetes.io/bootstrapping: rbac-defaults
+  annotations:
+    rbac.authorization.kubernetes.io/autoupdate: "true"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:coredns
+subjects:
+  - kind: ServiceAccount
+    name: coredns
+    namespace: kube-system
+`)
+
+var CoreDNSClusterRoleTemplate = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:coredns
+  labels:
+    kubernetes.io/bootstrapping: rbac-defaults
+rules:
+  - apiGroups: [""]
+    resources:
+      - endpoints
+      - services
+      - pods
+      - namespaces
+    verbs:
+      - list
+      - watch
+`)
+
+var CoreDNSConfigTemplate = []byte(`apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns
+  namespace: kube-system
+data:
+  Corefile: |
+    .:53 {
+        errors
+        health
+        log
+        kubernetes cluster.local {{ .ServiceCIDR }} {
+            pods insecure
+            upstream
+            fallthrough in-addr.arpa ip6.arpa
+        }
+        prometheus :9153
+        proxy . /etc/resolv.conf
+        cache 30
+        reload
+    }
+`)
+
+var CoreDNSDeploymentTemplate = []byte(`apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: kube-dns
+  name: coredns
   namespace: kube-system
   labels:
-    k8s-app: kube-dns
+    k8s-app: coredns
+    kubernetes.io/name: "CoreDNS"
     kubernetes.io/cluster-service: "true"
-    addonmanager.kubernetes.io/mode: Reconcile
 spec:
   # replicas: not specified here:
   # 1. In order to make Addon Manager do not reconcile this replicas parameter.
   # 2. Default is 1.
   # 3. Will be tuned in real time if DNS horizontal auto-scaling is turned on.
   strategy:
+    type: RollingUpdate
     rollingUpdate:
-      maxSurge: 10%
-      maxUnavailable: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
-      k8s-app: kube-dns
+      k8s-app: coredns
   template:
     metadata:
       labels:
-        k8s-app: kube-dns
+        k8s-app: coredns
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
-      nodeSelector:
-        node-role.kubernetes.io/master: ""
+      serviceAccountName: coredns
       tolerations:
-      - key: node-role.kubernetes.io/master
-        operator: Exists
-        effect: NoSchedule
-      volumes:
-      - name: kube-dns-config
-        configMap:
-          name: kube-dns
-          optional: true
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
       containers:
-      - name: kubedns
-        image: {{ .Images.KubeDNS }}
-        resources:
-          # TODO: Set memory limits when we've profiled the container for large
-          # clusters, then set request = limit to keep this container in
-          # guaranteed class. Currently, this container falls into the
-          # "burstable" category so the kubelet doesn't backoff from restarting it.
-          limits:
-            memory: 170Mi
-          requests:
-            cpu: 100m
-            memory: 70Mi
-        livenessProbe:
-          httpGet:
-            path: /healthcheck/kubedns
-            port: 10054
-            scheme: HTTP
-          initialDelaySeconds: 60
-          timeoutSeconds: 5
-          successThreshold: 1
-          failureThreshold: 5
-        readinessProbe:
-          httpGet:
-            path: /readiness
-            port: 8081
-            scheme: HTTP
-          # we poll on pod startup for the Kubernetes master service and
-          # only setup the /readiness HTTP server once that's available.
-          initialDelaySeconds: 3
-          timeoutSeconds: 5
-        args:
-        - --domain=cluster.local.
-        - --dns-port=10053
-        - --config-dir=/kube-dns-config
-        - --v=2
-        env:
-        - name: PROMETHEUS_PORT
-          value: "10055"
-        ports:
-        - containerPort: 10053
-          name: dns-local
-          protocol: UDP
-        - containerPort: 10053
-          name: dns-tcp-local
-          protocol: TCP
-        - containerPort: 10055
-          name: metrics
-          protocol: TCP
-        volumeMounts:
-        - name: kube-dns-config
-          mountPath: /kube-dns-config
-      - name: dnsmasq
-        image: {{ .Images.KubeDNSMasq }}
-        livenessProbe:
-          httpGet:
-            path: /healthcheck/dnsmasq
-            port: 10054
-            scheme: HTTP
-          initialDelaySeconds: 60
-          timeoutSeconds: 5
-          successThreshold: 1
-          failureThreshold: 5
-        args:
-        - -v=2
-        - -logtostderr
-        - -configDir=/etc/k8s/dns/dnsmasq-nanny
-        - -restartDnsmasq=true
-        - --
-        - -k
-        - --cache-size=1000
-        - --no-negcache
-        - --log-facility=-
-        - --server=/cluster.local/127.0.0.1#10053
-        - --server=/in-addr.arpa/127.0.0.1#10053
-        - --server=/ip6.arpa/127.0.0.1#10053
-        ports:
-        - containerPort: 53
-          name: dns
-          protocol: UDP
-        - containerPort: 53
-          name: dns-tcp
-          protocol: TCP
-        # see: https://github.com/kubernetes/kubernetes/issues/29055 for details
-        resources:
-          requests:
-            cpu: 150m
-            memory: 20Mi
-        volumeMounts:
-        - name: kube-dns-config
-          mountPath: /etc/k8s/dns/dnsmasq-nanny
-      - name: sidecar
-        image: {{ .Images.KubeDNSSidecar }}
-        livenessProbe:
-          httpGet:
-            path: /metrics
-            port: 10054
-            scheme: HTTP
-          initialDelaySeconds: 60
-          timeoutSeconds: 5
-          successThreshold: 1
-          failureThreshold: 5
-        args:
-        - --v=2
-        - --logtostderr
-        - --probe=kubedns,127.0.0.1:10053,kubernetes.default.svc.cluster.local,5,SRV
-        - --probe=dnsmasq,127.0.0.1:53,kubernetes.default.svc.cluster.local,5,SRV
-        ports:
-        - containerPort: 10054
-          name: metrics
-          protocol: TCP
-        resources:
-          requests:
-            memory: 20Mi
-            cpu: 10m
-      dnsPolicy: Default  # Don't use cluster DNS.
+        - name: coredns
+          image: {{ .Images.CoreDNS }}
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              memory: 170Mi
+            requests:
+              cpu: 100m
+              memory: 70Mi
+          args: [ "-conf", "/etc/coredns/Corefile" ]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/coredns
+              readOnly: true
+          ports:
+            - name: dns
+              protocol: UDP
+              containerPort: 53
+            - name: dns-tcp
+              protocol: TCP
+              containerPort: 53
+            - name: metrics
+              protocol: TCP
+              containerPort: 9153
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 60
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              add:
+              - NET_BIND_SERVICE
+              drop:
+              - all
+            readOnlyRootFilesystem: true
+      dnsPolicy: Default
+      volumes:
+        - name: config
+          configMap:
+            name: coredns
+            items:
+            - key: Corefile
+              path: Corefile
 `)
 
-var DNSSvcTemplate = []byte(`apiVersion: v1
-kind: Service
+var CoreDNSServiceAccountTemplate = []byte(`apiVersion: v1
+kind: ServiceAccount
 metadata:
-  name: kube-dns
+  name: coredns
   namespace: kube-system
   labels:
-    k8s-app: kube-dns
     kubernetes.io/cluster-service: "true"
-    kubernetes.io/name: "KubeDNS"
+`)
+
+var CoreDNSSvcTemplate = []byte(`apiVersion: v1
+kind: Service
+metadata:
+  name: coredns
+  namespace: kube-system
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9153"
+  labels:
+    k8s-app: coredns
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "CoreDNS"
 spec:
   selector:
-    k8s-app: kube-dns
+    k8s-app: coredns
   clusterIP: {{ .DNSServiceIP }}
   ports:
-  - name: dns
-    port: 53
-    protocol: UDP
-  - name: dns-tcp
-    port: 53
-    protocol: TCP
+    - name: dns
+      port: 53
+      protocol: UDP
+    - name: dns-tcp
+      port: 53
+      protocol: TCP
 `)
 
 var FlannelClusterRole = []byte(`apiVersion: rbac.authorization.k8s.io/v1

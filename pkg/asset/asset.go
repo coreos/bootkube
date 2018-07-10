@@ -70,8 +70,12 @@ const (
 	AssetPathControllerManagerDisruption    = "manifests/kube-controller-manager-disruption.yaml"
 	AssetPathScheduler                      = "manifests/kube-scheduler.yaml"
 	AssetPathSchedulerDisruption            = "manifests/kube-scheduler-disruption.yaml"
-	AssetPathKubeDNSDeployment              = "manifests/kube-dns-deployment.yaml"
-	AssetPathKubeDNSSvc                     = "manifests/kube-dns-svc.yaml"
+	AssetPathCoreDNSClusterRoleBinding      = "manifests/coredns-cluster-role-binding.yaml"
+	AssetPathCoreDNSClusterRole             = "manifests/coredns-cluster-role.yaml"
+	AssetPathCoreDNSConfig                  = "manifests/coredns-config.yaml"
+	AssetPathCoreDNSDeployment              = "manifests/coredns-deployment.yaml"
+	AssetPathCoreDNSSA                      = "manifests/coredns-service-account.yaml"
+	AssetPathCoreDNSSvc                     = "manifests/coredns-service.yaml"
 	AssetPathSystemNamespace                = "manifests/kube-system-ns.yaml"
 	AssetPathCheckpointer                   = "manifests/pod-checkpointer.yaml"
 	AssetPathCheckpointerSA                 = "manifests/pod-checkpointer-sa.yaml"
@@ -123,11 +127,9 @@ type ImageVersions struct {
 	FlannelCNI      string
 	Calico          string
 	CalicoCNI       string
+	CoreDNS         string
 	Hyperkube       string
 	Kenc            string
-	KubeDNS         string
-	KubeDNSMasq     string
-	KubeDNSSidecar  string
 	PodCheckpointer string
 }
 
