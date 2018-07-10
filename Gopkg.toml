@@ -9,16 +9,16 @@ required = [
 
 [[override]]
 name = "k8s.io/api"
-revision = "kubernetes-1.10.3"
+revision = "kubernetes-1.11.0"
 [[constraint]]
 name = "k8s.io/apiextensions-apiserver"
-revision = "kubernetes-1.10.3"
+revision = "kubernetes-1.11.0"
 [[constraint]]
 name = "k8s.io/apimachinery"
-revision = "kubernetes-1.10.3"
+revision = "kubernetes-1.11.0"
 [[constraint]]
 name = "k8s.io/client-go"
-revision = "kubernetes-1.10.3"
+revision = "kubernetes-1.11.0"
 
 [[constraint]]
 name = "github.com/coreos/etcd"
@@ -52,6 +52,9 @@ revision = "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
 name = "github.com/gogo/protobuf"
 revision = "909568be09de550ed094403c2bf8a261b5bb730a"
 [[override]]
+name = "github.com/google/btree"
+revision = "e89373fe6b4a7413d7acd6da1725b83ef713e6e4"
+[[override]]
 name = "github.com/golang/protobuf"
 revision = "4bd1920723d7b7c925de087aa32e2187708897f7"
 [[override]]
@@ -61,11 +64,11 @@ revision = "44d81051d367757e1c7c6a5a86423ece9afcf63c"
 name = "github.com/googleapis/gnostic"
 version = "v0.1.0"
 [[override]]
+name = "github.com/gregjones/httpcache"
+revision = "9cad4c3443a7200dd6400aef47183728de563a38"
+[[override]]
 name = "github.com/hashicorp/golang-lru"
 revision = "a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4"
-[[override]]
-name = "github.com/howeyc/gopass"
-revision = "bf9dde6d0d2c004a008c27aaee91170c786f6db8"
 [[override]]
 name = "github.com/imdario/mergo"
 revision = "6633656539c1639d9d78127b7d47c622b5d7b6dc"
@@ -74,13 +77,19 @@ name = "github.com/inconshreveable/mousetrap"
 revision = "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75"
 [[override]]
 name = "github.com/json-iterator/go"
-version = "1.0.6"
+revision = "f2b4162afba35581b6d4a50d3b8f34e33c144682"
 [[override]]
 name = "github.com/modern-go/concurrent"
 revision = "bacd9c7ef1dd9b15be4a9909b8ac7a4e313eec94"
 [[override]]
 name = "github.com/modern-go/reflect2"
 revision = "0b92968f4be75033e2089fba355a691ea2e9c5cc"
+[[override]]
+name = "github.com/petar/GoLLRB"
+revision = "53be0d36a84c2a886ca057d34b6aa4468df9ccb4"
+[[override]]
+name = "github.com/peterbourgon/diskv"
+version = "v2.0.1"
 [[override]]
 name = "github.com/spf13/pflag"
 revision = "e57e3eeb33f795204c1ca35f56c44f83227c6e66"
