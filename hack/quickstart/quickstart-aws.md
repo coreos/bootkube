@@ -77,3 +77,11 @@ IDENT=${CLUSTER_PREFIX}-key.pem ./init-node.sh <PUBLIC_IP> cluster/auth/kubeconf
 ```
 $ kubectl --kubeconfig=cluster/auth/kubeconfig get nodes
 ```
+
+### Add Additional Masters
+
+As with the **Add Workers** step above, only set `TAG_MASTER=true`
+
+```
+IDENT=${CLUSTER_PREFIX}-key.pem TAG_MASTER=true ./init-node.sh <PUBLIC_IP> cluster/auth/kubeconfig
+```
