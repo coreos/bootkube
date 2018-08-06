@@ -85,6 +85,9 @@ if [ "${REMOTE_HOST}" != "local" ]; then
 
     echo
     echo "Node (${REMOTE_HOST}) bootstrap complete. It may take a few minutes for the node to become ready."
+    if [ "$TAG_MASTER" = true ] ; then
+        echo "NOTE: You have configured this node as a master. You may want to set up load balancing with your cloud provider so that masters receive equal traffic and gracefully fail over."
+    fi
 
 # Execute this script locally on the machine, assumes a kubelet.service file has already been placed on host.
 elif [ "$1" == "local" ]; then
