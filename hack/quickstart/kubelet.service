@@ -1,7 +1,7 @@
 [Service]
 EnvironmentFile=-/etc/kubernetes/kubelet.env
 Environment=KUBELET_IMAGE_URL=docker://k8s.gcr.io/hyperkube
-Environment=KUBELET_IMAGE_TAG=v1.11.0
+Environment=KUBELET_IMAGE_TAG=v1.11.2
 Environment=KUBELET_MINIMUM_CONTAINER_TTL_DURATION=3m0s
 Environment=KUBELET_MAXIMUM_DEAD_CONTAINERS=-1
 Environment=KUBELET_MAXIMUM_DEAD_CONTAINERS_PER_CONTAINER=1
