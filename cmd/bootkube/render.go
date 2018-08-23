@@ -66,7 +66,7 @@ func init() {
 	cmdRender.Flags().StringVar(&renderOpts.podCIDR, "pod-cidr", "10.2.0.0/16", "The CIDR range of cluster pods.")
 	cmdRender.Flags().StringVar(&renderOpts.serviceCIDR, "service-cidr", "10.3.0.0/24", "The CIDR range of cluster services.")
 	cmdRender.Flags().StringVar(&renderOpts.cloudProvider, "cloud-provider", "", "The provider for cloud services.  Empty string for no provider")
-	cmdRender.Flags().StringVar(&renderOpts.networkProvider, "network-provider", "flannel", "CNI network provider (flannel or experimental-canal).")
+	cmdRender.Flags().StringVar(&renderOpts.networkProvider, "network-provider", "flannel", "CNI network provider (flannel, experimental-canal, or Cilium).")
 }
 
 func runCmdRender(cmd *cobra.Command, args []string) error {
@@ -102,7 +102,7 @@ func validateRenderOpts(cmd *cobra.Command, args []string) error {
 	if renderOpts.apiServers == "" {
 		return errors.New("Missing requried flag: --api-servers")
 	}
-	if renderOpts.networkProvider != asset.NetworkFlannel && renderOpts.networkProvider != asset.NetworkCalico && renderOpts.networkProvider != asset.NetworkCanal {
+	if renderOpts.networkProvider != asset.NetworkFlannel && renderOpts.networkProvider != asset.NetworkCalico && renderOpts.networkProvider != asset.NetworkCanal && renderOpts.networkProvider != asset.NetworkCilium {
 		return errors.New("Must specify --network-provider flannel or experimental-calico or experimental-canal")
 	}
 	return nil

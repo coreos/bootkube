@@ -1565,4 +1565,320 @@ subjects:
   namespace: kube-system
 `)
 
+var CiliumCfgTemplate = []byte(`apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cilium-config
+  namespace: kube-system
+data:
+  etcd-config: |-
+    ---
+    endpoints:
+    - {{ range $i, $e := .EtcdServers }}{{ if $i }},{{end}}{{ $e }}{{end}}
+{{- if .EtcdUseTLS }}
+    ca-file: '/var/lib/etcd-secrets/etcd-client-ca.crt'
+    cert-file: '/var/lib/etcd-secrets/etcd-client.crt'
+    key-file: '/var/lib/etcd-secrets/etcd-client.key'
+{{- end }}
+  debug: "false"
+  disable-ipv4: "false"
+  clean-cilium-state: "false"
+  legacy-host-allows-world: "false"
+  monitor-aggregation-level: "none"
+  sidecar-istio-proxy-image: "cilium/istio_proxy"
+  tunnel: "vxlan"
+  `)
+
+var CiliumTemplate = []byte(`kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: cilium
+  namespace: kube-system
+spec:
+  updateStrategy:
+    type: "RollingUpdate"
+    rollingUpdate:
+      maxUnavailable: "100%"
+  selector:
+    matchLabels:
+      k8s-app: cilium
+      kubernetes.io/cluster-service: "true"
+  template:
+    metadata:
+      labels:
+        k8s-app: cilium
+        kubernetes.io/cluster-service: "true"
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+        scheduler.alpha.kubernetes.io/tolerations: >-
+          [{"key":"dedicated","operator":"Equal","value":"master","effect":"NoSchedule"}]
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+    spec:
+      serviceAccountName: cilium
+      initContainers:
+      - name: cilium-state-cni
+        image: docker.io/library/busybox:1.28.4
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - -c
+        - 'if [ "${CLEAN_CILIUM_STATE}" = "true" ] ;
+        - then rm -rf /var/run/cilium/state &&
+        - rm -rf /sys/fs/bpf/tc/globals/cilium_*;
+        - fi;
+        - if [ ! "$(ls -A /host/opt/cni/bin)" ] ;
+        - then curl -sSf -L --retry 5 https://github.com/containernetworking/cni/releases/download/$CNI_VERSION/cni-amd64-$CNI_VERSION.tgz | tar -xz -C /host/opt/cni/bin &&
+        - curl -sSf -L --retry 5 https://github.com/containernetworking/plugins/releases/download/$CNI_VERSION/cni-plugins-amd64-$CNI_VERSION.tgz | tar -xz -C /host/opt/cni/bin;
+        - fi'
+        volumeMounts:
+          - name: bpf-maps
+            mountPath: /sys/fs/bpf
+          - name: cilium-run
+            mountPath: /var/run/cilium
+          - name: cni-path
+            mountPath: /host/opt/cni/bin
+        env:
+          - name: "CLEAN_CILIUM_STATE"
+            valueFrom:
+              configMapKeyRef:
+                name: cilium-config
+                optional: true
+                key: clean-cilium-state
+          - name: "CNI_VERSION"
+            value: "v0.6.0"
+      containers:
+      - image: {{ .Images.Cilium }}
+        imagePullPolicy: Always
+        name: cilium-agent
+        command: [ "cilium-agent" ]
+        args:
+          - "--debug=$(CILIUM_DEBUG)"
+          - "--kvstore=etcd"
+          - "--kvstore-opt=etcd.config=/var/lib/etcd-config/etcd.config"
+          - "--disable-ipv4=$(DISABLE_IPV4)"
+        ports:
+          - name: prometheus
+            containerPort: 9090
+        lifecycle:
+          postStart:
+            exec:
+              command:
+                - "/cni-install.sh"
+          preStop:
+            exec:
+              command:
+                - "/cni-uninstall.sh"
+        env:
+          - name: "K8S_NODE_NAME"
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: "CILIUM_DEBUG"
+            valueFrom:
+              configMapKeyRef:
+                name: cilium-config
+                key: debug
+          - name: "DISABLE_IPV4"
+            valueFrom:
+              configMapKeyRef:
+                name: cilium-config
+                key: disable-ipv4
+          - name: "CILIUM_PROMETHEUS_SERVE_ADDR"
+            valueFrom:
+              configMapKeyRef:
+                name: cilium-metrics-config
+                optional: true
+                key: prometheus-serve-addr
+          - name: "CILIUM_LEGACY_HOST_ALLOWS_WORLD"
+            valueFrom:
+              configMapKeyRef:
+                name: cilium-config
+                optional: true
+                key: legacy-host-allows-world
+          - name: "CILIUM_SIDECAR_ISTIO_PROXY_IMAGE"
+            valueFrom:
+              configMapKeyRef:
+                name: cilium-config
+                key: sidecar-istio-proxy-image
+                optional: true
+          - name: CILIUM_TUNNEL
+            valueFrom:
+              configMapKeyRef:
+                key: tunnel
+                name: cilium-config
+                optional: true
+          - name: "CILIUM_MONITOR_AGGREGATION_LEVEL"
+            valueFrom:
+              configMapKeyRef:
+                key: monitor-aggregation-level
+                name: cilium-config
+                optional: true
+        livenessProbe:
+          exec:
+            command:
+            - cilium
+            - status
+          initialDelaySeconds: 120
+          failureThreshold: 10
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - cilium
+            - status
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+          - name: bpf-maps
+            mountPath: /sys/fs/bpf
+          - name: cilium-run
+            mountPath: /var/run/cilium
+          - name: cni-path
+            mountPath: /host/opt/cni/bin
+          - name: etc-cni-netd
+            mountPath: /host/etc/cni/net.d
+          - name: docker-socket
+            mountPath: /var/run/docker.sock
+            readOnly: true
+          - name: etcd-config-path
+            mountPath: /var/lib/etcd-config
+            readOnly: true
+          - name: etcd-secrets
+            mountPath: /var/lib/etcd-secrets
+            readOnly: true
+        securityContext:
+          capabilities:
+            add:
+              - "NET_ADMIN"
+          privileged: true
+      hostNetwork: true
+      volumes:
+        - name: cilium-run
+          hostPath:
+            path: /var/run/cilium
+        - name: bpf-maps
+          hostPath:
+            path: /sys/fs/bpf
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock
+        - name: cni-path
+          hostPath:
+            path: /opt/cni/bin
+        - name: etc-cni-netd
+          hostPath:
+              path: /etc/kubernetes/cni/net.d
+        - name: etcd-config-path
+          configMap:
+            name: cilium-config
+            items:
+            - key: etcd-config
+              path: etcd.config
+        - name: etcd-secrets
+          secret:
+            secretName: cilium-etcd-secrets
+            optional: true
+      restartPolicy: Always
+      priorityClassName: system-node-critical
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+      - effect: NoSchedule
+        key: node.cloudprovider.kubernetes.io/uninitialized
+        value: "true"
+      - key: CriticalAddonsOnly
+        operator: "Exists"
+`)
+
+var CiliumClusterRoleBinding = []byte(`kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: cilium
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cilium
+subjects:
+- kind: ServiceAccount
+  name: cilium
+  namespace: kube-system
+- kind: Group
+  name: system:nodes
+`)
+
+var CiliumClusterRole = []byte(`kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: cilium
+rules:
+- apiGroups:
+  - "networking.k8s.io"
+  resources:
+  - networkpolicies
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  - services
+  - nodes
+  - endpoints
+  - componentstatuses
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+- apiGroups:
+  - extensions
+  resources:
+  - networkpolicies #FIXME remove this when we drop support for k8s NP-beta GH-1202
+  - thirdpartyresources
+  - ingresses
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+- apiGroups:
+  - "apiextensions.k8s.io"
+  resources:
+  - customresourcedefinitions
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - update
+- apiGroups:
+  - cilium.io
+  resources:
+  - ciliumnetworkpolicies
+  - ciliumnetworkpolicies/status
+  - ciliumendpoints
+  - ciliumendpoints/status
+  verbs:
+  - "*"
+`)
+
+var CiliumServiceAccount = []byte(`kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: cilium
+  namespace: kube-system
+`)
+
 // vim: set expandtab:tabstop=2

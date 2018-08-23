@@ -61,6 +61,12 @@ const (
 	AssetPathCalicoGlobalNetworkSetsCRD     = "manifests/calico-global-network-sets-crd.yaml"
 	AssetPathCalicoIPPoolsCRD               = "manifests/calico-ip-pools-crd.yaml"
 	AssetPathCalicoClusterInformationsCRD   = "manifests/calico-cluster-informations-crd.yaml"
+	AssetPathCiliumCfg                      = "manifests/cilium-cfg.yaml"
+	AssetPathCilium                         = "manifests/cilium.yaml"
+	AssetPathCiliumClusterRoleBinding       = "manifests/cilium-cluster-role-binding.yaml"
+	AssetPathCiliumClusterRole              = "manifests/cilium-cluster-role.yaml"
+	AssetPathCiliumSA                       = "manifests/cilium-sa.yaml"
+	AssetPathCiliumSecret                   = "manifests/cilium-secret.yaml"
 	AssetPathAPIServerSecret                = "manifests/kube-apiserver-secret.yaml"
 	AssetPathAPIServer                      = "manifests/kube-apiserver.yaml"
 	AssetPathControllerManager              = "manifests/kube-controller-manager.yaml"
@@ -127,6 +133,7 @@ type ImageVersions struct {
 	FlannelCNI      string
 	Calico          string
 	CalicoCNI       string
+	Cilium          string
 	CoreDNS         string
 	Hyperkube       string
 	Kenc            string
@@ -189,6 +196,15 @@ func NewDefaultAssets(conf Config) (Assets, error) {
 		return Assets{}, err
 	}
 	as = append(as, cmSecret)
+	
+  // Cilium ETCD secret
+	if conf.NetworkProvider == NetworkCilium && conf.EtcdUseTLS {
+		cSecret, err := newCiliumSecretAsset(as)
+		if err != nil {
+			return Assets{}, err
+		}
+		as = append(as, cSecret)
+	}
 
 	return as, nil
 }

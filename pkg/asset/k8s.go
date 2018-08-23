@@ -24,6 +24,7 @@ const (
 	NetworkFlannel = "flannel"
 	NetworkCalico  = "experimental-calico"
 	NetworkCanal   = "experimental-canal"
+	NetworkCilium  = "cilium"
 
 	secretNamespace     = "kube-system"
 	secretAPIServerName = "kube-apiserver"
@@ -111,6 +112,15 @@ func newDynamicAssets(conf Config) Assets {
 			MustCreateAssetFromTemplate(AssetPathCalicoNetworkPoliciesCRD, internal.CalicoNetworkPoliciesCRD, conf),
 			MustCreateAssetFromTemplate(AssetPathCalicoClusterInformationsCRD, internal.CalicoClusterInformationsCRD, conf),
 			MustCreateAssetFromTemplate(AssetPathCalicoIPPoolsCRD, internal.CalicoIPPoolsCRD, conf))
+	}
+	case NetworkCilium:
+		assets = append(assets,
+			MustCreateAssetFromTemplate(AssetPathCilium, internal.CiliumTemplate, conf),
+			MustCreateAssetFromTemplate(AssetPathCiliumCfg, internal.CiliumCfgTemplate, conf),
+			MustCreateAssetFromTemplate(AssetPathCiliumClusterRole, internal.CiliumClusterRole, conf),
+			MustCreateAssetFromTemplate(AssetPathCiliumClusterRoleBinding, internal.CiliumClusterRoleBinding, conf),
+			MustCreateAssetFromTemplate(AssetPathCiliumSA, internal.CiliumServiceAccount, conf),
+		)
 	}
 	return assets
 }
@@ -226,6 +236,21 @@ func newControllerManagerSecretAsset(assets Assets) (Asset, error) {
 	}
 
 	return Asset{Name: AssetPathControllerManagerSecret, Data: secretYAML}, nil
+}
+
+func newCiliumSecretAsset(assets Assets) (Asset, error) {
+	secretAssets := []string{
+		AssetPathEtcdClientCA,
+		AssetPathEtcdClientCert,
+		AssetPathEtcdClientKey,
+	}
+	
+	secretYAML, err := secretFromAssets(secretCiliumName, secretNamespace, secretAssets, assets)
+	if err != nil {
+		return Asset{}, err
+	}
+
+	return Asset{Name: AssetPathCiliumSecret, Data: secretYAML}, nil
 }
 
 // TODO(aaron): use actual secret object (need to wrap in apiversion/type)
