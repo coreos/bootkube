@@ -1587,6 +1587,7 @@ data:
   monitor-aggregation-level: "none"
   sidecar-istio-proxy-image: "cilium/istio_proxy"
   tunnel: "vxlan"
+  cluster-name: default
   `)
 
 var CiliumTemplate = []byte(`kind: DaemonSet
@@ -1631,6 +1632,11 @@ spec:
         - then curl -sSf -L --retry 5 https://github.com/containernetworking/cni/releases/download/$CNI_VERSION/cni-amd64-$CNI_VERSION.tgz | tar -xz -C /host/opt/cni/bin &&
         - curl -sSf -L --retry 5 https://github.com/containernetworking/plugins/releases/download/$CNI_VERSION/cni-plugins-amd64-$CNI_VERSION.tgz | tar -xz -C /host/opt/cni/bin;
         - fi'
+        securityContext:
+          capabilities:
+            add:
+              - "NET_ADMIN"
+          privileged: true
         volumeMounts:
           - name: bpf-maps
             mountPath: /sys/fs/bpf
@@ -1657,6 +1663,7 @@ spec:
           - "--kvstore=etcd"
           - "--kvstore-opt=etcd.config=/var/lib/etcd-config/etcd.config"
           - "--disable-ipv4=$(DISABLE_IPV4)"
+          # - "--container-runtime=crio"
         ports:
           - name: prometheus
             containerPort: 9090
@@ -1714,6 +1721,20 @@ spec:
                 key: monitor-aggregation-level
                 name: cilium-config
                 optional: true
+          - name: CILIUM_CLUSTERMESH_CONFIG
+            value: "/var/lib/cilium/clustermesh/"
+          - name: CILIUM_CLUSTER_NAME
+            valueFrom:
+              configMapKeyRef:
+                key: cluster-name
+                name: cilium-config
+                optional: true
+          - name: CILIUM_CLUSTER_ID
+            valueFrom:
+              configMapKeyRef:
+                key: cluster-id
+                name: cilium-config
+                optional: true
         livenessProbe:
           exec:
             command:
@@ -1747,6 +1768,9 @@ spec:
           - name: etcd-secrets
             mountPath: /var/lib/etcd-secrets
             readOnly: true
+          - name: clustermesh-secrets
+            mountPath: /var/lib/cilium/clustermesh
+            readOnly: true
         securityContext:
           capabilities:
             add:
@@ -1779,6 +1803,11 @@ spec:
           secret:
             secretName: cilium-etcd-secrets
             optional: true
+        - name: clustermesh-secrets
+          secret:
+            defaultMode: 420
+            optional: true
+            secretName: cilium-clustermesh
       restartPolicy: Always
       priorityClassName: system-node-critical
       tolerations:
@@ -1791,8 +1820,8 @@ spec:
         operator: "Exists"
 `)
 
-var CiliumClusterRoleBinding = []byte(`kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
+var CiliumClusterRoleBinding = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
 metadata:
   name: cilium
 roleRef:
@@ -1800,78 +1829,78 @@ roleRef:
   kind: ClusterRole
   name: cilium
 subjects:
-- kind: ServiceAccount
-  name: cilium
-  namespace: kube-system
-- kind: Group
-  name: system:nodes
+  - kind: ServiceAccount
+    name: cilium
+    namespace: kube-system
+  - kind: Group
+    name: system:nodes
 `)
 
-var CiliumClusterRole = []byte(`kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
+var CiliumClusterRole = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
 metadata:
   name: cilium
 rules:
-- apiGroups:
-  - "networking.k8s.io"
-  resources:
-  - networkpolicies
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - namespaces
-  - services
-  - nodes
-  - endpoints
-  - componentstatuses
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  - nodes
-  verbs:
-  - get
-  - list
-  - watch
-  - update
-- apiGroups:
-  - extensions
-  resources:
-  - networkpolicies #FIXME remove this when we drop support for k8s NP-beta GH-1202
-  - thirdpartyresources
-  - ingresses
-  verbs:
-  - create
-  - get
-  - list
-  - watch
-- apiGroups:
-  - "apiextensions.k8s.io"
-  resources:
-  - customresourcedefinitions
-  verbs:
-  - create
-  - get
-  - list
-  - watch
-  - update
-- apiGroups:
-  - cilium.io
-  resources:
-  - ciliumnetworkpolicies
-  - ciliumnetworkpolicies/status
-  - ciliumendpoints
-  - ciliumendpoints/status
-  verbs:
-  - "*"
+  - apiGroups:
+      - "networking.k8s.io"
+    resources:
+      - networkpolicies
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+      - services
+      - nodes
+      - endpoints
+      - componentstatuses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - nodes
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+  - apiGroups:
+      - extensions
+    resources:
+      - networkpolicies  # FIXME remove this when we drop support for k8s NP-beta GH-1202
+      - thirdpartyresources
+      - ingresses
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - "apiextensions.k8s.io"
+    resources:
+      - customresourcedefinitions
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+  - apiGroups:
+      - cilium.io
+    resources:
+      - ciliumnetworkpolicies
+      - ciliumnetworkpolicies/status
+      - ciliumendpoints
+      - ciliumendpoints/status
+    verbs:
+      - "*"
 `)
 
 var CiliumServiceAccount = []byte(`kind: ServiceAccount
