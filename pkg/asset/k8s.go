@@ -112,15 +112,13 @@ func newDynamicAssets(conf Config) Assets {
 			MustCreateAssetFromTemplate(AssetPathCalicoNetworkPoliciesCRD, internal.CalicoNetworkPoliciesCRD, conf),
 			MustCreateAssetFromTemplate(AssetPathCalicoClusterInformationsCRD, internal.CalicoClusterInformationsCRD, conf),
 			MustCreateAssetFromTemplate(AssetPathCalicoIPPoolsCRD, internal.CalicoIPPoolsCRD, conf))
-	}
 	case NetworkCilium:
 		assets = append(assets,
 			MustCreateAssetFromTemplate(AssetPathCilium, internal.CiliumTemplate, conf),
 			MustCreateAssetFromTemplate(AssetPathCiliumCfg, internal.CiliumCfgTemplate, conf),
 			MustCreateAssetFromTemplate(AssetPathCiliumClusterRole, internal.CiliumClusterRole, conf),
 			MustCreateAssetFromTemplate(AssetPathCiliumClusterRoleBinding, internal.CiliumClusterRoleBinding, conf),
-			MustCreateAssetFromTemplate(AssetPathCiliumSA, internal.CiliumServiceAccount, conf),
-		)
+			MustCreateAssetFromTemplate(AssetPathCiliumSA, internal.CiliumServiceAccount, conf))
 	}
 	return assets
 }
