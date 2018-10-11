@@ -71,7 +71,7 @@ name = "github.com/hashicorp/golang-lru"
 revision = "a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4"
 [[override]]
 name = "github.com/imdario/mergo"
-revision = "6633656539c1639d9d78127b7d47c622b5d7b6dc"
+revision = "9f23e2d6bd2a77f959b2bf6acdbefd708a83a4a4"
 [[override]]
 name = "github.com/inconshreveable/mousetrap"
 revision = "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75"
