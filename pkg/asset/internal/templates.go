@@ -433,6 +433,8 @@ spec:
           initialDelaySeconds: 15
           timeoutSeconds: 15
         volumeMounts:
+        - name: var-run-kubernetes
+          mountPath: /var/run/kubernetes
         - name: secrets
           mountPath: /etc/kubernetes/secrets
           readOnly: true
@@ -450,6 +452,8 @@ spec:
         operator: Exists
         effect: NoSchedule
       volumes:
+      - name: var-run-kubernetes
+        emptyDir: {}
       - name: secrets
         secret:
           secretName: kube-controller-manager

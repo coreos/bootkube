@@ -8,6 +8,6 @@ var DefaultImages = ImageVersions{
 	Calico:          "quay.io/calico/node:v3.0.3",
 	CalicoCNI:       "quay.io/calico/cni:v2.0.0",
 	CoreDNS:         "k8s.gcr.io/coredns:1.1.3",
-	Hyperkube:       "k8s.gcr.io/hyperkube:v1.11.2",
+	Hyperkube:       "k8s.gcr.io/hyperkube:v1.12.1",
 	PodCheckpointer: "quay.io/coreos/pod-checkpointer:018007e77ccd61e8e59b7e15d7fc5e318a5a2682",
 }
