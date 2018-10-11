@@ -17,7 +17,7 @@ This is accomplished by managing checkpoints as static pod manifests:
 ## Use
 
 Any pod which contains the `checkpointer.alpha.coreos.com/checkpoint=true` annotation will be considered a viable "parent pod" which should be checkpointed.
-The parent pod cannot itself be a static pod, and is not a checkpoint itself.
+The parent pod cannot itself be a static pod, and is not a checkpoint itself. Affinity is not supported for a pod, and any pod labelled with the checkpoint annotation will be checkpointed.
 
 Checkpoints are denoted by the `checkpointer.alpha.coreos.com/checkpoint-of` annotation. This annotation will point to the parent of this checkpoint by pod name.
 
