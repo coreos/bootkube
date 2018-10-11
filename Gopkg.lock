@@ -204,10 +204,11 @@
   revision = "0fe963104e9d1877082f8fb38f816fcd97eb1d10"
 
 [[projects]]
-  digest = "1:9df93ac210a5019e31c4d681b361d8d94b394a4084104053a909c4d580c69e70"
+  digest = "1:40f5bf7f98b3bd3f71c801ff54170ee39c09ebd329899e1810648139465abbe7"
   name = "golang.org/x/net"
   packages = [
     "context",
+    "context/ctxhttp",
     "http2",
     "http2/hpack",
     "idna",
@@ -217,6 +218,17 @@
   ]
   pruneopts = "NUT"
   revision = "ae89d30ce0c63142b652837da33d782e2b0a9b25"
+
+[[projects]]
+  branch = "master"
+  digest = "1:fab6f7f953638242af9ab52d7ab10bcbfd695c09934cac829206732973e94662"
+  name = "golang.org/x/oauth2"
+  packages = [
+    ".",
+    "internal",
+  ]
+  pruneopts = "NUT"
+  revision = "c57b0facaced709681d9f90397429b9430a74754"
 
 [[projects]]
   digest = "1:5f1063e099e3cfcd3b020d43cbdcb633509729025f8391497937be0953c34598"
@@ -254,6 +266,22 @@
   packages = ["rate"]
   pruneopts = "NUT"
   revision = "fbb02b2291d28baffd63558aa44b4b56f178d650"
+
+[[projects]]
+  digest = "1:36354a269794d9cb4cebae233f65a966e818f763088370c8524726853a31c96f"
+  name = "google.golang.org/appengine"
+  packages = [
+    "internal",
+    "internal/base",
+    "internal/datastore",
+    "internal/log",
+    "internal/remote_api",
+    "internal/urlfetch",
+    "urlfetch",
+  ]
+  pruneopts = "NUT"
+  revision = "ae0ab99deb4dc413a2b4bd6c8bdd0eb67f1e4d06"
+  version = "v1.2.0"
 
 [[projects]]
   digest = "1:cd018653a358d4b743a9d3bee89e825521f2ab2f2ec0770164bf7632d8d73ab7"
@@ -310,7 +338,7 @@
   revision = "53feefa2559fb8dfa8d81baad31be332c97d6c77"
 
 [[projects]]
-  digest = "1:ef716a2116d8a040e16fbcd7fca71d3354915a94720de6af22c7a09970234296"
+  digest = "1:c6b0cfc418f5e8bb9169d78f1024cb1c9f3e61c9a76235134d26d3f28ecdf27b"
   name = "k8s.io/api"
   packages = [
     "admissionregistration/v1alpha1",
@@ -324,10 +352,12 @@
     "authorization/v1beta1",
     "autoscaling/v1",
     "autoscaling/v2beta1",
+    "autoscaling/v2beta2",
     "batch/v1",
     "batch/v1beta1",
     "batch/v2alpha1",
     "certificates/v1beta1",
+    "coordination/v1beta1",
     "core/v1",
     "events/v1beta1",
     "extensions/v1beta1",
@@ -344,20 +374,20 @@
     "storage/v1beta1",
   ]
   pruneopts = "NUT"
-  revision = "kubernetes-1.11.2"
+  revision = "kubernetes-1.12.1"
 
 [[projects]]
-  digest = "1:eec90201603e6ace18210cf0c4922180a0502726f26668b0a84769b6b63ebed7"
+  digest = "1:b8a1dcc5f4e559b7af185ba12dd341cb8c175ea3d36227a02699b251ae5fde05"
   name = "k8s.io/apiextensions-apiserver"
   packages = [
     "pkg/apis/apiextensions",
     "pkg/apis/apiextensions/v1beta1",
   ]
   pruneopts = "NUT"
-  revision = "kubernetes-1.11.2"
+  revision = "kubernetes-1.12.1"
 
 [[projects]]
-  digest = "1:397a5947b8bf14319299de65598603e75fba708a5168b0bceaefbfeb84931b4a"
+  digest = "1:ad82134136dded41a1cbffeaac296b39596978e3635ee14eb81aa40eda4e5fe2"
   name = "k8s.io/apimachinery"
   packages = [
     "pkg/api/equality",
@@ -389,6 +419,7 @@
     "pkg/util/framer",
     "pkg/util/intstr",
     "pkg/util/json",
+    "pkg/util/naming",
     "pkg/util/net",
     "pkg/util/rand",
     "pkg/util/runtime",
@@ -402,10 +433,10 @@
     "third_party/forked/golang/reflect",
   ]
   pruneopts = "NUT"
-  revision = "kubernetes-1.11.2"
+  revision = "kubernetes-1.12.1"
 
 [[projects]]
-  digest = "1:ec20753259cc200aae886497ac6ad022fc04584015cf13e97569487b9d2c1cba"
+  digest = "1:eb54301d9c98b538f2dd741d40403d24a1afe9a5442addc40c289e955375601c"
   name = "k8s.io/client-go"
   packages = [
     "discovery",
@@ -422,10 +453,12 @@
     "kubernetes/typed/authorization/v1beta1",
     "kubernetes/typed/autoscaling/v1",
     "kubernetes/typed/autoscaling/v2beta1",
+    "kubernetes/typed/autoscaling/v2beta2",
     "kubernetes/typed/batch/v1",
     "kubernetes/typed/batch/v1beta1",
     "kubernetes/typed/batch/v2alpha1",
     "kubernetes/typed/certificates/v1beta1",
+    "kubernetes/typed/coordination/v1beta1",
     "kubernetes/typed/core/v1",
     "kubernetes/typed/events/v1beta1",
     "kubernetes/typed/extensions/v1beta1",
@@ -466,7 +499,7 @@
     "util/retry",
   ]
   pruneopts = "NUT"
-  revision = "kubernetes-1.11.2"
+  revision = "kubernetes-1.12.1"
 
 [solve-meta]
   analyzer-name = "dep"
