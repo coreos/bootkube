@@ -63,6 +63,9 @@ func sanitizeCheckpointPod(cp *v1.Pod) *v1.Pod {
 	cp.Spec.ServiceAccountName = ""
 	cp.Spec.DeprecatedServiceAccount = ""
 
+	// Remove affinity
+	cp.Spec.Affinity = nil
+
 	// Sanitize the volumes
 	for i := range cp.Spec.Volumes {
 		v := &cp.Spec.Volumes[i]
