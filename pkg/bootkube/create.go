@@ -223,7 +223,7 @@ func (c *creater) waitForCRD(m manifest) error {
 	}
 
 	return wait.PollImmediate(crdRolloutDuration, crdRolloutTimeout, func() (bool, error) {
-		uri := customResourceDefinitionKindURI(crd.Spec.Group, crd.Spec.Version, crd.GetNamespace(), crd.Spec.Names.Plural)
+		uri := customResourceDefinitionKindURI(crd.Spec.Scope == apiextensionsv1beta1.NamespaceScoped, crd.Spec.Group, crd.Spec.Version, crd.GetNamespace(), crd.Spec.Names.Plural)
 		res := c.client.Get().RequestURI(uri).Do()
 		if res.Error() != nil {
 			if errors.IsNotFound(res.Error()) {
@@ -241,7 +241,13 @@ func (c *creater) waitForCRD(m manifest) error {
 // Example of version: "v1"
 // Example of namespace: "default"
 // Example of plural: "appversions"
-func customResourceDefinitionKindURI(apiGroup, version, namespace, plural string) string {
+func customResourceDefinitionKindURI(namespaced bool, apiGroup, version, namespace, plural string) string {
+	if !namespaced {
+		return fmt.Sprintf("/apis/%s/%s/%s",
+			strings.ToLower(apiGroup),
+			strings.ToLower(version),
+			strings.ToLower(plural))
+	}
 	if namespace == "" {
 		namespace = metav1.NamespaceDefault
 	}
