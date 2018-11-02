@@ -35,7 +35,7 @@ const (
 )
 
 var (
-	// bootstrapK8sApps contains the components (as identified by the the label "k8s-app") that we
+	// bootstrapK8sApps contains the components (as identified by the label "k8s-app") that we
 	// will extract to construct the temporary bootstrap control plane.
 	bootstrapK8sApps = map[string]struct{}{
 		apiServerContainerName:    {},
