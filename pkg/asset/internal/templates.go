@@ -373,6 +373,30 @@ subjects:
   namespace: kube-system
 `)
 
+var CheckpointerClusterRole = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pod-checkpointer
+rules:
+  - apiGroups: [""]
+    resources: ["nodes", "nodes/proxy"]
+    verbs: ["get"]
+`)
+
+var CheckpointerClusterRoleBinding = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pod-checkpointer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: pod-checkpointer
+subjects:
+- kind: ServiceAccount
+  name: pod-checkpointer
+  namespace: kube-system
+`)
+
 var ControllerManagerTemplate = []byte(`apiVersion: apps/v1
 kind: Deployment
 metadata:

@@ -48,6 +48,8 @@ func newStaticAssets(imageVersions ImageVersions) Assets {
 		MustCreateAssetFromTemplate(AssetPathCheckpointerSA, internal.CheckpointerServiceAccount, conf),
 		MustCreateAssetFromTemplate(AssetPathCheckpointerRole, internal.CheckpointerRole, conf),
 		MustCreateAssetFromTemplate(AssetPathCheckpointerRoleBinding, internal.CheckpointerRoleBinding, conf),
+		MustCreateAssetFromTemplate(AssetPathCheckpointerClusterRole, internal.CheckpointerClusterRole, conf),
+		MustCreateAssetFromTemplate(AssetPathCheckpointerClusterRoleBinding, internal.CheckpointerClusterRoleBinding, conf),
 		MustCreateAssetFromTemplate(AssetPathCSRApproverRoleBinding, internal.CSRApproverRoleBindingTemplate, conf),
 		MustCreateAssetFromTemplate(AssetPathCSRBootstrapRoleBinding, internal.CSRNodeBootstrapTemplate, conf),
 		MustCreateAssetFromTemplate(AssetPathCSRRenewalRoleBinding, internal.CSRRenewalRoleBindingTemplate, conf),
