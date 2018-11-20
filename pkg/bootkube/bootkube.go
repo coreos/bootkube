@@ -12,18 +12,31 @@ import (
 
 const assetTimeout = 20 * time.Minute
 
+type RequiredPodStatus int
+
+const (
+	PodStatusRunning RequiredPodStatus = iota
+	PodStatusReady
+)
+
+type RequiredPod struct {
+	Name      string
+	Namespace string
+	Status    RequiredPodStatus
+}
+
 type Config struct {
 	AssetDir        string
 	PodManifestPath string
 	Strict          bool
-	RequiredPods    []string
+	RequiredPods    []RequiredPod
 }
 
 type bootkube struct {
 	podManifestPath string
 	assetDir        string
 	strict          bool
-	requiredPods    []string
+	requiredPods    []RequiredPod
 }
 
 func NewBootkube(config Config) (*bootkube, error) {

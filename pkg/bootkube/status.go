@@ -17,18 +17,14 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-const (
-	doesNotExist = "DoesNotExist"
-)
-
-func WaitUntilPodsRunning(c clientcmd.ClientConfig, pods []string, timeout time.Duration) error {
+func WaitUntilPodsRunning(c clientcmd.ClientConfig, pods []RequiredPod, timeout time.Duration) error {
 	sc, err := NewStatusController(c, pods)
 	if err != nil {
 		return err
 	}
 	sc.Run()
 
-	if err := wait.Poll(5*time.Second, timeout, sc.AllRunning); err != nil {
+	if err := wait.Poll(5*time.Second, timeout, sc.AllInRequiredState); err != nil {
 		return fmt.Errorf("error while checking pod status: %v", err)
 	}
 
@@ -39,11 +35,11 @@ func WaitUntilPodsRunning(c clientcmd.ClientConfig, pods []string, timeout time.
 type statusController struct {
 	client        kubernetes.Interface
 	podStore      cache.Store
-	watchPods     []string
-	lastPodPhases map[string]v1.PodPhase
+	watchPods     []RequiredPod
+	lastPodPhases map[string]*PodStatus
 }
 
-func NewStatusController(c clientcmd.ClientConfig, pods []string) (*statusController, error) {
+func NewStatusController(c clientcmd.ClientConfig, pods []RequiredPod) (*statusController, error) {
 	config, err := c.ClientConfig()
 	if err != nil {
 		return nil, err
@@ -78,7 +74,7 @@ func (s *statusController) Run() {
 	go podController.Run(wait.NeverStop)
 }
 
-func (s *statusController) AllRunning() (bool, error) {
+func (s *statusController) AllInRequiredState() (bool, error) {
 	ps, err := s.PodStatus()
 	if err != nil {
 		glog.Infof("Error retriving pod statuses: %v", err)
@@ -93,40 +89,73 @@ func (s *statusController) AllRunning() (bool, error) {
 	changed := !reflect.DeepEqual(ps, s.lastPodPhases)
 	s.lastPodPhases = ps
 
-	running := true
+	watchPods := map[string]RequiredPod{}
+	for _, p := range s.watchPods {
+		watchPods[fmt.Sprintf("%s/%s", p.Namespace, p.Name)] = p
+	}
+
+	allinRequiredState := true
 	for p, s := range ps {
-		if changed {
-			UserOutput("\tPod Status:%24s\t%s\n", p, s)
+		if s == nil {
+			UserOutput("\tPod Status:%24s\t%s\n", p, "does-not-exist")
+			continue
 		}
-		if s != v1.PodRunning {
-			running = false
+		if changed {
+			r := "unready"
+			if s.Ready {
+				r = "ready"
+			}
+			UserOutput("\tPod Status:%24s\t%s\t%s\n", p, s.Phase, r)
+		}
+		if s.Phase != v1.PodRunning {
+			allinRequiredState = false
+		} else if watchPods[p].Status == PodStatusReady && !s.Ready {
+			allinRequiredState = false
 		}
 	}
-	return running, nil
+	return allinRequiredState, nil
 }
 
-func (s *statusController) PodStatus() (map[string]v1.PodPhase, error) {
-	status := make(map[string]v1.PodPhase)
+// PodStatus describes a pod's phase and readiness.
+type PodStatus struct {
+	Phase v1.PodPhase
+	Ready bool
+}
+
+// PodStatus retrieves the pod status by reading the PodPhase and whether it is ready.
+// A non existing pod is represented with nil.
+func (s *statusController) PodStatus() (map[string]*PodStatus, error) {
+	status := make(map[string]*PodStatus)
 
 	podNames := s.podStore.ListKeys()
 	for _, watchedPod := range s.watchPods {
+		nsWatchedPod := fmt.Sprintf("%s/%s", watchedPod.Namespace, watchedPod.Name)
+
 		// Pod names are suffixed with random data. Match on prefix
 		for _, pn := range podNames {
-			if strings.HasPrefix(pn, watchedPod) {
-				watchedPod = pn
+			if strings.HasPrefix(pn, nsWatchedPod) {
+				nsWatchedPod = pn
 				break
 			}
 		}
-		p, exists, err := s.podStore.GetByKey(watchedPod)
+
+		p, exists, err := s.podStore.GetByKey(nsWatchedPod)
 		if err != nil {
 			return nil, err
 		}
 		if !exists {
-			status[watchedPod] = doesNotExist
+			status[nsWatchedPod] = nil
 			continue
 		}
 		if p, ok := p.(*v1.Pod); ok {
-			status[watchedPod] = p.Status.Phase
+			status[nsWatchedPod] = &PodStatus{
+				Phase: p.Status.Phase,
+			}
+			for _, c := range p.Status.Conditions {
+				if c.Type == v1.PodReady {
+					status[nsWatchedPod].Ready = c.Status == v1.ConditionTrue
+				}
+			}
 		}
 	}
 	return status, nil
