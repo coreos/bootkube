@@ -50,12 +50,21 @@ func testCheckpointerUnscheduleCheckpointer(t *testing.T) {
 		t.Fatalf("Failed to create nginx daemonset: %v", err)
 	}
 
-	// Verify the checkpoints are created.
-	if err := verifyCheckpoint(c, testNS, "test-checkpointer", true, true); err != nil {
-		t.Fatalf("Failed to verify checkpoint: %v", err)
-	}
-	if err := verifyCheckpoint(c, testNS, "test-nginx", true, false); err != nil {
-		t.Fatalf("Failed to verify checkpoint: %v", err)
+	if err := retry(10, 1*time.Second, func() error {
+		// Verify the checkpoints are created.
+		if err := verifyCheckpoint(c, testNS, "test-checkpointer", true, true); err != nil {
+			err = fmt.Errorf("Failed to verify checkpoint: %v", err)
+			t.Log(err)
+			return err
+		}
+		if err := verifyCheckpoint(c, testNS, "test-nginx", true, false); err != nil {
+			err = fmt.Errorf("Failed to verify checkpoint: %v", err)
+			t.Log(err)
+			return err
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
 	}
 
 	// Delete the pod checkpointer.
