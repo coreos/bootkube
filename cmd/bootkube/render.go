@@ -17,10 +17,14 @@ import (
 )
 
 const (
-	apiOffset            = 1
-	dnsOffset            = 10
-	defaultServiceBaseIP = "10.3.0.0"
-	defaultEtcdServers   = "https://127.0.0.1:2379"
+	apiOffset              = 1
+	dnsOffset              = 10
+	defaultServiceBaseIP   = "10.3.0.0"
+	defaultEtcdServers     = "https://127.0.0.1:2379"
+	defaultAPIServers      = "https://127.0.0.1:6443"
+	defaultPodCIDR         = "10.2.0.0/16"
+	defaultServiceCIDR     = "10.3.0.0/24"
+	defaultNetworkProvider = "flannel"
 )
 
 var (
@@ -61,12 +65,12 @@ func init() {
 	cmdRender.Flags().StringVar(&renderOpts.etcdCertificatePath, "etcd-certificate-path", "", "Path to an existing certificate that will be used for TLS-enabled communication between the apiserver and etcd. Must be used in conjunction with --etcd-ca-path and --etcd-private-key-path, and must have etcd configured to use TLS with matching secrets.")
 	cmdRender.Flags().StringVar(&renderOpts.etcdPrivateKeyPath, "etcd-private-key-path", "", "Path to an existing private key that will be used for TLS-enabled communication between the apiserver and etcd. Must be used in conjunction with --etcd-ca-path and --etcd-certificate-path, and must have etcd configured to use TLS with matching secrets.")
 	cmdRender.Flags().StringVar(&renderOpts.etcdServers, "etcd-servers", defaultEtcdServers, "List of etcd servers URLs including host:port, comma separated")
-	cmdRender.Flags().StringVar(&renderOpts.apiServers, "api-servers", "https://127.0.0.1:6443", "List of API server URLs including host:port, comma seprated")
+	cmdRender.Flags().StringVar(&renderOpts.apiServers, "api-servers", defaultAPIServers, "List of API server URLs including host:port, comma seprated")
 	cmdRender.Flags().StringVar(&renderOpts.altNames, "api-server-alt-names", "", "List of SANs to use in api-server certificate. Example: 'IP=127.0.0.1,IP=127.0.0.2,DNS=localhost'. If empty, SANs will be extracted from the --api-servers flag.")
-	cmdRender.Flags().StringVar(&renderOpts.podCIDR, "pod-cidr", "10.2.0.0/16", "The CIDR range of cluster pods.")
-	cmdRender.Flags().StringVar(&renderOpts.serviceCIDR, "service-cidr", "10.3.0.0/24", "The CIDR range of cluster services.")
+	cmdRender.Flags().StringVar(&renderOpts.podCIDR, "pod-cidr", defaultPodCIDR, "The CIDR range of cluster pods.")
+	cmdRender.Flags().StringVar(&renderOpts.serviceCIDR, "service-cidr", defaultServiceCIDR, "The CIDR range of cluster services.")
 	cmdRender.Flags().StringVar(&renderOpts.cloudProvider, "cloud-provider", "", "The provider for cloud services.  Empty string for no provider")
-	cmdRender.Flags().StringVar(&renderOpts.networkProvider, "network-provider", "flannel", "CNI network provider (flannel or experimental-canal).")
+	cmdRender.Flags().StringVar(&renderOpts.networkProvider, "network-provider", defaultNetworkProvider, "CNI network provider (flannel or experimental-canal).")
 }
 
 func runCmdRender(cmd *cobra.Command, args []string) error {
