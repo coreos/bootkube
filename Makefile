@@ -77,8 +77,8 @@ conformance-%: all
 #TODO: curl/sed "vendored" libs is gross - come up with something better
 vendor:
 	@dep ensure -v
-	@curl https://raw.githubusercontent.com/kubernetes/kubernetes/v1.11.2/pkg/kubelet/util/util.go | sed 's/^package util$$/package internal/' > pkg/checkpoint/internal/util.go
-	@curl https://raw.githubusercontent.com/kubernetes/kubernetes/v1.11.2/pkg/kubelet/util/util_unix.go | sed 's/^package util$$/package internal/' > pkg/checkpoint/internal/util_unix.go
+	@curl https://raw.githubusercontent.com/kubernetes/kubernetes/v1.12.3/pkg/kubelet/util/util.go | sed 's/^package util$$/package internal/' > pkg/checkpoint/internal/util.go
+	@curl https://raw.githubusercontent.com/kubernetes/kubernetes/v1.12.3/pkg/kubelet/util/util_unix.go | sed 's/^package util$$/package internal/' > pkg/checkpoint/internal/util_unix.go
 	@CGO_ENABLED=1 go build -o _output/bin/license-bill-of-materials ./vendor/github.com/coreos/license-bill-of-materials
 	@./_output/bin/license-bill-of-materials ./cmd/bootkube ./cmd/checkpoint > bill-of-materials.json
 
