@@ -12,7 +12,6 @@ There are exceptions to these principles, but these are general guidelines the p
     - Configuration beyond the initial kubeconfig should be sourced from API objects. For example, the pod network is configured via CNI daemonset.
 - Should not require flag or configuration coordination between the `render` and `start` steps.
     - Required flag coordination means certain `render` assets will only work with certain `start` flags, and this is something we should avoid.
-    - For example, `bootkube render --self-hosted-etcd` requires no changes when ultimately running `bootkube start`.
 - Avoid adding feature flags as much as possible. This makes testing & stability very difficult to maintain.
     - Users customize their cluster by modifying the output of `bootkube render` to fit their configuration. Users can generate their own assets for use with `bootkube start`, subject to following a small number of conventions.
     - Complex rendering needs can be handled by custom rendering tools.
