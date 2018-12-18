@@ -9,5 +9,5 @@ var DefaultImages = ImageVersions{
 	CalicoCNI:       "quay.io/calico/cni:v2.0.0",
 	CoreDNS:         "k8s.gcr.io/coredns:1.2.4",
 	Hyperkube:       "k8s.gcr.io/hyperkube:v1.12.1",
-	PodCheckpointer: "quay.io/coreos/pod-checkpointer:018007e77ccd61e8e59b7e15d7fc5e318a5a2682",
+	PodCheckpointer: "quay.io/coreos/pod-checkpointer:83e25e5968391b9eb342042c435d1b3eeddb2be1",
 }
