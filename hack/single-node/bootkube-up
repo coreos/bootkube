@@ -27,6 +27,7 @@ fi
 # Start the VM
 vagrant up
 vagrant ssh-config > ssh_config
+echo "StrictHostKeyChecking no" >> ssh_config
 
 # Copy locally rendered assets to the server
 scp -q -F ssh_config -r cluster core@default:/home/core/cluster
