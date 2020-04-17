@@ -101,6 +101,7 @@ const (
 	AssetPathBootstrapAPIServer             = "bootstrap-manifests/bootstrap-apiserver.yaml"
 	AssetPathBootstrapControllerManager     = "bootstrap-manifests/bootstrap-controller-manager.yaml"
 	AssetPathBootstrapScheduler             = "bootstrap-manifests/bootstrap-scheduler.yaml"
+	AssetPathCharts                         = "charts"
 )
 
 var BootstrapSecretsDir = "/etc/kubernetes/bootstrap-secrets" // Overridden for testing.

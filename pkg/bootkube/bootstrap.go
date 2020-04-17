@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/kubernetes-sigs/bootkube/cmd/render/plugin/default/asset"
+	"github.com/kubernetes-sigs/bootkube/pkg/util"
 )
 
 type bootstrapControlPlane struct {
@@ -26,7 +27,7 @@ func NewBootstrapControlPlane(assetDir, podManifestPath string) *bootstrapContro
 // Start seeds static manifests to the kubelet to launch the bootstrap control plane.
 // Users should always ensure that Cleanup() is called even in the case of errors.
 func (b *bootstrapControlPlane) Start() error {
-	UserOutput("Starting temporary bootstrap control plane...\n")
+	util.UserOutput("Starting temporary bootstrap control plane...\n")
 	// Make secrets temporarily available to bootstrap cluster.
 	if err := os.RemoveAll(asset.BootstrapSecretsDir); err != nil {
 		return err
@@ -50,7 +51,7 @@ func (b *bootstrapControlPlane) Start() error {
 // Teardown brings down the bootstrap control plane and cleans up the temporary manifests and
 // secrets. This function is idempotent.
 func (b *bootstrapControlPlane) Teardown() error {
-	UserOutput("Tearing down temporary bootstrap control plane...\n")
+	util.UserOutput("Tearing down temporary bootstrap control plane...\n")
 	if err := os.RemoveAll(asset.BootstrapSecretsDir); err != nil {
 		return err
 	}

@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubernetes-sigs/bootkube/pkg/util"
+
 	"github.com/golang/glog"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +34,7 @@ func WaitUntilPodsRunning(c clientcmd.ClientConfig, pods []string, timeout time.
 		return fmt.Errorf("error while checking pod status: %v", err)
 	}
 
-	UserOutput("All self-hosted control plane components successfully started\n")
+	util.UserOutput("All self-hosted control plane components successfully started\n")
 	return nil
 }
 
@@ -96,7 +98,7 @@ func (s *statusController) AllRunning() (bool, error) {
 	running := true
 	for p, s := range ps {
 		if changed {
-			UserOutput("\tPod Status:%24s\t%s\n", p, s)
+			util.UserOutput("\tPod Status:%24s\t%s\n", p, s)
 		}
 		if s != corev1.PodRunning {
 			running = false

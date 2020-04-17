@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/kubernetes-sigs/bootkube/pkg/bootkube"
+	"github.com/kubernetes-sigs/bootkube/pkg/util"
 )
 
 var (
@@ -57,7 +58,7 @@ func runCmdStart(cmd *cobra.Command, args []string) error {
 	err = bk.Run()
 	if err != nil {
 		// Always report errors.
-		bootkube.UserOutput("Error: %v\n", err)
+		util.UserOutput("Error: %v\n", err)
 	}
 	return err
 }

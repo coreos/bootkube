@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kubernetes-sigs/bootkube/pkg/bootkube"
 	"github.com/kubernetes-sigs/bootkube/pkg/recovery"
+	"github.com/kubernetes-sigs/bootkube/pkg/util"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/spf13/cobra"
@@ -62,7 +62,7 @@ func runCmdRecover(cmd *cobra.Command, args []string) error {
 	var backend recovery.Backend
 	switch {
 	case recoverOpts.etcdServers != "":
-		bootkube.UserOutput("Attempting recovery using etcd cluster at %q...\n", recoverOpts.etcdServers)
+		util.UserOutput("Attempting recovery using etcd cluster at %q...\n", recoverOpts.etcdServers)
 		etcdClient, err := createEtcdClient()
 		if err != nil {
 			return err
@@ -70,7 +70,7 @@ func runCmdRecover(cmd *cobra.Command, args []string) error {
 		backend = recovery.NewEtcdBackend(etcdClient, recoverOpts.etcdPrefix)
 
 	default:
-		bootkube.UserOutput("Attempting recovery using apiserver at %q...\n", recoverOpts.kubeConfigPath)
+		util.UserOutput("Attempting recovery using apiserver at %q...\n", recoverOpts.kubeConfigPath)
 		backend, err = recovery.NewAPIServerBackend(recoverOpts.kubeConfigPath)
 		if err != nil {
 			return err

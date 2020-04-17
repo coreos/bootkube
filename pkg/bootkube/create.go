@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -14,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"github.com/kubernetes-sigs/bootkube/pkg/util"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -34,9 +32,9 @@ const (
 	crdRolloutTimeout  = 2 * time.Minute
 )
 
-func CreateAssets(config clientcmd.ClientConfig, manifestDir string, timeout time.Duration, strict bool) error {
+func CreateAssets(config clientcmd.ClientConfig, manifestDir string, strict bool) error {
 	if _, err := os.Stat(manifestDir); os.IsNotExist(err) {
-		UserOutput(fmt.Sprintf("WARNING: %v does not exist, not creating any self-hosted assets.\n", manifestDir))
+		util.UserOutput(fmt.Sprintf("WARNING: %v does not exist, not creating any self-hosted assets.\n", manifestDir))
 		return nil
 	}
 	c, err := config.ClientConfig()
@@ -53,25 +51,10 @@ func CreateAssets(config clientcmd.ClientConfig, manifestDir string, timeout tim
 		return fmt.Errorf("loading manifests: %v", err)
 	}
 
-	upFn := func() (bool, error) {
-		if err := apiTest(config); err != nil {
-			glog.Warningf("Unable to determine api-server readiness: %v", err)
-			return false, nil
-		}
-		return true, nil
-	}
-
-	UserOutput("Waiting for api-server...\n")
-	if err := wait.Poll(5*time.Second, timeout, upFn); err != nil {
-		err = fmt.Errorf("API Server is not ready: %v", err)
-		glog.Error(err)
-		return err
-	}
-
-	UserOutput("Creating self-hosted assets...\n")
+	util.UserOutput("Creating self-hosted assets...\n")
 	if ok := creater.createManifests(m); !ok {
-		UserOutput("\nNOTE: Bootkube failed to create some cluster assets. It is important that manifest errors are resolved and resubmitted to the apiserver.\n")
-		UserOutput("For example, after resolving issues: kubectl create -f <failed-manifest>\n\n")
+		util.UserOutput("\nNOTE: Bootkube failed to create some cluster assets. It is important that manifest errors are resolved and resubmitted to the apiserver.\n")
+		util.UserOutput("For example, after resolving issues: kubectl create -f <failed-manifest>\n\n")
 
 		// Don't fail on manifest creation. It's easier to debug a cluster with a failed
 		// manifest than exiting and tearing down the control plane. If strict
@@ -82,28 +65,6 @@ func CreateAssets(config clientcmd.ClientConfig, manifestDir string, timeout tim
 	}
 
 	return nil
-}
-
-func apiTest(c clientcmd.ClientConfig) error {
-	config, err := c.ClientConfig()
-	if err != nil {
-		return err
-	}
-	client, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return err
-	}
-
-	// API Server is responding
-	healthStatus := 0
-	client.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
-	if healthStatus != http.StatusOK {
-		return fmt.Errorf("API Server http status: %d", healthStatus)
-	}
-
-	// System namespace has been created
-	_, err = client.CoreV1().Namespaces().Get("kube-system", metav1.GetOptions{})
-	return err
 }
 
 type manifest struct {
@@ -174,10 +135,10 @@ func (c *creater) createManifests(manifests []manifest) (ok bool) {
 	create := func(m manifest) error {
 		if err := c.create(m); err != nil {
 			ok = false
-			UserOutput("Failed creating %s: %v\n", m, err)
+			util.UserOutput("Failed creating %s: %v\n", m, err)
 			return err
 		}
-		UserOutput("Created %s\n", m)
+		util.UserOutput("Created %s\n", m)
 		return nil
 	}
 
@@ -200,7 +161,7 @@ func (c *creater) createManifests(manifests []manifest) (ok bool) {
 	for _, crd := range crds {
 		if err := c.waitForCRD(crd); err != nil {
 			ok = false
-			UserOutput("Failed waiting for %s: %v", crd, err)
+			util.UserOutput("Failed waiting for %s: %v", crd, err)
 			if c.strict {
 				return false
 			}
