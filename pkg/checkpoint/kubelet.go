@@ -3,6 +3,7 @@ package checkpoint
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/golang/glog"
@@ -13,7 +14,7 @@ import (
 )
 
 // A minimal kubelet client. It assumes the kubelet can be reached the kubelet's insecure API at
-// 127.0.0.1:10255 and the secure API at 127.0.0.1:10250.
+// HOST_IP:10255 and the secure API at HOST_IP:10250 or localhost at the same ports.
 type kubeletClient struct {
 	insecureClient *rest.RESTClient
 	secureClient   *rest.RESTClient
@@ -29,12 +30,18 @@ func newKubeletClient(config *rest.Config) (*kubeletClient, error) {
 	config.TLSClientConfig.CAFile = ""
 	config.TLSClientConfig.CAData = nil
 
+	hostIP := os.Getenv("HOST_IP")
+	// Default to previous behaviour of using localhost.
+	if hostIP == "" {
+		hostIP = "127.0.0.1"
+	}
+
 	// Shallow copy.
 	insecureConfig := *config
 	secureConfig := *config
 
-	insecureConfig.Host = "http://127.0.0.1:10255"
-	secureConfig.Host = "https://127.0.0.1:10250"
+	insecureConfig.Host = fmt.Sprintf("http://%s:10255", hostIP)
+	secureConfig.Host = fmt.Sprintf("https://%s:10250", hostIP)
 
 	client := new(kubeletClient)
 	var err error
