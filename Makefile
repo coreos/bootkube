@@ -47,7 +47,7 @@ _output/bin/%: GOARCH=$(word 2, $(subst /, ,$*))
 _output/bin/%: GOARCH:=amd64  # default to amd64 to support release scripts
 _output/bin/%: $(GOFILES) $(VENDOR_GOFILES)
 	mkdir -p $(dir $@)
-	GOOS=$(GOOS) GOARCH=$(GOARCH) go build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ github.com/kubernetes-sigs/bootkube/cmd/$(notdir $@)
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -mod vendor $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ github.com/kubernetes-sigs/bootkube/cmd/$(notdir $@)
 
 _output/release/bootkube.tar.gz: _output/bin/linux/bootkube _output/bin/darwin/bootkube _output/bin/linux/checkpoint
 	mkdir -p $(dir $@)
@@ -76,10 +76,8 @@ conformance-%: all
 #TODO: curl/sed "vendored" libs is gross - come up with something better
 vendor:
 	@go mod vendor
-	@curl https://raw.githubusercontent.com/kubernetes/kubernetes/v1.16.2/pkg/kubelet/util/util.go | sed 's/^package util$$/package internal/' > pkg/checkpoint/internal/util.go
-	@curl https://raw.githubusercontent.com/kubernetes/kubernetes/v1.16.2/pkg/kubelet/util/util_unix.go | sed 's/^package util$$/package internal/' > pkg/checkpoint/internal/util_unix.go
-	@CGO_ENABLED=1 go build -o _output/bin/license-bill-of-materials ./vendor/github.com/coreos/license-bill-of-materials
-	@./_output/bin/license-bill-of-materials ./cmd/bootkube ./cmd/checkpoint > bill-of-materials.json
+	@curl https://raw.githubusercontent.com/kubernetes/kubernetes/v1.18.2/pkg/kubelet/util/util.go | sed 's/^package util$$/package internal/' > pkg/checkpoint/internal/util.go
+	@curl https://raw.githubusercontent.com/kubernetes/kubernetes/v1.18.2/pkg/kubelet/util/util_unix.go | sed 's/^package util$$/package internal/' > pkg/checkpoint/internal/util_unix.go
 
 clean:
 	rm -rf _output

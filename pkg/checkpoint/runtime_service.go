@@ -36,7 +36,7 @@ func newRemoteRuntimeService(endpoint string, connectionTimeout time.Duration) (
 		return nil, err
 	}
 
-	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(connectionTimeout), grpc.WithDialer(dialer))
+	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(connectionTimeout), grpc.WithContextDialer(dialer))
 	if err != nil {
 		glog.Errorf("Connect remote runtime %s failed: %v", addr, err)
 		return nil, err
