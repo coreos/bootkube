@@ -3,6 +3,7 @@ set -euo pipefail
 
 BUILD_IMAGE=${BUILD_IMAGE:-}
 PUSH_IMAGE=${PUSH_IMAGE:-false}
+GOARCH=${GOARCH:-amd64}
 
 if [ -z "${BUILD_IMAGE}" ]; then
     echo "BUILD_IMAGE env var must be set"

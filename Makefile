@@ -2,6 +2,10 @@ export CGO_ENABLED:=0
 export GOARCH:=amd64
 export PATH:=$(PATH):$(PWD)
 
+IMAGE_REPO_BOOTKUBE?=quay.io/coreos/bootkube
+IMAGE_REPO_PODCHECKPOINTER?=quay.io/coreos/pod-checkpointer
+VERSION?=
+
 LOCAL_OS:=$(shell uname | tr A-Z a-z)
 GOFILES:=$(shell find . -name '*.go' ! -path './vendor/*')
 VENDOR_GOFILES ?= $(shell find vendor -name '*.go')
@@ -15,7 +19,13 @@ all: \
 
 cross: \
 	_output/bin/linux/bootkube \
+	_output/bin/linux/amd64/bootkube \
+	_output/bin/linux/arm/bootkube \
+	_output/bin/linux/arm64/bootkube \
+	_output/bin/linux/ppc64le/bootkube \
+	_output/bin/linux/s390x/bootkube \
 	_output/bin/darwin/bootkube \
+	_output/bin/darwin/amd64/bootkube \
 	_output/bin/linux/checkpoint \
 	_output/bin/linux/amd64/checkpoint \
 	_output/bin/linux/arm/checkpoint \
@@ -25,6 +35,7 @@ cross: \
 
 release: \
 	check \
+	cross \
 	_output/release/bootkube.tar.gz \
 
 check: gofmt
@@ -42,16 +53,30 @@ gofmt:
 install:
 	go install -ldflags "$(LDFLAGS)" ./cmd/bootkube
 
-_output/bin/%: GOOS=$(word 1, $(subst /, ,$*))
-_output/bin/%: GOARCH=$(word 2, $(subst /, ,$*))
-_output/bin/%: GOARCH:=amd64  # default to amd64 to support release scripts
+release-bootkube: release
+	BUILD_IMAGE=bootkube GOARCH=$(GOARCH) IMAGE_REPO=$(IMAGE_REPO_BOOTKUBE) \
+	VERSION=$(VERSION) \
+		./build/build-image.sh
+
+release-podcheckpointer: release
+	BUILD_IMAGE=checkpoint GOARCH=$(GOARCH) IMAGE_REPO=$(IMAGE_REPO_PODCHECKPOINTER) \
+	VERSION=$(VERSION) \
+		./build/build-image.sh
+
+_output/bin/linux/amd64/%: GOARGS = GOOS=linux GOARCH=amd64
+_output/bin/linux/arm/%: GOARGS = GOOS=linux GOARCH=arm
+_output/bin/linux/arm64/%: GOARGS = GOOS=linux GOARCH=arm64
+_output/bin/linux/ppc64le/%: GOARGS = GOOS=linux GOARCH=ppc64le
+_output/bin/linux/s390x/%: GOARGS = GOOS=linux GOARCH=s390x
+_output/bin/darwin/amd64/%: GOARGS = GOOS=darwin GOARCH=amd64
+
 _output/bin/%: $(GOFILES) $(VENDOR_GOFILES)
 	mkdir -p $(dir $@)
-	GOOS=$(GOOS) GOARCH=$(GOARCH) go build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ github.com/kubernetes-sigs/bootkube/cmd/$(notdir $@)
+	$(GOARGS) go build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o $@ github.com/kubernetes-sigs/bootkube/cmd/$(notdir $@)
 
-_output/release/bootkube.tar.gz: _output/bin/linux/bootkube _output/bin/darwin/bootkube _output/bin/linux/checkpoint
+_output/release/bootkube.tar.gz: cross
 	mkdir -p $(dir $@)
-	tar czf $@ -C _output bin/linux/bootkube bin/darwin/bootkube bin/linux/checkpoint
+	tar czf $@ -C _output bin
 
 run-%: GOFLAGS = -i
 run-%: _output/bin/linux/bootkube _output/bin/$(LOCAL_OS)/bootkube
